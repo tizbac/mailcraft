@@ -1,0 +1,1 @@
+| 2026-11-04 | minor | #252: calendars, contacts and to-dos kept in step both ways, and a person's calendar or address book opened by address; tried on a Grommunio container, including the shared folders and the limits there |
