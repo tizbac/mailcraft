@@ -2,12 +2,32 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! People: the list, the card and the small pieces they are made of.
 
-use mailcraft_model::{Labeled, Message};
+use mailcraft_engine::Session;
+use mailcraft_model::{Account, AccountKind, ContactBook, Labeled, Message, Origin};
 
 use super::*;
 
 fn contact(first: &str, last: &str) -> Contact {
     Contact { first: first.into(), last: last.into(), ..Default::default() }
+}
+
+#[test]
+fn address_book_rights_decide_whether_a_contact_can_be_edited() {
+    let mut app = MailApp::new(Session::empty(), crate::Services::default());
+    let account = app.session.mailbox.add_account(Account { email: "ada@example.org".into(), kind: AccountKind::Imap, ..Default::default() });
+    app.session.mailbox.contact_books.push(ContactBook { account, id: "book".into(), name: "Team".into(), rights: Rights::Edit });
+    let mut c = Contact { book_id: "book".into(), origin: Origin { account, id: "c-1".into(), ..Default::default() }, ..Default::default() };
+    assert!(contact_writable(&app, &c), "a writable CardDAV book");
+    app.session.mailbox.contact_books[0].rights = Rights::Read;
+    assert!(!contact_writable(&app, &c), "a read-only CardDAV book");
+    app.session.mailbox.contact_books.clear();
+    assert!(!contact_writable(&app, &c), "a book the server no longer lists");
+    // A Graph contact has no book: its server keeps it and changes are not sent back.
+    c.book_id.clear();
+    assert!(!contact_writable(&app, &c));
+    // One kept on this computer is always editable.
+    let local = Contact { first: "Local".into(), ..Default::default() };
+    assert!(contact_writable(&app, &local));
 }
 
 fn day(y: i32, m: u8, d: u8) -> Date {

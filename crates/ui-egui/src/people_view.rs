@@ -538,7 +538,8 @@ fn keyboard(app: &mut MailApp, ui: &Ui, layout: &Layout<Group>) {
     }
     // Only a new press that is the main window's: not the repeats of an Enter that closed a dialog
     // (#406).
-    if app.session.sel.contact.is_some() && crate::keys::take_enter_alone(ui.ctx(), ui.layer_id()) {
+    let editable = app.session.sel.contact.and_then(|id| app.session.mailbox.contact(id)).is_some_and(|contact| contact_writable(app, contact));
+    if editable && crate::keys::take_enter_alone(ui.ctx(), ui.layer_id()) {
         let _ = app.run("people.edit", json!({}));
     }
 }
@@ -679,7 +680,7 @@ fn contact_row(app: &mut MailApp, ui: &mut Ui, id: Id, copy: u16, rect: Rect, la
         app.people_picked.clear();
         let _ = app.run("people.select", json!({"id": id}));
     }
-    if resp.double_clicked() && !command {
+    if resp.double_clicked() && !command && contact_writable(app, &c) {
         let _ = app.execute("people.select", json!({"id": id}));
         let _ = app.run("people.edit", json!({}));
     }
@@ -839,12 +840,21 @@ pub(crate) fn contact_writable(app: &MailApp, c: &Contact) -> bool {
         // A contact a server keeps outside an address book (Microsoft Graph) is still read only.
         return false;
     }
+    // A book the server no longer lists is not one to write into: the contact would not reach
+    // the server, and the next read would take the change away. The card says so.
     app.session
         .mailbox
         .contact_books
         .iter()
         .find(|book| book.account == c.origin.account && book.id == c.book_id)
-        .is_none_or(|book| book.rights == Rights::Edit)
+        .is_some_and(|book| book.rights == Rights::Edit)
+}
+
+/// Whether the address book a contact came from is no longer in the account's list.
+fn book_unavailable(app: &MailApp, c: &Contact) -> bool {
+    c.origin.account != 0
+        && !c.book_id.is_empty()
+        && !app.session.mailbox.contact_books.iter().any(|book| book.account == c.origin.account && book.id == c.book_id)
 }
 
 fn card_actions(app: &mut MailApp, ui: &mut Ui, c: &Contact) {
@@ -918,7 +928,11 @@ fn read_only_here(app: &MailApp, c: &Contact) -> bool {
 fn card_account(app: &MailApp, ui: &mut Ui, c: &Contact) {
     if let Some(place) = kept_in(app, c) {
         section(ui, tl!("Account"));
-        if read_only_here(app, c) {
+        if book_unavailable(app, c) {
+            field(ui, "account", &place, tl!("Unavailable"), false).on_hover_text(tl!(
+                "The address book this contact came from is no longer in the account's list, so changes here could not reach the server. Send/Receive may bring it back."
+            ));
+        } else if read_only_here(app, c) {
             field(ui, "account", &place, tl!("Read-only"), false).on_hover_text(tl!(
                 "This account's server keeps this contact. Changes made here aren't sent back yet, so it can't be edited or deleted here. Favorite and categories are kept on this computer."
             ));
