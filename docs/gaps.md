@@ -146,6 +146,7 @@ this code base.
 | 2026-11-05 | minor | #600: gap 6: a message is drawn in the first of its fonts installed on this computer; no font is fetched |
 | 2026-11-04 | minor | #232: state the primary-address limit for Workspace OAuth while retaining public release requirements |
 | 2026-11-04 | patch | #795: conversations are threads, not subjects; legacy mail fills its server's thread id a run at a time |
+| 2026-11-04 | minor | #252: gap 5: Exchange server accounts keep their calendars, address books and to-dos in step both ways, and open a person's calendar or address book by address, with their defaults under Shared Calendars or the account's books; tried on a Grommunio container |
 | 2026-11-03 | minor | #661: rough edges: a Microsoft account's list of categories kept in step with its server both ways, read-only until its owner allows it |
 | 2026-11-03 | minor | #232: reconcile Google desktop setup, explicit conversion, credential boundaries and verified acceptance scope with current main; retain public release requirements |
 | 2026-11-03 | minor | #757: gap 6: tables floated left and right that are all their holder holds stand side by side; an empty column of a layout table is dropped only when it is empty in every row, a cell spanning columns counted; tables laid out as boxes by `inline-block` stand in one line; the `align` of a cell, a row, a `<div>` or a `<p>` and a `<center>` stop at a table inside them |
