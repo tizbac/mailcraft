@@ -117,6 +117,36 @@ fn the_accounts_own_calendar_is_the_main_one_not_the_first_listed() {
 }
 
 #[test]
+fn a_listing_that_names_no_owner_has_no_main_calendar() {
+    fn answer(body: &str) -> Vec<u8> {
+        format!("HTTP/1.1 207 Multi-Status\r\nContent-Type: application/xml; charset=utf-8\r\nContent-Length: {}\r\n\r\n{body}", body.len())
+            .into_bytes()
+    }
+    let discovery = r#"<?xml version="1.0"?><D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+      <D:response><D:href>/caldav/</D:href><D:propstat><D:prop>
+        <C:calendar-home-set><D:href>/caldav/ada@example.org/</D:href></C:calendar-home-set>
+      </D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>
+    </D:multistatus>"#;
+    let listing = r#"<?xml version="1.0"?><D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+      <D:response><D:href>/caldav/ada@example.org/one/</D:href><D:propstat><D:prop>
+        <D:resourcetype><D:collection/><C:calendar/></D:resourcetype><D:displayname>One</D:displayname>
+      </D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>
+      <D:response><D:href>/caldav/ada@example.org/two/</D:href><D:propstat><D:prop>
+        <D:resourcetype><D:collection/><C:calendar/></D:resourcetype><D:displayname>Two</D:displayname>
+      </D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>
+    </D:multistatus>"#;
+    let empty = r#"<?xml version="1.0"?><D:multistatus xmlns:D="DAV:"/>"#;
+    let server = FakeHttp::start(move |n, _| match n {
+        0 => answer(discovery),
+        1 => answer(listing),
+        _ => answer(empty),
+    });
+    let (calendars, _, errors) = calendars(&server.url("/caldav/"), "Basic aW52ZW50ZWQ=", "ada@example.org", 0, 0).unwrap();
+    assert!(errors.is_empty(), "{errors:?}");
+    assert!(calendars.calendars.iter().all(|calendar| !calendar.main), "the first one is not guessed as the main one");
+}
+
+#[test]
 fn addresses_resolve_within_the_service() {
     let base = "https://mail.example.org/caldav/";
     assert_eq!(resolve(base, "/caldav/ada/").as_deref(), Some("https://mail.example.org/caldav/ada/"));
