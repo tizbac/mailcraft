@@ -27,6 +27,7 @@ pub(crate) const MAX_NAME: usize = 255;
 #[derive(Clone, PartialEq, Eq)]
 pub struct SyncFolderHierarchy {
     state: String,
+    mailbox: String,
 }
 
 impl std::fmt::Debug for SyncFolderHierarchy {
@@ -72,7 +73,15 @@ impl std::fmt::Debug for HierarchyPage {
 impl SyncFolderHierarchy {
     /// Reads from `state` (the server's; empty to begin).
     pub fn new(state: &str) -> Self {
-        Self { state: state.to_owned() }
+        Self { state: state.to_owned(), mailbox: String::new() }
+    }
+
+    /// Reads the folders of the mailbox at `address` rather than the account's own: a shared
+    /// mailbox, with the owner's sign-in.
+    #[must_use]
+    pub fn in_mailbox(mut self, address: &str) -> Self {
+        self.mailbox = address.trim().to_owned();
+        self
     }
 
     /// The operation as the schema has it: `FolderShape`, `SyncFolderId`, `SyncState`.
@@ -84,7 +93,11 @@ impl SyncFolderHierarchy {
         let shape = Element::new("m:FolderShape")
             .child(Element::new("t:BaseShape").text("Default"))
             .child(Element::new("t:AdditionalProperties").child(field("folder:FolderClass")).child(field("folder:ParentFolderId")));
-        let root = Element::new("m:SyncFolderId").child(Element::new("t:DistinguishedFolderId").attr("Id", "msgfolderroot"));
+        let mut distinguished = Element::new("t:DistinguishedFolderId").attr("Id", "msgfolderroot");
+        if !self.mailbox.is_empty() {
+            distinguished = distinguished.child(crate::folder::mailbox(&self.mailbox));
+        }
+        let root = Element::new("m:SyncFolderId").child(distinguished);
         let mut operation = Element::new("m:SyncFolderHierarchy").child(shape).child(root);
         if !self.state.is_empty() {
             operation = operation.child(Element::new("m:SyncState").text(&self.state));
