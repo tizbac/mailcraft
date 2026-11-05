@@ -136,6 +136,9 @@ pub(crate) struct Run<'a, E: HttpExchange> {
     /// A folder deleted here is still on the server (it refused, or it is one of its own): the
     /// folder list is read afresh, as a delta wouldn't bring it back.
     pub(crate) reread_folders: bool,
+    /// The mailbox the run reads, when it is not the account's own: a shared mailbox, at its
+    /// address. Empty for the account itself.
+    pub(crate) mailbox: String,
 }
 
 impl<E: HttpExchange> Run<'_, E> {
@@ -322,8 +325,8 @@ impl<E: HttpExchange> Run<'_, E> {
         Ok(found)
     }
 
-    async fn specials(&mut self) -> Result<Specials, Asked> {
-        let get = GetFolder::new(&KNOWN.map(|(folder, _)| folder));
+    async fn specials(&mut self, mailbox: &str) -> Result<Specials, Asked> {
+        let get = GetFolder::new(&KNOWN.map(|(folder, _)| folder)).in_mailbox(mailbox);
         let found = self.ask(&get.element(), &|reply| get.answer(reply)).await?;
         let mut out = Specials::default();
         for ((folder, kind), info) in KNOWN.iter().zip(found) {
@@ -346,12 +349,12 @@ impl<E: HttpExchange> Run<'_, E> {
     }
 
     /// The folder list from `state`: all of it (a read afresh when the state is lost).
-    async fn folders(&mut self, state: &str, specials: &Specials) -> Result<(EwsFolderDeltas, String), Asked> {
+    async fn folders(&mut self, state: &str, specials: &Specials, mailbox: &str) -> Result<(EwsFolderDeltas, String), Asked> {
         let (mut state, mut deltas, mut tried_afresh) =
             (state.to_owned(), EwsFolderDeltas { afresh: state.is_empty(), ..EwsFolderDeltas::default() }, false);
         let mut skipped = 0usize;
         for _ in 0..MAX_HIERARCHY_PAGES {
-            let op = SyncFolderHierarchy::new(&state);
+            let op = SyncFolderHierarchy::new(&state).in_mailbox(mailbox);
             match self.ask(&op.element(), &|reply| op.answer(reply)).await {
                 Ok(page) => {
                     skipped = skipped.saturating_add(page.skipped);
@@ -408,6 +411,7 @@ pub async fn sync_mail<E: HttpExchange>(
         read_unsaid: false,
         own: HashSet::new(),
         reread_folders: false,
+        mailbox: request.mailbox.clone(),
     };
     let mut out = Outcome::default();
     if let Err(stop) = run.all(request, &mut out, emit).await {
@@ -519,7 +523,7 @@ impl<E: HttpExchange> Run<'_, E> {
             self.push(request, emit).await?;
         }
         // What the server calls its special folders: the Inbox first, and what each folder is.
-        let specials = self.specials().await?;
+        let specials = self.specials(&request.mailbox).await?;
         if specials.inbox.is_none() {
             out.incomplete = true;
             out.line("Couldn't find the Inbox on the server");
@@ -531,7 +535,7 @@ impl<E: HttpExchange> Run<'_, E> {
         if (request.list_folders || self.reread_folders) && !request.inbox_pass {
             // (A folder deleted here that the server keeps comes back only in a read afresh.)
             let from = if self.reread_folders { "" } else { request.hierarchy.as_str() };
-            let (mut deltas, state) = match self.folders(from, &specials).await {
+            let (mut deltas, state) = match self.folders(from, &specials, &request.mailbox).await {
                 Ok(found) => found,
                 Err(Asked::Stop(stop)) => return Err(Asked::Stop(stop)),
                 Err(_) => {
@@ -688,6 +692,7 @@ pub async fn fetch_messages<E: HttpExchange>(
         read_unsaid: false,
         own: HashSet::new(),
         reread_folders: false,
+        mailbox: String::new(),
     };
     let mut out = GraphFetchResult { account: request.account, email: request.email.clone(), ..GraphFetchResult::default() };
     let mut outcome = Outcome::default();

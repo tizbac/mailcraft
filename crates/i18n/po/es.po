@@ -7977,6 +7977,11 @@ msgid "Opened with {owner}'s sign-in. It needs Full Access to the mailbox, which
 msgstr "Se abre con el inicio de sesión de {owner}. Requiere Acceso total al buzón, que concede el administrador de su organización. Microsoft le pide una vez que permita a MailCraft leer y cambiar buzones compartidos. Lo que cambie en él se aplica en él. El correo que escriba en él sale de su dirección, y enviar como él requiere el permiso Enviar como o Enviar en nombre de: Microsoft se lo vuelve a pedir en su primer envío."
 
 #. interface
+#: crates/ui-egui/src/dialogs.rs
+msgid "Opened with {owner}'s sign-in. It needs Full Access to the mailbox, which your organisation's administrator gives. What you change in it goes to it. Mail you write in it is from its address, and sending as it needs Send As or Send on Behalf permission, which the administrator also gives."
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/attachment_open.rs
 #, fuzzy
 msgid "Opening Mail Attachment"
@@ -15625,16 +15630,9 @@ msgid "select an appointment first"
 msgstr "seleccione primero una cita"
 
 #. what a command says, why a command can't run
-#: crates/engine/src/cmd/shared.rs
-#, fuzzy
-msgid "shared mailboxes open under an account kept in step through Microsoft Graph"
-msgstr "los buzones compartidos se abren con una cuenta sincronizada a través de Microsoft Graph"
-
-#. what a command says
-#: crates/model/src/mailbox.rs
-#, fuzzy
-msgid "shared mailboxes open under an account that is kept in step through Microsoft Graph"
-msgstr "los buzones compartidos se abren con una cuenta que se sincroniza a través de Microsoft Graph"
+#: crates/engine/src/cmd/shared.rs crates/model/src/mailbox.rs
+msgid "shared mailboxes open under a Microsoft or Exchange server account"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/account_setup.rs
@@ -16761,7 +16759,7 @@ msgid "{name} has declined this meeting."
 msgstr "{name} ha rechazado esta reunión."
 
 #. what a command says
-#: crates/engine/src/cmd/ews_directory.rs
+#: crates/engine/src/cmd/ews_directory.rs crates/engine/src/cmd/ews_mail.rs
 msgid "{name} has no Exchange server account it is opened through"
 msgstr ""
 
@@ -17754,6 +17752,14 @@ msgstr "«{subject}» era demasiado grande para descargarlo: solo está aquí su
 #, fuzzy
 msgid "“{subject}” wasn't found on its server, so it can't be forwarded as an attachment"
 msgstr "«{subject}» no se encontró en su servidor, así que no se puede reenviar como datos adjuntos"
+
+#, fuzzy
+#~ msgid "shared mailboxes open under an account kept in step through Microsoft Graph"
+#~ msgstr "los buzones compartidos se abren con una cuenta sincronizada a través de Microsoft Graph"
+
+#, fuzzy
+#~ msgid "shared mailboxes open under an account that is kept in step through Microsoft Graph"
+#~ msgstr "los buzones compartidos se abren con una cuenta que se sincroniza a través de Microsoft Graph"
 
 #~ msgid "Google Desktop Registration Secret"
 #~ msgstr "Secreto del registro de escritorio de Google"

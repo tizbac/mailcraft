@@ -668,7 +668,7 @@ fn a_shared_mailbox_opens_under_a_microsoft_account_with_folders_of_its_own() {
 fn a_shared_mailbox_is_refused_where_it_cant_be_one() {
     let (mut mb, local, owner) = with_microsoft();
     let refused = |mb: &mut Mailbox, under: Id, address: &str| mb.add_shared_mailbox(under, address).unwrap_err().to_string();
-    assert!(refused(&mut mb, local, "support@example.org").contains("Microsoft Graph"));
+    assert!(refused(&mut mb, local, "support@example.org").contains("Microsoft or Exchange"));
     assert!(refused(&mut mb, 999, "support@example.org").contains("no account"));
     assert!(refused(&mut mb, owner, "noor@EXAMPLE.org").contains("own address"));
     assert!(refused(&mut mb, owner, "ada@example.org").contains("already here"));

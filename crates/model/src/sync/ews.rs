@@ -339,6 +339,10 @@ pub struct EwsMailRequest {
     /// system's ([`crate::EwsServer::trusted`]); empty when none.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub trusted: String,
+    /// The mailbox to read, when it is not the account's own: a shared mailbox, at its address,
+    /// with the owner's sign-in. Empty for the account itself.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub mailbox: String,
     /// Read the server's folder hierarchy in this run (`SyncFolderHierarchy` from `hierarchy`): the
     /// first run, a run that reads every folder, and the run after one that brought no folders.
     #[serde(skip_serializing_if = "is_false")]
