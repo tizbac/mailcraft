@@ -595,6 +595,12 @@ fn the_folder_list_asks_where_each_folder_lies() {
 }
 
 #[test]
+fn the_folder_list_can_read_a_shared_mailbox_at_its_own_address() {
+    let xml = crate::hierarchy::SyncFolderHierarchy::new("").in_mailbox("team@example.org").element().write();
+    assert!(xml.contains("<t:EmailAddress>team@example.org</t:EmailAddress>"), "{xml}");
+}
+
+#[test]
 fn the_requests_hold_to_the_schema_and_write_nothing() {
     let standin = StandIn::new();
     standin.state().deliver("inbox", "Kickoff", false);

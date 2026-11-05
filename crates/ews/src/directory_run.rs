@@ -58,6 +58,7 @@ pub async fn sync_directory<E: HttpExchange>(
         read_unsaid: false,
         own: Default::default(),
         reread_folders: false,
+        mailbox: request.mailbox.trim().to_owned(),
     };
     let mut out = mailcraft_model::sync::EwsDirectoryResult {
         account: request.account,

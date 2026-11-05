@@ -19,6 +19,22 @@ fn session() -> (Session, Id) {
     (s, added["id"].as_u64().unwrap())
 }
 
+#[test]
+fn a_shared_mailbox_is_read_at_its_own_address_with_the_owners_server() {
+    let (mut s, owner) = session();
+    s.mailbox.account_mut(owner).unwrap().ews.as_mut().unwrap().hierarchy = "the owner's state".into();
+    let shared = s.run("account.addSharedMailbox", &json!({"account": owner, "address": "team@example.org"})).unwrap()["id"].as_u64().unwrap();
+    let (account, signer, server) = ews_account(&s.mailbox, shared).unwrap();
+    assert_eq!((account.id, signer.id, server.url.as_str()), (shared, owner, URL));
+    let request = ews_mail_request(&s, shared, false).unwrap();
+    assert_eq!((request.email.as_str(), request.mailbox.as_str()), ("team@example.org", "team@example.org"));
+    assert_eq!(request.username, ME, "the owner's sign-in reaches the shared mailbox");
+    assert!(request.hierarchy.is_empty(), "the shared mailbox's folder list starts from its own state");
+    assert_eq!(request.url, URL);
+    assert_eq!(ews_fetch_request(&s, shared, None, 1).unwrap().username, ME);
+    assert_eq!(ews_mail_request(&s, owner, false).unwrap().mailbox, "");
+}
+
 fn folder(id: &str, parent: &str, name: &str, kind: FolderKind) -> GraphFolder {
     GraphFolder { id: id.into(), parent: parent.into(), name: name.into(), kind, ..Default::default() }
 }

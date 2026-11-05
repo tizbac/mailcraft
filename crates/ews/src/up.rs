@@ -97,6 +97,9 @@ impl<E: HttpExchange> Run<'_, E> {
     async fn push_into(&mut self, request: &EwsMailRequest, piece: &mut EwsMailResult) -> Result<(), Asked> {
         // The folders made in this run, by the id they have here.
         let mut made: HashMap<Id, String> = HashMap::new();
+        // (A shared mailbox's drafts, sent copy and marker search are in that mailbox, not the
+        // owner's.)
+        let mailbox = self.mailbox.clone();
         for change in request.changes.iter().take(MAX_FOLDER_CHANGES) {
             // One of the server's own folders (#779) is never renamed, moved or deleted: it is
             // refused here without asking, and put back as any refusal is.
@@ -119,14 +122,14 @@ impl<E: HttpExchange> Run<'_, E> {
             }
         }
         for draft in request.drafts.iter().take(MAX_DRAFTS) {
-            let (done, ended) = self.draft(draft).await;
+            let (done, ended) = self.draft(draft, &mailbox).await;
             if !done.id.is_empty() || done.refused.is_some() || done.conflict {
                 piece.drafts.push(done);
             }
             ended?;
         }
         for send in request.sends.iter().take(MAX_SENDS) {
-            let (done, ended) = self.send(send).await;
+            let (done, ended) = self.send(send, &mailbox).await;
             if done.draft.is_some() || done.outcome != SendOutcome::Waits {
                 piece.sent.push(done);
             }
@@ -318,18 +321,18 @@ impl<E: HttpExchange> Run<'_, E> {
 
     /// One draft brought up to date: made (found by its marker first), or changed in place.
     /// What became of it, and why the run must stop if it must.
-    pub(crate) async fn draft(&mut self, up: &DraftUp) -> (DraftDone, Result<(), Asked>) {
+    pub(crate) async fn draft(&mut self, up: &DraftUp, mailbox: &str) -> (DraftDone, Result<(), Asked>) {
         let mut done = DraftDone { change: up.without_data(), id: up.id.clone(), ..DraftDone::default() };
-        let ended = self.draft_into(up, &mut done).await;
+        let ended = self.draft_into(up, &mut done, mailbox).await;
         (done, ended)
     }
 
-    async fn draft_into(&mut self, up: &DraftUp, done: &mut DraftDone) -> Result<(), Asked> {
+    async fn draft_into(&mut self, up: &DraftUp, done: &mut DraftDone, mailbox: &str) -> Result<(), Asked> {
         let (mut id, mut key) = (up.id.clone(), up.change_key.clone());
         let mut adopted = false;
         if id.is_empty() {
             // A make whose answer was lost is found by its marker.
-            let find = FindDraft::new(None, &up.marker).knowing(&up.change_key);
+            let find = FindDraft::new(None, &up.marker).knowing(&up.change_key).in_mailbox(mailbox);
             match self.ask(&find.element(), &|reply| find.answer(reply)).await {
                 Ok(Some(found)) => {
                     (id, key) = (found.id, found.change_key);
@@ -342,7 +345,7 @@ impl<E: HttpExchange> Run<'_, E> {
             }
         }
         if id.is_empty() {
-            return self.make_draft(up, done).await;
+            return self.make_draft(up, done, mailbox).await;
         }
         // Changed in place, field by field. A draft changed elsewhere since is not written over.
         let update = ItemUpdate {
@@ -394,7 +397,7 @@ impl<E: HttpExchange> Run<'_, E> {
     }
 
     /// Makes the draft in the server's Drafts, with its files.
-    async fn make_draft(&mut self, up: &DraftUp, done: &mut DraftDone) -> Result<(), Asked> {
+    async fn make_draft(&mut self, up: &DraftUp, done: &mut DraftDone, mailbox: &str) -> Result<(), Asked> {
         let here = up.attachments.as_ref().map(|a| a.here.clone()).unwrap_or_default();
         let content = DraftContent {
             subject: up.subject.clone().unwrap_or_default(),
@@ -408,7 +411,7 @@ impl<E: HttpExchange> Run<'_, E> {
             attachments: here.clone(),
             marker: up.marker.clone(),
         };
-        let op = CreateDraft::new(None, content);
+        let op = CreateDraft::new(None, content).in_mailbox(mailbox);
         match self.ask_once(&op.element(), &|reply| op.answer(reply)).await {
             Ok(saved) => {
                 done.id = saved.id.clone();
@@ -519,13 +522,13 @@ impl<E: HttpExchange> Run<'_, E> {
 
     /// One message sent (a saved draft is brought up to date and sent as the draft; one never saved
     /// goes as its MIME). Never twice: a lost answer is held.
-    pub(crate) async fn send(&mut self, send: &SendUp) -> (SendDone, Result<(), Asked>) {
+    pub(crate) async fn send(&mut self, send: &SendUp, mailbox: &str) -> (SendDone, Result<(), Asked>) {
         let mut done = SendDone { message: send.message, outcome: SendOutcome::Waits, draft: None, draft_left: String::new() };
-        let ended = self.send_into(send, &mut done).await;
+        let ended = self.send_into(send, &mut done, mailbox).await;
         (done, ended)
     }
 
-    async fn send_into(&mut self, send: &SendUp, done: &mut SendDone) -> Result<(), Asked> {
+    async fn send_into(&mut self, send: &SendUp, done: &mut SendDone, mailbox: &str) -> Result<(), Asked> {
         // Every message goes as its MIME with a copy asked for in Sent Items, a saved draft too:
         // `SendItem` of a draft leaves it in Drafts and files no copy on some servers (Grommunio,
         // E8). A send with no MIME (not one the engine makes for an Exchange account) waits.
@@ -533,7 +536,7 @@ impl<E: HttpExchange> Run<'_, E> {
             log::info!("ews sending: a message without its content waits");
             return Ok(());
         };
-        let op = match SendMessage::new(message) {
+        let op = match SendMessage::new(message, mailbox) {
             Ok(op) => op,
             Err(e) => {
                 done.outcome = SendOutcome::Held { lost: false, why: e.to_string() };
@@ -551,7 +554,7 @@ impl<E: HttpExchange> Run<'_, E> {
         // an ordinary delete: the send is not made again.
         let Some(draft) = send.draft.as_ref().filter(|d| !d.id.is_empty() || !d.marker.is_empty()) else { return Ok(()) };
         let id = if draft.id.is_empty() {
-            let find = FindDraft::new(None, &draft.marker);
+            let find = FindDraft::new(None, &draft.marker).in_mailbox(mailbox);
             match self.ask(&find.element(), &|reply| find.answer(reply)).await {
                 Ok(Some(found)) => found.id,
                 // (None: it was never made.)

@@ -1641,14 +1641,17 @@ pub fn show(app: &mut MailApp, ctx: &egui::Context) {
                 if checking.is_none() && error.is_empty() {
                     crate::text_menu::hold(&resp);
                 }
-                ui.label(
-                    egui::RichText::new(crate::i18n::fmt(
-                        tl!("Opened with {owner}'s sign-in. It needs Full Access to the mailbox, which your organisation's administrator gives. Microsoft asks you once to let MailCraft read and change shared mailboxes. What you change in it goes to it. Mail you write in it is from its address, and sending as it needs Send As or Send on Behalf permission: Microsoft asks you once more at your first send."),
-                        &[("owner", &owner)],
-                    ))
-                    .color(t.text_dim)
-                    .size(11.0),
-                );
+                let on_exchange = app.session.mailbox.account(*account).is_some_and(|a| a.kind == mailcraft_model::AccountKind::Exchange);
+                let words = if on_exchange {
+                    tl!(
+                        "Opened with {owner}'s sign-in. It needs Full Access to the mailbox, which your organisation's administrator gives. What you change in it goes to it. Mail you write in it is from its address, and sending as it needs Send As or Send on Behalf permission, which the administrator also gives."
+                    )
+                } else {
+                    tl!(
+                        "Opened with {owner}'s sign-in. It needs Full Access to the mailbox, which your organisation's administrator gives. Microsoft asks you once to let MailCraft read and change shared mailboxes. What you change in it goes to it. Mail you write in it is from its address, and sending as it needs Send As or Send on Behalf permission: Microsoft asks you once more at your first send."
+                    )
+                };
+                ui.label(egui::RichText::new(crate::i18n::fmt(words, &[("owner", &owner)])).color(t.text_dim).size(11.0));
                 if checking.is_some() {
                     ui.label(egui::RichText::new(tl!("Checking the address with Microsoft…")).color(t.text_dim));
                 }
