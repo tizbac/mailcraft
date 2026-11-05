@@ -25,6 +25,38 @@ fn an_mx_host_is_asked_whether_it_is_linchange_without_a_password() {
 }
 
 #[test]
+fn a_well_known_answer_is_used_only_after_it_moved_to_the_service_root() {
+    let challenge =
+        b"HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"linchange CalDAV\", charset=\"UTF-8\"\r\nContent-Length: 0\r\n\r\n".to_vec();
+    // A 401 at the well-known name itself is not a service root: the ordinary root is tried.
+    let direct = FakeHttp::answering(challenge.clone());
+    let base = FakeHttp::answering(challenge);
+    let found = discover_service_at(&base.url("/caldav/"), Some(&direct.url("/.well-known/caldav")), "CalDAV").unwrap();
+    assert_eq!(found.as_deref(), Some(base.url("/caldav/").as_str()));
+
+    // When the well-known name does redirect to it, the address it lands on is the service.
+    let moved = FakeHttp::start(|n, _| {
+        if n == 0 {
+            b"HTTP/1.1 302 Found\r\nLocation: /caldav/\r\nContent-Length: 0\r\n\r\n".to_vec()
+        } else {
+            b"HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"linchange CalDAV\"\r\nContent-Length: 0\r\n\r\n".to_vec()
+        }
+    });
+    let found = discover_service_at(&moved.url("/caldav/"), Some(&moved.url("/.well-known/caldav")), "CalDAV").unwrap();
+    assert_eq!(found.as_deref(), Some(moved.url("/caldav/").as_str()));
+}
+
+#[test]
+fn a_broken_well_known_answer_does_not_hide_the_service_root() {
+    let broken = FakeHttp::answering(b"not an HTTP answer\r\n\r\n".to_vec());
+    let base = FakeHttp::answering(
+        b"HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"linchange CardDAV\"\r\nContent-Length: 0\r\n\r\n".to_vec(),
+    );
+    let found = discover_service_at(&base.url("/carddav/"), Some(&broken.url("/.well-known/carddav")), "CardDAV").unwrap();
+    assert_eq!(found.as_deref(), Some(base.url("/carddav/").as_str()));
+}
+
+#[test]
 fn a_multistatus_names_its_collections() {
     let body = br#"<?xml version="1.0"?><D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
       <D:response><D:href>/caldav/ada@example.org/</D:href><D:propstat><D:prop>
