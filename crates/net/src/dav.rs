@@ -91,12 +91,22 @@ pub fn probe(host: &str) -> Result<Option<Endpoints>, NetError> {
 /// Ask the RFC 6764 well-known address first, then the service root the server publishes. A
 /// redirect from either is followed; the address the challenge came from is the service root.
 fn discover_service(host: &str, base: &str, service: &str) -> Result<Option<String>, NetError> {
-    if let Some(root) = service_root(host) {
-        let well_known = format!("{root}.well-known/{}", service.to_ascii_lowercase());
-        let (answer, final_url) = send_following(&well_known, "PROPFIND", Some("0"), None, "", XML, &[], 16 * 1024)?;
-        if names_linchange(&answer, service) {
-            return Ok(Some(service_url(&final_url)));
-        }
+    let well_known = service_root(host).map(|root| format!("{root}.well-known/{}", service.to_ascii_lowercase()));
+    discover_service_at(base, well_known.as_deref(), service)
+}
+
+/// [`discover_service`] with the RFC 6764 name given, so that the fallback can be tested.
+fn discover_service_at(base: &str, well_known: Option<&str>, service: &str) -> Result<Option<String>, NetError> {
+    // RFC 6764's well-known name is a shortcut, not a requirement: a server that doesn't serve
+    // it (or serves something that cannot be followed) must not stop the service root from being
+    // tried. The name is the answer only when it redirected away from itself; a 401 there is
+    // not itself a service root.
+    if let Some(well_known) = well_known
+        && let Ok((answer, final_url)) = send_following(well_known, "PROPFIND", Some("0"), None, "", XML, &[], 16 * 1024)
+        && names_linchange(&answer, service)
+        && !final_url.to_ascii_lowercase().contains("/.well-known/")
+    {
+        return Ok(Some(service_url(&final_url)));
     }
     let (answer, final_url) = send_following(base, "PROPFIND", Some("0"), None, "", XML, &[], 16 * 1024)?;
     Ok(names_linchange(&answer, service).then(|| service_url(&final_url)))
