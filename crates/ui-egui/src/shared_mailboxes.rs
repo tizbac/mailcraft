@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: MailCraft contributors
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! Shared mailboxes in the window (#70, a draft): read through Microsoft Graph with the sign-in
-//! of the account they are opened through, at their own address.
+//! Shared mailboxes in the window (#70, a draft): read with the sign-in of the account they are
+//! opened through, at their own address, through Microsoft Graph for a Microsoft account or
+//! Exchange Web Services for an Exchange server account.
 //!
 //! A shared mailbox's Send/Receive is its folders and mail alone, what was changed in it here going
 //! up first, to its own address, with its drafts and its Outbox: no calendar, no contacts, no
@@ -39,7 +40,9 @@ use crate::{GraphRequest, GraphResult, MailApp, Tokens};
 /// step through Graph, of a work or school (not a personal Microsoft account, which has none),
 /// and no shared mailbox itself.
 pub(crate) fn can_open_shared(a: &Account) -> bool {
-    a.kind == AccountKind::Microsoft && !a.is_shared() && a.oauth.as_ref().is_none_or(|oauth| oauth.directory != Directory::Personal)
+    !a.is_shared()
+        && (a.kind == AccountKind::Exchange
+            || (a.kind == AccountKind::Microsoft && a.oauth.as_ref().is_none_or(|oauth| oauth.directory != Directory::Personal)))
 }
 
 /// What the owner is told when Microsoft won't open the shared mailbox at `address` (S1).

@@ -48,7 +48,16 @@ pub async fn sync_directory<E: HttpExchange>(
     cancel: &AtomicBool,
     wait: &mut dyn FnMut(u32) -> bool,
 ) -> mailcraft_model::sync::EwsDirectoryResult {
-    let mut run = Run { client, exchange, cancel, wait, shape: crate::items::Shape::Full, flag_lacking: false, read_unsaid: false };
+    let mut run = Run {
+        client,
+        exchange,
+        cancel,
+        wait,
+        shape: crate::items::Shape::Full,
+        flag_lacking: false,
+        read_unsaid: false,
+        mailbox: request.mailbox.trim().to_owned(),
+    };
     let mut out = mailcraft_model::sync::EwsDirectoryResult {
         account: request.account,
         email: request.email.clone(),

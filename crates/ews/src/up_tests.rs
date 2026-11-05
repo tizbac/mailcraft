@@ -415,6 +415,18 @@ fn message(to: &str, bcc: &str) -> Box<Message> {
 }
 
 #[test]
+fn a_shared_mailboxs_drafts_and_sent_copy_are_filed_in_it() {
+    use crate::compose::{CreateDraft, DraftContent, FindDraft, SendMessage};
+    let address = "<t:EmailAddress>team@example.org</t:EmailAddress>";
+    let sent = SendMessage::new(&message("zoe@example.org", ""), "team@example.org").unwrap().element().write();
+    assert!(sent.contains(address), "{sent}");
+    let draft = CreateDraft::new(None, DraftContent::default()).in_mailbox("team@example.org").element().write();
+    assert!(draft.contains(address), "{draft}");
+    let find = FindDraft::new(None, "mark").in_mailbox("team@example.org").element().write();
+    assert!(find.contains(address), "{find}");
+}
+
+#[test]
 fn a_message_never_saved_goes_as_mime_with_its_bcc_and_a_copy_is_filed_in_sent_items() {
     let standin = StandIn::new();
     let send = SendUp { message: 3, draft: None, mime: Some(message("zoe@example.org", "kit@example.org")) };

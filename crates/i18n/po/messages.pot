@@ -6864,6 +6864,11 @@ msgid "Opened with {owner}'s sign-in. It needs Full Access to the mailbox, which
 msgstr ""
 
 #. interface
+#: crates/ui-egui/src/dialogs.rs
+msgid "Opened with {owner}'s sign-in. It needs Full Access to the mailbox, which your organisation's administrator gives. What you change in it goes to it. Mail you write in it is from its address, and sending as it needs Send As or Send on Behalf permission, which the administrator also gives."
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/attachment_open.rs
 msgid "Opening Mail Attachment"
 msgstr ""
@@ -13528,13 +13533,8 @@ msgid "select an appointment first"
 msgstr ""
 
 #. what a command says, why a command can't run
-#: crates/engine/src/cmd/shared.rs
-msgid "shared mailboxes open under an account kept in step through Microsoft Graph"
-msgstr ""
-
-#. what a command says
-#: crates/model/src/mailbox.rs
-msgid "shared mailboxes open under an account that is kept in step through Microsoft Graph"
+#: crates/engine/src/cmd/shared.rs crates/model/src/mailbox.rs
+msgid "shared mailboxes open under a Microsoft or Exchange server account"
 msgstr ""
 
 #. interface
@@ -14502,7 +14502,7 @@ msgid "{name} has declined this meeting."
 msgstr ""
 
 #. what a command says
-#: crates/engine/src/cmd/ews_directory.rs
+#: crates/engine/src/cmd/ews_directory.rs crates/engine/src/cmd/ews_mail.rs
 msgid "{name} has no Exchange server account it is opened through"
 msgstr ""
 

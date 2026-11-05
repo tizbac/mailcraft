@@ -8248,6 +8248,11 @@ msgid "Opened with {owner}'s sign-in. It needs Full Access to the mailbox, which
 msgstr "Geopend met de aanmelding van {owner}. Er is Volledige toegang tot het postvak nodig, die de beheerder van uw organisatie verleent. Microsoft vraagt u één keer om MailCraft gedeelde postvakken te laten lezen en wijzigen. Wat u erin wijzigt, gaat ernaartoe. E-mail die u erin schrijft, is afkomstig van het adres ervan, en verzenden als dat postvak vereist de machtiging Verzenden als of Verzenden namens: Microsoft vraagt het u nog een keer bij uw eerste verzending."
 
 #. interface
+#: crates/ui-egui/src/dialogs.rs
+msgid "Opened with {owner}'s sign-in. It needs Full Access to the mailbox, which your organisation's administrator gives. What you change in it goes to it. Mail you write in it is from its address, and sending as it needs Send As or Send on Behalf permission, which the administrator also gives."
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/attachment_open.rs
 #, fuzzy
 msgid "Opening Mail Attachment"
@@ -16241,16 +16246,9 @@ msgid "select an appointment first"
 msgstr "selecteer eerst een afspraak"
 
 #. what a command says, why a command can't run
-#: crates/engine/src/cmd/shared.rs
-#, fuzzy
-msgid "shared mailboxes open under an account kept in step through Microsoft Graph"
-msgstr "gedeelde postvakken worden geopend onder een via Microsoft Graph bijgehouden account"
-
-#. what a command says
-#: crates/model/src/mailbox.rs
-#, fuzzy
-msgid "shared mailboxes open under an account that is kept in step through Microsoft Graph"
-msgstr "gedeelde postvakken worden geopend onder een account dat via Microsoft Graph wordt bijgehouden"
+#: crates/engine/src/cmd/shared.rs crates/model/src/mailbox.rs
+msgid "shared mailboxes open under a Microsoft or Exchange server account"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/account_setup.rs
@@ -17396,7 +17394,7 @@ msgid "{name} has declined this meeting."
 msgstr "{name} heeft deze vergadering geweigerd."
 
 #. what a command says
-#: crates/engine/src/cmd/ews_directory.rs
+#: crates/engine/src/cmd/ews_directory.rs crates/engine/src/cmd/ews_mail.rs
 msgid "{name} has no Exchange server account it is opened through"
 msgstr ""
 
@@ -18419,6 +18417,14 @@ msgstr "„{subject}” was te groot om te downloaden: alleen de koptekst is hie
 #, fuzzy
 msgid "“{subject}” wasn't found on its server, so it can't be forwarded as an attachment"
 msgstr "„{subject}” is niet op de server gevonden, dus het kan niet als bijlage worden doorgestuurd"
+
+#, fuzzy
+#~ msgid "shared mailboxes open under an account kept in step through Microsoft Graph"
+#~ msgstr "gedeelde postvakken worden geopend onder een via Microsoft Graph bijgehouden account"
+
+#, fuzzy
+#~ msgid "shared mailboxes open under an account that is kept in step through Microsoft Graph"
+#~ msgstr "gedeelde postvakken worden geopend onder een account dat via Microsoft Graph wordt bijgehouden"
 
 #, fuzzy
 #~ msgid "MailCraft couldn't find the settings for this address. Check the servers below before you connect."

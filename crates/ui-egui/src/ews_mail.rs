@@ -64,6 +64,8 @@ impl MailApp {
     /// the one typed this session, or else the one the operating system was asked to remember (what
     /// the background read of the store brought, never the store itself, #613).
     pub(crate) fn ews_secret(&self, account: Id) -> Option<String> {
+        // A shared mailbox is read with the sign-in of the account it is opened through.
+        let account = self.session.mailbox.owner_of(account).map_or(account, |owner| owner.id);
         if let Some(typed) = self.passwords.get(&account) {
             return Some(typed.clone());
         }
@@ -74,15 +76,17 @@ impl MailApp {
     /// A Send/Receive of the Exchange server account `account`; `p` may carry the password the owner
     /// has just typed, and `inboxPass` asks for the Inbox alone. Asks for the password the first time.
     pub(crate) fn start_ews_mail(&mut self, account: Id, quiet: bool, p: &Value) -> Result<Value, String> {
+        // A shared mailbox is read with the sign-in of the account it is opened through.
+        let password_account = self.session.mailbox.owner_of(account).map_or(account, |owner| owner.id);
         if let Some(typed) = p.get("password").and_then(Value::as_str).filter(|typed| !typed.is_empty()) {
-            self.passwords.insert(account, typed.to_string());
+            self.passwords.insert(password_account, typed.to_string());
         }
         // The owner asked: a password turned down before is tried again.
         if !quiet {
             self.jmap_refused.remove(&account);
         }
         let Some(secret) = self.ews_secret(account) else {
-            self.dialog = dialogs::Dialog::open("password", self, &json!({"account": account}));
+            self.dialog = dialogs::Dialog::open("password", self, &json!({"account": password_account}));
             return Ok(json!({"pending": "password"}));
         };
         let Some(run) = &self.services.ews else { return Err(tl!("This build can't connect to mail servers").to_string()) };
@@ -177,6 +181,8 @@ impl MailApp {
                     }
                 }
             }
+            // A shared mailbox being added is kept once its Inbox is read, not after all its mail.
+            self.shared_check_piece(account, last);
             if !last {
                 continue;
             }

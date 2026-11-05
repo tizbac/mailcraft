@@ -1,12 +1,19 @@
 # Exchange servers other than Microsoft's
 
-> **Last reviewed:** 2026-11-04 · **Last updated:** 2026-11-04 · **Change:** minor
+> **Last reviewed:** 2026-11-05 · **Last updated:** 2026-11-05 · **Change:** minor
 
 An Exchange server account (#252) reaches an organisation's own mail server through Exchange Web
 Services: its mail, and now its calendars, address books and to-do lists, including a person's
 calendar or address book opened by address. This page says what has been seen working on servers
 other than Microsoft's, one at a time, and what has not. Everything here was tried with made-up
 data on a server running on the same computer; no real mailbox was used.
+
+A shared mailbox of the same server can be opened under the account (Add Shared Mailbox, or
+`account.addSharedMailbox`): it is read at its own address with the owner's sign-in, and its
+folders and mail are its own. Nothing is asked of any server when it is added; a server that won't
+let the owner in says so at that first Send/Receive. Mail written in it goes from its address when
+the owner has Send As or Send on Behalf permission there, and its copy is filed in its own Sent
+Items; without it the message is held with the reason, never sent from another address.
 
 The directory is read after the mail of a Send/Receive: the account's calendars, books and lists
 (the folders the server gives that kind), the events of the days on screen and a week either side,
@@ -31,6 +38,7 @@ against this server.
 | Sign-in: Basic | Works | |
 | Sign-in: NTLM | Not offered | The server's challenge lists Basic only, so NTLM was not tried against a real server |
 | First download | Works | Folders, then headers with a preview, then whole messages; an accented subject and body, an attachment and a message in a folder made on the server all arrived. The server's folders for calendar, contacts, tasks, notes, journal and settings are left out: Grommunio's Default listing gives no folder class, so MailCraft now asks for it by name and also leaves out the calendar, contacts, tasks and search elements whatever class they say (before this, they showed as mail folders) |
+| Shared mailbox | Works | A mailbox the owner was given store-owner access to (`grommunio-admin user storeowner team@… add ada@…`; delegate access alone wasn't enough for EWS) was opened under the account. Its Inbox message came down with its whole body, and its folder list is its own rather than the owner's. With Send As granted (`grommunio-admin user sendas team@… add ada@…`), a message written there went to another mailbox from the shared address, and its copy was filed in the shared Sent Items. Calendar, contacts and to-dos of the shared mailbox are not read there yet |
 | Delta after a new message | Works | A message delivered after the first run came with the next one, and nothing came twice |
 | Read, flag, categories | Work | Seen on the server afterwards. Importance of a message already received cannot be changed from here, so it was not tried |
 | Move, copy | Work | Between folders made on the server |
@@ -108,6 +116,7 @@ and modern sign-in (not built), a shared mailbox, and Autodiscover from an addre
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-05 | minor | #70: a shared mailbox opens under an Exchange server account, read at its own address with the owner's sign-in; tried on Grommunio |
 | 2026-11-04 | patch | #746: Exchange Server 2019 seen working for mail (Basic over TLS, 24,574 messages, exact folder counts), and taken off the not yet tried list |
 | 2026-11-04 | minor | #252: calendars, contacts and to-dos kept in step both ways, and a person's calendar or address book opened by address; tried on a Grommunio container, including the shared folders and the limits there |
 | 2026-11-01 | minor | #252: Exchange server accounts are on for everyone, for mail; the testing switch is gone |
