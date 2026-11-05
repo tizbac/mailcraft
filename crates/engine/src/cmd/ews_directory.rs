@@ -72,7 +72,7 @@ pub fn ews_directory_request(
     to: Option<i64>,
     background: bool,
 ) -> Result<EwsDirectoryRequest, CmdError> {
-    let (a, _signer, server) = ews_account(&s.mailbox, account)?;
+    let (a, signer, server) = ews_account(&s.mailbox, account)?;
     let (from, to) = match (from, to) {
         (Some(from), Some(to)) if to > from => (from, to),
         _ => {
@@ -113,7 +113,12 @@ pub fn ews_directory_request(
         account,
         email: a.email.clone(),
         url: server.url.clone(),
-        username: server.username.clone(),
+        // (A shared mailbox is read with the owner's sign-in: its own name would be the wrong one.)
+        username: if a.is_shared() {
+            if server.username.trim().is_empty() { signer.email.clone() } else { server.username.clone() }
+        } else {
+            server.username.clone()
+        },
         mailbox: if a.is_shared() { a.email.clone() } else { String::new() },
         trusted: server.trusted.clone(),
         calendars: true,
