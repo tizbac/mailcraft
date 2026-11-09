@@ -1,0 +1,1 @@
+| 2026-11-10 | Windows x64 built on Linux with Docker (`packaging/windows/docker/build.sh`, cargo-xwin plus WiX under Wine): its MSI uses MSZIP cabinets instead of the release's `high` (LZX), and it is not the release pipeline |
