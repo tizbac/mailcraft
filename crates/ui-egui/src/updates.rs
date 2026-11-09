@@ -54,8 +54,9 @@ pub const MOST_ASKS: u8 = 3;
 const DAY: i64 = 86_400;
 /// How long after a check that got none the next is tried (seconds).
 const AFTER_A_FAILURE: i64 = 3_600;
-/// The repository the build came from, whose releases are the ones told of.
-const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
+/// The repository whose releases are the ones told of: this fork's own
+/// (`mailcraft_model::update::UPDATE_REPOSITORY`), the same one the host asks.
+const REPOSITORY: &str = mailcraft_model::update::UPDATE_REPOSITORY;
 /// The command that checks once.
 pub const CHECK: &str = "ui.checkForUpdates";
 /// The refusal of a check by an agent or a script while the daily check is off.
@@ -842,7 +843,7 @@ mod tests {
         assert_eq!(said(&app), Some(format!("MailCraft {} is available", newer())));
         assert_eq!(app.ui.update_told, newer());
         assert_eq!(app.ui.update_checked, NOW);
-        assert_eq!(app.newer_release().unwrap().page, format!("https://github.com/UCS-Care-Group/mailcraft/releases/tag/v{}", newer()));
+        assert_eq!(app.newer_release().unwrap().page, format!("{}/releases/tag/v{}", REPOSITORY.trim_end_matches('/'), newer()));
         saved = app.prefs();
 
         // Within the day: nobody is asked.
