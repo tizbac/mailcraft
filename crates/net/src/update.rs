@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: MailCraft contributors
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Whether a new version of MailCraft is out: one question to GitHub's API about the newest
-//! release of the repository under its new owner ([`RENAMED`]), and, only when GitHub has no
-//! such repository yet, the same question about the one the build names (`CARGO_PKG_REPOSITORY`).
+//! release of this fork's own repository (`mailcraft_model::update::UPDATE_REPOSITORY`), and
+//! nothing else: a build of this fork updates from this fork's releases, not the project's.
 //!
 //! The request is a GET over HTTPS with the crate's fixed `User-Agent` (`MailCraft`, no version)
 //! and an `Accept` header: no account, address, mailbox detail, identifier or version of this
@@ -33,14 +33,10 @@ use crate::http::{self, Request, Url};
 /// (docs/releasing.md).
 pub const RELEASE_KEYS: [&str; 2] = ["Mu5RF5oJpFhDGfa5wpgznC39tDC8vbUbyNkiAMdluPQ=", "XV6WRgW06/mGhZCHhFVKMIEZDmLevQduZPLSj/UW5zI="];
 
-/// The repository this build came from: `https://github.com/{owner}/{repo}`.
-pub const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
-/// The repository after its organisation is renamed `UCS-Care-Group` → `UCSLabs`, asked first.
-/// Until the rename GitHub has no such repository (404) and [`REPOSITORY`] is asked; after it,
-/// this answers and the old name, which GitHub only redirects, is never asked. Each answer is
-/// checked against the repository asked, so one owner's release never passes as the other's.
-/// lean: two names for one move; the next release after the rename names only `UCSLabs`.
-pub const RENAMED: &str = "https://github.com/UCSLabs/mailcraft";
+/// The repository this build came from: this fork's own
+/// (`mailcraft_model::update::UPDATE_REPOSITORY`), whose releases the update check reads.
+/// The project's own releases are not asked for: a build of this fork updates from this fork.
+pub const REPOSITORY: &str = mailcraft_model::update::UPDATE_REPOSITORY;
 /// What [`latest_at`] says when GitHub has no such repository or no release of it.
 const NO_RELEASE: &str = "GitHub has no release of MailCraft";
 /// GitHub's API.
@@ -59,7 +55,7 @@ const MAX_ASSETS: usize = 200;
 /// build could run. `pre_releases`: the running build is a pre-release itself, so one is not
 /// passed over. Blocks for ten seconds at most, twenty when the new name isn't there yet.
 pub fn latest(pre_releases: bool) -> Result<Release, NetError> {
-    latest_of(API, &[RENAMED, REPOSITORY], pre_releases)
+    latest_of(API, &[REPOSITORY], pre_releases)
 }
 
 /// [`latest_at`] for each of `repositories` in turn, moving on to the next only when GitHub
@@ -568,8 +564,13 @@ mod tests {
         let server = FakeHttp::answering(answer(&release_of("v0.9.0")));
         assert_eq!(config(latest_at(&server.url(""), "https://example.org/a/b", false)), "this build names no repository on GitHub");
         assert_eq!(server.asked(), 0);
-        // The build's own is one.
-        assert!(owner_and_repo(REPOSITORY).is_some());
+        // The build's own is one, and it is this fork's, whose releases the update check reads.
+        assert_eq!(owner_and_repo(REPOSITORY), Some(("tizbac", "mailcraft")));
+    }
+
+    #[test]
+    fn updates_come_from_this_forks_releases() {
+        assert_eq!(REPOSITORY, "https://github.com/tizbac/mailcraft");
     }
 
     proptest! {

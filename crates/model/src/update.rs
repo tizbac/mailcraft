@@ -9,6 +9,11 @@
 
 use std::cmp::Ordering;
 
+/// The repository a build checks for updates at: this fork's own, so that a newer build here
+/// is found and installed from its releases, never the project's. Kept here, where both the
+/// host that asks (the net crate) and the window that shows the answer read it.
+pub const UPDATE_REPOSITORY: &str = "https://github.com/tizbac/mailcraft";
+
 /// Most digits in one number of a version.
 const MAX_DIGITS: usize = 6;
 /// Longest pre-release suffix taken.
