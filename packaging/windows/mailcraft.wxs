@@ -7,14 +7,17 @@
     wix build mailcraft.wxs -arch x64 -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext
       -d Version=1.2.3 -d BinDir=... -d IconPath=... -d LicenseRtf=... -o out.msi
 
-  Per-machine install into Program Files with a Start Menu shortcut. The installer shows the
-  standard WiX dialogs: welcome + license, progress, and a finish page.
+  Per-machine install into Program Files with a Start Menu shortcut and a desktop shortcut. The
+  installer shows the standard WiX dialogs: welcome + license, progress, and a finish page.
 
   UpgradeCode and the component GUIDs below belong to MailCraft alone. Never copy them from (or
   into) a sibling Craft app: Windows Installer treats every package sharing an UpgradeCode as one
   product, so a shared code makes one app's installer refuse to install ("a newer version is
   already installed") or silently uninstall the other. packaging-lint.yml checks this.
 -->
+<?ifndef CompressionLevel ?>
+  <?define CompressionLevel = "high" ?>
+<?endif ?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package
       Name="MailCraft"
@@ -32,13 +35,15 @@
          new one doesn't start (apps/mailcraft/src/self_update.rs): installing this package over
          a newer MailCraft replaces it. The mailbox is in the user's own folder either way. -->
     <MajorUpgrade AllowDowngrades="yes" />
-    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <!-- `high` is LZX. Wine's cabinet support has no LZX (Wine bug 56558), so the Docker build
+         passes -d CompressionLevel=mszip; the release MSI built on Windows keeps the default. -->
+    <MediaTemplate EmbedCab="yes" CompressionLevel="$(var.CompressionLevel)" />
 
     <Icon Id="MailcraftIcon.ico" SourceFile="$(var.IconPath)" />
     <Property Id="ARPPRODUCTICON" Value="MailcraftIcon.ico" />
-    <Property Id="ARPURLINFOABOUT" Value="https://github.com/UCSLabs/mailcraft" />
-    <Property Id="ARPURLUPDATEINFO" Value="https://github.com/UCSLabs/mailcraft" />
-    <Property Id="ARPHELPLINK" Value="https://github.com/UCSLabs/mailcraft/issues" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/UCS-Care-Group/mailcraft" />
+    <Property Id="ARPURLUPDATEINFO" Value="https://github.com/tizbac/mailcraft/releases" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/UCS-Care-Group/mailcraft/issues" />
 
     <!-- Installer UI (#198): WixUI_Minimal is welcome + license, progress, then a finish page so
          people can see the install worked. Its dialogs and bitmaps are WiX's own
@@ -68,6 +73,7 @@
       <Directory Id="INSTALLFOLDER" Name="MailCraft" />
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder" />
+    <StandardDirectory Id="DesktopFolder" />
 
     <Feature Id="Main" Title="MailCraft" Level="1">
       <ComponentGroupRef Id="MailcraftFiles" />
@@ -84,6 +90,13 @@
             <!-- The AppUserModelID Windows knows MailCraft by: it shows the program's desktop
                  alerts (toasts) only for a program it knows by such a shortcut
                  (apps/mailcraft/src/alerts.rs). -->
+            <ShortcutProperty Key="System.AppUserModel.ID" Value="MailCraft.MailCraft" />
+          </Shortcut>
+          <!-- The desktop icon the installer puts on the all-users desktop (a per-machine
+               install). Built on Windows or on Linux with Docker, the same MSI makes it. -->
+          <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="MailCraft"
+              Description="MailCraft mail and calendar" WorkingDirectory="INSTALLFOLDER" Advertise="yes"
+              Icon="MailcraftIcon.ico" IconIndex="0">
             <ShortcutProperty Key="System.AppUserModel.ID" Value="MailCraft.MailCraft" />
           </Shortcut>
         </File>
