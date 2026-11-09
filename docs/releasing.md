@@ -302,6 +302,21 @@ wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
 pwsh packaging/windows/package.ps1 -Arch x64
 ```
 
+Windows x64 from a Linux machine, with Docker and no Windows toolchain:
+
+```
+packaging/windows/docker/build.sh
+```
+
+It cross-compiles `x86_64-pc-windows-msvc` with cargo-xwin and runs WiX under Wine, and writes the
+same `mailcraft-<version>-windows-x64.msi` and portable zip to `dist/release/`
+(`packaging/windows/docker/README.md`). The image is several GB and the first run downloads the
+Microsoft CRT/Windows SDK that cargo-xwin uses; later runs reuse the caches. Its MSI compresses
+with MSZIP rather than `high` (LZX), because Wine's cabinet support has no LZX, so it is a little
+larger; `mailcraft.wxs` keeps `high` for the release build. A local build is unsigned, or signed
+with `WINDOWS_CERTIFICATE` through `osslsigncode`. It is not the release pipeline: releases are
+still built and signed on Windows.
+
 Linux (build on Ubuntu 22.04 so the result runs on newer systems; these are the packages the
 release workflow installs):
 

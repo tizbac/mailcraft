@@ -15,6 +15,9 @@
   product, so a shared code makes one app's installer refuse to install ("a newer version is
   already installed") or silently uninstall the other. packaging-lint.yml checks this.
 -->
+<?ifndef CompressionLevel ?>
+  <?define CompressionLevel = "high" ?>
+<?endif ?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package
       Name="MailCraft"
@@ -32,7 +35,9 @@
          new one doesn't start (apps/mailcraft/src/self_update.rs): installing this package over
          a newer MailCraft replaces it. The mailbox is in the user's own folder either way. -->
     <MajorUpgrade AllowDowngrades="yes" />
-    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <!-- `high` is LZX. Wine's cabinet support has no LZX (Wine bug 56558), so the Docker build
+         passes -d CompressionLevel=mszip; the release MSI built on Windows keeps the default. -->
+    <MediaTemplate EmbedCab="yes" CompressionLevel="$(var.CompressionLevel)" />
 
     <Icon Id="MailcraftIcon.ico" SourceFile="$(var.IconPath)" />
     <Property Id="ARPPRODUCTICON" Value="MailcraftIcon.ico" />

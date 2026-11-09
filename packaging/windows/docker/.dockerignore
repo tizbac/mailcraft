@@ -1,0 +1,4 @@
+# SPDX-FileCopyrightText: MailCraft contributors
+# SPDX-License-Identifier: MIT OR Apache-2.0
+__pycache__/
+*.pyc
