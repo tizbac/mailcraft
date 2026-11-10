@@ -35,7 +35,7 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("account.list", "List Accounts", "File › Info", list).pure(),
         CommandSpec::new("account.preset", "Suggest Account Settings", "File › Info", preset)
             .pure()
-            .params(r#"{"email": string, "provider"?: "microsoft"|"google", "service"?: "microsoft365"|"outlook.com"|"google"|"yahoo"|"icloud"|"fastmail"|"aol"|"zoho", "mx"?: [string] (the domain's mail exchangers, when the host looked them up), "found"?: {"incoming"?: {"host": string, "port"?: number, "security": "tls"|"starttls", "via": "srv"|"autoconfig"|"ispdb"}, "outgoing"?: same, "username"?: string (the found incoming server's, as its source wrote it: %EMAILADDRESS%, %EMAILLOCALPART% or %EMAILDOMAIN% stand for the address or its parts; taken only with an incoming server found by autoconfig or ispdb)} (what the host found for the domain: its SRV records (RFC 6186, #1063), the autoconfig document it publishes, or Mozilla's ISP database (#1112); taken only when the domain and its exchangers name no provider this program knows, and a server without encryption is never taken)} — answers the servers and sign-in an address usually takes, with `via` saying where they came from (domain, mx, asked, srv, autoconfig, ispdb, or guess), `known` whether they are a provider's own, and `outside` on a server that was found and isn't in the address's own domain (the owner is asked before a password goes there, #1063, #1112); what is found or guessed is for the owner to confirm; changes nothing"#),
+            .params(r#"{"email": string, "provider"?: "microsoft"|"google", "service"?: "microsoft365"|"outlook.com"|"google"|"yahoo"|"icloud"|"fastmail"|"aol"|"zoho"|"linchange", "mx"?: [string] (the domain's mail exchangers, when the host looked them up), "found"?: {"incoming"?: {"host": string, "port"?: number, "security": "tls"|"starttls", "via": "srv"|"autoconfig"|"ispdb"}, "outgoing"?: same, "username"?: string (the found incoming server's, as its source wrote it: %EMAILADDRESS%, %EMAILLOCALPART% or %EMAILDOMAIN% stand for the address or its parts; taken only with an incoming server found by autoconfig or ispdb)} (what the host found for the domain: its SRV records (RFC 6186, #1063), the autoconfig document it publishes, or Mozilla's ISP database (#1112); taken only when the domain and its exchangers name no provider this program knows, and a server without encryption is never taken)} — answers the servers and sign-in an address usually takes, with `via` saying where they came from (domain, mx, asked, srv, autoconfig, ispdb, or guess), `known` whether they are a provider's own, and `outside` on a server that was found and isn't in the address's own domain (the owner is asked before a password goes there, #1063, #1112); what is found or guessed is for the owner to confirm; changes nothing"#),
         CommandSpec::new("sync.request", "Send/Receive All Folders", "Send / Receive", request)
             .pure()
             .key("F9")
@@ -152,8 +152,23 @@ fn preset(_: &mut Session, v: &Value) -> CmdResult {
     };
     // The owner says whose the account is: that settles it.
     let named = match p::str(v, "service") {
+        Some(name) if name.trim().eq_ignore_ascii_case("linchange") => {
+            // Linchange is self-hosted: the host is the mail exchanger that answered, else the
+            // usual name for the domain.
+            let found = v
+                .get("mx")
+                .and_then(Value::as_array)
+                .map(Vec::as_slice)
+                .unwrap_or_default()
+                .iter()
+                .take(20)
+                .filter_map(Value::as_str)
+                .find_map(provider::linchange)
+                .or_else(|| provider::linchange_for_domain(&domain));
+            Some(found.ok_or_else(|| bad("`mx` names no Linchange server"))?)
+        }
         Some(name) => {
-            Some(provider::by_name(name).ok_or_else(|| bad("`service` is microsoft365, outlook.com, google, yahoo, icloud, fastmail, aol or zoho"))?)
+            Some(provider::by_name(name).ok_or_else(|| bad("`service` is microsoft365, outlook.com, google, yahoo, icloud, fastmail, aol, zoho or linchange"))?)
         }
         None => None,
     };
