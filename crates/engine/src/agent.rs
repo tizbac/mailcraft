@@ -338,6 +338,7 @@ const SAFE: &[&str] = &[
     "people.select",
     "people.get",
     "people.list",
+    "people.addressBooks",
     "people.search",
     "people.arrange",
     "people.favorite",
