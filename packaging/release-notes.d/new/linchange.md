@@ -1,0 +1,1 @@
+- Linchange accounts: Add Account has a Linchange tile, and such an account takes the mail exchanger of its domain as its server. It signs in through Linchange's own page in the browser and keeps an application password named for this computer, so the account password and its second factor never go to the mail client.
