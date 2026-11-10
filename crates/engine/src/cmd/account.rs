@@ -35,7 +35,7 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("account.list", "List Accounts", "File › Info", list).pure(),
         CommandSpec::new("account.preset", "Suggest Account Settings", "File › Info", preset)
             .pure()
-            .params(r#"{"email": string, "provider"?: "microsoft"|"google", "service"?: "microsoft365"|"outlook.com"|"google"|"yahoo"|"icloud"|"fastmail"|"aol"|"zoho"|"dav", "mx"?: [string] (the domain's mail exchangers, when the host looked them up), "found"?: {"incoming"?: {"host": string, "port"?: number, "security": "tls"|"starttls", "via": "srv"}, "outgoing"?: same} (what the host found in the domain's own SRV records, RFC 6186, #1063; taken only when the domain and its exchangers name no provider this program knows, and a server without encryption is never taken)} — answers the servers and sign-in an address usually takes, with `via` saying where they came from (domain, mx, asked, srv, or guess), `known` whether they are a provider's own, and `outside` on a server that was found and isn't in the address's own domain (the owner is asked before a password goes there, #1063); what is found or guessed is for the owner to confirm; changes nothing"#),
+            .params(r#"{"email": string, "provider"?: "microsoft"|"google", "service"?: "microsoft365"|"outlook.com"|"google"|"yahoo"|"icloud"|"fastmail"|"aol"|"zoho"|"dav"|"linchange", "mx"?: [string] (the domain's mail exchangers, when the host looked them up), "found"?: {"incoming"?: {"host": string, "port"?: number, "security": "tls"|"starttls", "via": "srv"}, "outgoing"?: same} (what the host found in the domain's own SRV records, RFC 6186, #1063; taken only when the domain and its exchangers name no provider this program knows, and a server without encryption is never taken)} — answers the servers and sign-in an address usually takes, with `via` saying where they came from (domain, mx, asked, srv, or guess), `known` whether they are a provider's own, and `outside` on a server that was found and isn't in the address's own domain (the owner is asked before a password goes there, #1063); what is found or guessed is for the owner to confirm; changes nothing"#),
         CommandSpec::new("sync.request", "Send/Receive All Folders", "Send / Receive", request)
             .pure()
             .key("F9")
@@ -150,13 +150,24 @@ fn preset(_: &mut Session, v: &Value) -> CmdResult {
     // The owner says whose the account is: that settles it.
     let exchangers = v.get("mx").and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default();
     let named = match p::str(v, "service").map(|name| name.trim().to_ascii_lowercase()) {
+        Some(name) if name == "linchange" => {
+            // Linchange is self-hosted: the address comes from the exchanger that answered,
+            // else from the usual name.
+            let found = exchangers
+                .iter()
+                .take(20)
+                .filter_map(Value::as_str)
+                .find_map(provider::linchange)
+                .or_else(|| provider::linchange_for_domain(&domain));
+            Some(found.ok_or_else(|| bad("`mx` names no Linchange server"))?)
+        }
         Some(name) if name == "dav" => {
             let found = exchangers.iter().take(20).filter_map(Value::as_str).find_map(provider::dav);
             Some(found.ok_or_else(|| bad("`mx` names no DAV server"))?)
         }
         Some(name) => Some(
             provider::by_name(&name)
-                .ok_or_else(|| bad("`service` is microsoft365, outlook.com, google, yahoo, icloud, fastmail, aol, zoho or dav"))?,
+                .ok_or_else(|| bad("`service` is microsoft365, outlook.com, google, yahoo, icloud, fastmail, aol, zoho, dav or linchange"))?,
         ),
         None => None,
     };

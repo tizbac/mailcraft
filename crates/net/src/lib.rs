@@ -53,6 +53,8 @@ mod kept;
 #[cfg(not(target_arch = "wasm32"))]
 mod kinds;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod linchange;
+#[cfg(not(target_arch = "wasm32"))]
 #[cfg(not(target_arch = "wasm32"))]
 pub mod oauth;
 #[cfg(not(target_arch = "wasm32"))]
@@ -111,7 +113,8 @@ mod native {
     pub use crate::anchors::system_trust_anchors;
     pub use crate::cert::{CertificateFault, CertificateInfo, CertificateProblem, describe as describe_certificate};
     pub use crate::dav::{
-        DavSync, Endpoints, check as check_dav, probe as probe_dav, sync as sync_dav, upload_contacts as upload_dav_contacts,
+        DavSync, Endpoints, check as check_dav, probe as probe_dav, probe_linchange, sync as sync_dav,
+        upload_contacts as upload_dav_contacts,
         upload_events as upload_dav_events,
     };
     pub use crate::discover::{discover, discover_at};
@@ -120,6 +123,7 @@ mod native {
         AutodiscoverTargets, SrvTarget, autodiscover_hosts, autodiscover_hosts_at, autodiscover_targets, autodiscover_targets_at,
         lookup_autodiscover, lookup_autodiscover_at,
     };
+    pub use crate::linchange::{AppTokenGrant, finish as finish_linchange_app_token, start as start_linchange_app_token};
     pub use crate::pinned::pin_check_under_way;
     pub use crate::send::send;
     pub use crate::sync::{sync, sync_with, token_may_go_to};
