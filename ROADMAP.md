@@ -933,4 +933,3 @@ follows:
 | 2026-10-29 | #252 E4 review: Exchange sync states are bound to their pages and a state is kept only after the page it followed (progress log) |
 | 2026-10-29 | #252 E4 second review: a blocked Exchange folder is named and blocks only itself; a lost page keeps the end of its run from sweeping (progress log) |
 | 2026-10-29 | #252 E3 review: the sign-in goes only in answer to a Basic challenge; Microsoft's consumer mail is refused up front (progress log) |
-| 2026-11-04 | #252: calendars, address books and to-dos over Exchange Web Services, and shared ones opened by address (progress log); tried on a Grommunio container |
