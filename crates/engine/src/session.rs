@@ -757,6 +757,10 @@ pub struct Compose {
     /// since 1970). A time that has passed by the time of Send is no delay.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub send_at: Option<i64>,
+    /// Sign (`compose.sign`, #30 R16a): `None` while the owner hasn't set it for this message,
+    /// and the account's Always add a Digital signature holds, as it stands at Send.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sign: Option<bool>,
     pub in_reply_to: String,
     pub references: Vec<String>,
     /// The signature put in the body (its paragraphs are marked there): which one, how it lays

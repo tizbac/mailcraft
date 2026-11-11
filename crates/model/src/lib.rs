@@ -60,6 +60,7 @@ pub mod senders;
 mod senders_tests;
 pub mod shown;
 pub mod signature;
+pub mod signing;
 pub mod subscription;
 pub mod sync;
 mod task;
