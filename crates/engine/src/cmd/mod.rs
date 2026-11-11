@@ -179,6 +179,9 @@ mod snooze_review_tests;
 mod snooze_servers_tests;
 #[cfg(test)]
 mod snooze_tests;
+pub mod signing;
+#[cfg(test)]
+mod signing_tests;
 pub mod sync_progress;
 pub mod tasks;
 pub mod tasks_remote;
@@ -257,6 +260,7 @@ pub fn registry() -> Registry {
     v.extend(react::specs());
     v.extend(signature::specs());
     v.extend(senders::specs());
+    v.extend(signing::specs());
     v.extend(graph_mail::specs());
     v.extend(jmap_mail::specs());
     v.extend(ews_mail::specs());

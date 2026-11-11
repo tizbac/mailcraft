@@ -100,6 +100,7 @@ mod dialog_report_tests;
 #[cfg(test)]
 mod dialog_scrim_tests;
 pub mod dialogs;
+pub mod digital_signatures;
 #[cfg(test)]
 mod draft_continue_tests;
 #[cfg(test)]
@@ -433,6 +434,8 @@ pub struct Services {
     /// test the account with one request for the Inbox ([`ews_setup`]). Absent where no host does
     /// (the browser): Add Account then says it can't connect.
     pub ews_setup: Option<Box<dyn Fn(ews_setup::EwsSetupJob) -> Receiver<ews_setup::EwsSetupEvent>>>,
+    /// Desktop: the owner's keys that can add a Digital signature, and a smartcard's PIN (#30).
+    pub signing: Option<std::sync::Arc<dyn digital_signatures::SigningHost>>,
     /// Whether the host holds the credential of this JMAP account itself (a page that signed the
     /// owner in to its server): for such an account the window never asks for a password, and its
     /// jobs go without one. Absent, or false for an account: the owner types it.
@@ -4247,6 +4250,12 @@ impl MailApp {
             "Microsoft",
             self.session.interface_language,
             &mut said,
+        ) | mailcraft_engine::cmd::signing::hold_unsigned(
+            &mut self.session.mailbox,
+            account,
+            &result.unsigned,
+            self.session.interface_language,
+            &mut said,
         ) {
             self.session.mailbox_changed();
             if let Some(first) = said.first() {
@@ -4390,7 +4399,7 @@ impl MailApp {
             return;
         }
         self.note_sync_problems(account, &errors, false);
-        let skip: Vec<Id> = result.sent.iter().chain(&result.held).copied().collect();
+        let skip: Vec<Id> = result.sent.iter().chain(&result.held).copied().chain(result.unsigned.iter().map(|u| u.message)).collect();
         if let Err(e) = self.start_sync(&json!({"account": account, "quiet": quiet, "afterGraph": true, "skip": skip})) {
             self.session.sync_progress.end(account, false);
             self.session.sync_status.clear();
@@ -5601,6 +5610,8 @@ impl MailApp {
         // mailbox's times are put by the new clock before anything of it is drawn, and so are
         // the appointments that stand open.
         self.follow_zone();
+        // A smartcard that wanted its PIN for a Digital signature is asked about (#30).
+        self.ask_for_signing_pin();
         // Escape and Enter go to one place, and to nothing under it: worked out here, before
         // anything reads them (#406). The agent's question is on top of everything.
         keys::gate_main(self, &ctx);
