@@ -1099,6 +1099,7 @@ fn reopened(s: &Session, m: &Message) -> Compose {
         follow_up: m.follow_up.filter(|f| f.if_no_reply).map(|f| if f.days > 0 { FollowUpPlan::Days(f.days) } else { FollowUpPlan::At(f.at) }),
         read_receipt: asked_receipt(m),
         send_at: m.send_at,
+        sign: m.sign,
         in_reply_to: m.in_reply_to.clone(),
         references: m.references.clone(),
         ..Default::default()
@@ -1449,6 +1450,7 @@ fn build_as(s: &Session, c: &Compose, strict: bool, message_id: Option<&str>) ->
             }
         }),
         send_at: c.send_at,
+        sign: c.sign,
         message_id,
         ..Default::default()
     })
@@ -1625,6 +1627,10 @@ pub(super) fn send_now(s: &mut Session) -> CmdResult {
             "which sends its mail: send this message from another account, or save it as a draft to send it from that version",
         ));
     }
+    // What it will be is decided now, from the account's setting as it stands and the owner's
+    // choice for this message (#30 R16a): signed with the key the account signs with, or refused
+    // here, never sent unsigned.
+    m.sign_with = super::signing::will_sign(s, &c).map_err(super::signing::send_refused)?;
     // An account that sends its mail queues the message for the next Send/Receive; a local one
     // has nowhere to send it, so it is filed as sent (and delivered to local accounts it names).
     let queued = account.kind.sends_mail();

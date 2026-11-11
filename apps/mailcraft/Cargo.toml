@@ -22,6 +22,8 @@ image = { workspace = true }
 tempfile = { workspace = true }
 mailcraft-host = { workspace = true }
 mailcraft-ui-egui = { workspace = true }
+# Dragging a message out of the window: OLE on Windows, XDND on Linux.
+mailcraft-drag-out = { workspace = true }
 # The control key file's location (shared with the MCP bridge).
 mailcraft-control-key = { workspace = true }
 # Sockets: Send/Receive runs on a background thread.
@@ -36,6 +38,12 @@ mailcraft-mime-model = { workspace = true }
 mailcraft-vcard = { workspace = true }
 mailcraft-smime = { workspace = true }
 mailcraft-openpgp = { workspace = true }
+# Printing: the system's spooler (CUPS on Linux and macOS, the Windows print spooler) takes the
+# pages MailCraft sets itself. MIT OR Apache-2.0.
+# Pinned to the craft-libs release tag rather than crates.io: the published 1.4.7 asks `winprint`
+# 0.2 for a page-by-page progress call that crate's 0.2 series never had, so a Windows build of it
+# fails to compile. craft-libs pins the maintained BSD-3-Clause winprint fork, which has it.
+craft-print = { git = "https://github.com/storytold/craft-libs", rev = "44086e9c5867bf3c392fcd0e506322785b94ca14" }
 # `clipboard`: since 0.37 eframe has copy and paste behind a feature of its own (on by default, and
 # we turn the defaults off); without it nothing is copied, on any platform.
 eframe = { workspace = true, features = ["default_fonts", "wgpu", "accesskit", "wayland", "x11", "clipboard"] }
@@ -64,6 +72,16 @@ mailcraft-ews = { workspace = true, features = ["stand-in"] }
 # A sign-in the provider refuses, as `mailcraft-net` says it.
 mailcraft-proto = { workspace = true }
 mailcraft-charset = { workspace = true }
+# Digital signatures made at Send checked by verifiers that aren't MailCraft's (#30 part 5):
+# rPGP's own for OpenPGP, RustCrypto's CMS reader and ECDSA for S/MIME; the keys and the
+# example.org certificate are made in the test. All already in the tree, the same versions.
+pgp = { workspace = true }
+rand = { version = "0.8", default-features = false, features = ["std", "std_rng"] }
+rcgen = { workspace = true }
+cms = { workspace = true }
+der = { workspace = true }
+p256 = { workspace = true }
+sha2 = { workspace = true }
 
 [build-dependencies]
 # Icon + VERSIONINFO for mailcraft.exe; build.rs only uses it when the target is Windows.
@@ -153,6 +171,11 @@ windows = { version = "0.62", features = [
 ] }
 # A `.p12` goes to the Windows Runtime's import as base64 text (`key_holders/windows_store.rs`).
 base64 = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Dragging a file out of the window on Wayland: a data source on the window's own wl_display, the
+# one thing winit leaves unimplemented (`drag_out`). MIT OR Apache-2.0.
+limn-dnd = "0.1.43"
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
 # Probe X11 before choosing it for close-to-tray, so a stale DISPLAY keeps native Wayland.
