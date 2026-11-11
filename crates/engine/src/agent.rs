@@ -206,6 +206,8 @@ const SAFE: &[&str] = &[
     "mail.cancelSend",
     // The message Send put in the Outbox for its wait is taken back and opened to write again (#950).
     "compose.undoSend",
+    // Sign (#30 R23): the key is used only at Send, which an agent asks the owner about.
+    "compose.sign",
     "compose.attach",
     "compose.attachItem",
     "insert.businessCard",
