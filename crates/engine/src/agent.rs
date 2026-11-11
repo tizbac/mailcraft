@@ -20,6 +20,9 @@
 use mailcraft_model::{FolderKind, Id, Mailbox, Task};
 use serde_json::{Value, json};
 
+#[cfg(test)]
+#[path = "agent_signing_tests.rs"]
+mod agent_signing_tests;
 pub mod bind;
 #[cfg(test)]
 mod delete_form_tests;
@@ -209,6 +212,10 @@ const SAFE: &[&str] = &[
     "mail.cancelSend",
     // The message Send put in the Outbox for its wait is taken back and opened to write again (#950).
     "compose.undoSend",
+    // Sign (#30 R23): the key is used only at Send, which an agent asks the owner about.
+    // Sign (#30 R23): the key is used only at Send, which an agent asks the owner about; turning
+    // Sign off is asked about every time (`sign_turns_off`).
+    "compose.sign",
     "compose.attach",
     "compose.attachItem",
     "insert.businessCard",
@@ -636,6 +643,8 @@ const NEVER: &[&str] = &[
     // for the owner.
     "mail.dismissReminder",
     "mail.postponeReminder",
+    // Which key an account Digitally signs with, and whether always (#30): the owner's alone.
+    "account.setSigning",
     // The host's side of a synchronisation: what came from a server is the host's to say.
     "sync.request",
     "sync.apply",
@@ -911,6 +920,9 @@ pub fn classify(s: &Session, id: &str, params: &Value) -> Access {
         }
         "ui.sync" if params.get("password").is_some_and(|v| !v.is_null()) => Access::Owner(Class::Accounts),
         "mail.unsubscribe" if sends => Access::Owner(Class::Send),
+        // A message that was to go Digitally signed going without: the owner says so in the
+        // window, every time, whatever `--allow` says (turning Sign on is the agent's to do).
+        "compose.sign" if sign_turns_off(s, params) => Access::Asked(Class::Send),
         // A command that closes the message being written, or puts another in its place, saves
         // what isn't saved of it first (#442). Letting that go instead (`discard`) is throwing it
         // away. When the owner wrote in it, the window asks them every time either way, saved or
@@ -2749,6 +2761,40 @@ fn item_text(s: &Session, item: &crate::SelectedEvent) -> String {
 
 /// What a call would do, in a sentence that follows "An agent wants to …" (for the owner's
 /// question; never trusted for anything else).
+/// Whether `compose.sign` with `params` turns Sign off for the message being written: it would be
+/// Digitally signed now, and `value` is false, or absent (the other way round).
+fn sign_turns_off(s: &Session, params: &Value) -> bool {
+    let Some(c) = s.compose.as_ref() else { return false };
+    let now = s.mailbox.account(c.account).or(s.mailbox.default_account()).is_some_and(|a| a.signing.signs(c.sign));
+    let on = match params.get("value") {
+        None | Some(Value::Null) => !now,
+        Some(Value::Bool(b)) => *b,
+        // (The command refuses it.)
+        Some(_) => return false,
+    };
+    now && !on
+}
+
+/// What the message being written will be at Send, for the question about sending it: Digitally
+/// signed and with what, without a Digital signature, or to be signed and refused for now.
+fn signing_text(s: &Session, c: &crate::Compose) -> String {
+    use mailcraft_model::digital_signature::SignatureFormat;
+    match crate::cmd::signing::will_sign(s, c) {
+        Ok(None) => ", without a Digital signature".to_string(),
+        Ok(Some(key)) => {
+            let kind = match key.format {
+                SignatureFormat::Smime => "S/MIME certificate",
+                SignatureFormat::OpenPgp => "OpenPGP key",
+            };
+            let fp = crate::digital_signature::fingerprint_digits(&key.fingerprint);
+            let tail = fp.get(fp.len().saturating_sub(16)..).unwrap_or(&fp);
+            let name = if key.label.is_empty() { String::new() } else { format!("{} ", quoted(&clip(&key.label, 80))) };
+            format!(", Digitally signed with the {kind} {name}(…{tail})")
+        }
+        Err(_) => ", which is to be Digitally signed and can't be yet, so Send refuses it".to_string(),
+    }
+}
+
 pub fn describe(s: &Session, id: &str, params: &Value) -> String {
     // What the window would lose (`unsaved`) is said in words, never shown as params.
     let form = matches!(id, "ui.closeDialog" | "ui.dialog" | "ui.closeWindow");
@@ -2840,7 +2886,7 @@ fn what_it_does(s: &Session, id: &str, params: &Value) -> String {
                 };
                 // From a sender address other than the account's own, said (#797).
                 let from = if c.from.is_empty() { String::new() } else { format!(" from {}", plain(&c.from)) };
-                format!("send {}{from} to {to}{files}", quoted(&c.subject))
+                format!("send {}{from} to {to}{files}{}", quoted(&c.subject), signing_text(s, c))
             }
             None => "send the message being written".to_string(),
         },
@@ -2875,6 +2921,12 @@ fn what_it_does(s: &Session, id: &str, params: &Value) -> String {
             let ids = taken(params);
             format!("let {} go not before {when}", messages_text(s, &ids))
         }
+        "compose.sign" => match s.compose.as_ref() {
+            Some(c) if sign_turns_off(s, params) => {
+                format!("turn Sign off for {}: it will be sent without a Digital signature", quoted(&c.subject))
+            }
+            _ => "turn Sign on for the message being written".to_string(),
+        },
         "mail.move" | "mail.copy" => {
             // What the agent names (#620), read as the command reads them (#503, #451).
             let ids = taken(params);
