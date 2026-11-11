@@ -244,6 +244,26 @@ fn a_deleted_folder_goes_with_its_mail_and_a_renamed_one_keeps_where_it_went_on_
 }
 
 #[test]
+fn a_folder_moved_on_the_server_follows_it_into_deleted_items() {
+    let (mut s, account) = session();
+    list(&mut s, account);
+    let projects = s.mailbox.folder_by_server(account, "F5").unwrap();
+    // Webmail deletes the folder: the server moves it into Deleted Items, which comes as an
+    // Update of the same folder whose parent is now that folder (#252).
+    let delta = EwsFolderDeltas {
+        changed: vec![folder("F9", "", "Deleted Items", FolderKind::Deleted), folder("F5", "F9", "Projects", FolderKind::Custom)],
+        afresh: false,
+        ..Default::default()
+    };
+    apply_ews_mail(&mut s, EwsMailResult { folders: Some(delta), hierarchy: "HIER-2".into(), ..piece(account) }).unwrap();
+    let deleted = s.mailbox.folder_by_server(account, "F9").unwrap();
+    let moved = s.mailbox.folder_by_server(account, "F5").unwrap();
+    assert_eq!(moved, projects, "the same local folder, with its mail");
+    assert_eq!(s.mailbox.folder(moved).unwrap().parent, Some(deleted), "it lies under Deleted Items here too");
+    assert_eq!(s.mailbox.folder(moved).unwrap().server.as_ref().unwrap().parent, "F9");
+}
+
+#[test]
 fn a_page_for_a_folder_that_is_not_here_is_passed_over_with_its_state() {
     let (mut s, account) = session();
     let said = read(&mut s, account, page("F1", vec![mail("A1", "Kickoff", 1_000)], true, true), "S-1");
