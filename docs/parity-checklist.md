@@ -69,7 +69,6 @@
 | Options | Themes | Themes | `options.theme` |
 | Options | Themes | Page Color | `options.pageColor` |
 | Options | Encrypt | Encrypt | `compose.encrypt` |
-| Options | Encrypt | Sign | `compose.sign` |
 | Options | Tracking | Use Voting Buttons | `compose.voting` |
 | Options | Tracking | Request a Delivery Receipt | `compose.deliveryReceipt` |
 | Options | More Options | Save Sent Item To | `compose.saveSentTo` |
