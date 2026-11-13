@@ -929,8 +929,13 @@ msgid "Address"
 msgstr "Adresă"
 
 #. interface
-#: crates/ui-egui/src/people_view.rs
+#: crates/ui-egui/src/forms.rs crates/ui-egui/src/people_view.rs
 msgid "Address Book"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/forms.rs
+msgid "Address book unavailable"
 msgstr ""
 
 #. interface
@@ -1051,6 +1056,11 @@ msgstr "Permiteți păstrarea regulilor pe server"
 #, fuzzy
 msgid "Allow Keeping Tasks in Step with Microsoft To Do"
 msgstr "Permiteți sincronizarea sarcinilor cu Microsoft To Do"
+
+#. interface
+#: crates/ui-egui/src/account_setup.rs
+msgid "Allow MailCraft on your Linchange account"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/auto_replies.rs
@@ -1415,6 +1425,11 @@ msgid "Apply Downloaded To-dos"
 msgstr "Aplicare sarcini descărcate"
 
 #. command label
+#: crates/engine/src/cmd/ews_directory.rs
+msgid "Apply Read Exchange Calendar, Contacts and To-dos"
+msgstr ""
+
+#. command label
 #: crates/engine/src/cmd/search_server.rs
 #, fuzzy
 msgid "Apply Results from the Server"
@@ -1680,6 +1695,11 @@ msgstr "Cere doar e-mailul, fără calendar și contacte, care pot fi conectate 
 #, fuzzy
 msgid "At most {max} contacts can be merged at once."
 msgstr "Se pot îmbina cel mult {max} contacte odată."
+
+#. what a command says
+#: crates/engine/src/cmd/contacts_opened.rs
+msgid "At most {n} address books can be opened by address: remove one first."
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/calendar_opened.rs
@@ -4512,6 +4532,11 @@ msgstr "Tot conținutul din „{folder}” va fi șters definitiv."
 msgid "Everything the interface does is a command: {commands} of them, covering {percent}% of the feature catalog. The command line, the control channel and the MCP server run the same commands."
 msgstr "Tot ce face interfața este o comandă: {commands} în total, acoperind {percent}% din catalogul de funcții. Linia de comandă, canalul de control și serverul MCP rulează aceleași comenzi."
 
+#. command label
+#: crates/engine/src/cmd/ews_directory.rs
+msgid "Exchange Calendar, Contacts and To-dos to Read"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup/exchange.rs
 #, fuzzy
@@ -6827,6 +6852,16 @@ msgstr "Luminos"
 msgid "Limited details: and the titles"
 msgstr "Detalii limitate: inclusiv titlurile"
 
+#. name
+#: crates/ui-egui/src/account_setup.rs
+msgid "Linchange"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/account_setup.rs
+msgid "Linchange's sign-in page is open in your browser"
+msgstr ""
+
 #. ribbon
 #: crates/ui-egui/src/ribbon.rs
 #, fuzzy
@@ -6850,6 +6885,11 @@ msgstr "Linkuri"
 #, fuzzy
 msgid "List Accounts"
 msgstr "Listare conturi"
+
+#. command label
+#: crates/engine/src/cmd/people.rs
+msgid "List Address Books"
+msgstr ""
 
 #. command label
 #: crates/engine/src/cmd/calendar_settings.rs
@@ -7115,6 +7155,11 @@ msgstr "E-mail, calendar, persoane și sarcini, scris de la zero în Rust."
 msgid "Mail, calendar, people and tasks, written from scratch in Rust. It runs natively on macOS, Windows, Linux and BSD, and in the browser."
 msgstr "E-mail, calendar, persoane și sarcini, scris de la zero în Rust. Rulează nativ pe macOS, Windows, Linux și BSD, precum și în browser."
 
+#. name
+#: crates/ui-egui/src/account_setup.rs
+msgid "Mail, calendars and address books"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/graph_switch.rs
 #, fuzzy
@@ -7243,6 +7288,11 @@ msgstr "MailCraft are nevoie de browserul sistemului pentru conectare. Puteți f
 #, fuzzy
 msgid "MailCraft now installs its updates itself. Turn this off in File › About."
 msgstr "MailCraft își instalează acum singur actualizările. Opriți asta din Fișier › Despre."
+
+#. interface
+#: crates/ui-egui/src/account_setup.rs
+msgid "MailCraft on {computer}"
+msgstr ""
 
 #. name
 #: crates/engine/src/cmd/rules.rs
@@ -9301,6 +9351,18 @@ msgstr "Deschidere răspunsuri și redirecționări în fereastră nouă"
 msgid "Open Result from the Server"
 msgstr "Deschidere rezultat de pe server"
 
+#. ribbon
+#: crates/ui-egui/src/ribbon.rs
+msgid ""
+"Open Shared\n"
+"Address Book"
+msgstr ""
+
+#. command label, interface
+#: crates/engine/src/cmd/contacts_opened.rs crates/ui-egui/src/dialogs.rs
+msgid "Open Shared Address Book"
+msgstr ""
+
 #. command label, interface
 #: crates/engine/src/cmd/calendar_opened.rs crates/ui-egui/src/backstage.rs crates/ui-egui/src/dialogs.rs crates/ui-egui/src/open_shared.rs
 #, fuzzy
@@ -9399,6 +9461,11 @@ msgstr "Deschideți {name}? {why}"
 
 #. interface
 #: crates/ui-egui/src/open_shared.rs
+msgid "Opened the address book of {address}. It is read at the next Send/Receive, and kept on this computer only."
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/open_shared.rs
 #, fuzzy
 msgid "Opened the calendar of {name}. It is listed under Shared Calendars, on this computer only."
 msgstr "S-a deschis calendarul lui {name}. Apare la Calendare partajate, doar pe acest computer."
@@ -9408,6 +9475,11 @@ msgstr "S-a deschis calendarul lui {name}. Apare la Calendare partajate, doar pe
 #, fuzzy
 msgid "Opened with {owner}'s sign-in. It needs Full Access to the mailbox, which your organisation's administrator gives. Microsoft asks you once to let MailCraft read and change shared mailboxes. What you change in it goes to it. Mail you write in it is from its address, and sending as it needs Send As or Send on Behalf permission: Microsoft asks you once more at your first send."
 msgstr "Deschis cu conectarea lui {owner}. Necesită Acces deplin la cutia poștală, pe care îl acordă administratorul organizației. Microsoft vă întreabă o dată dacă permiteți ca MailCraft să citească și să modifice cutii poștale partajate. Ce modificați în ea ajunge la ea. E-mailurile pe care le scrieți din ea sunt de la adresa ei, iar trimiterea în numele ei necesită permisiunea Trimitere ca sau Trimitere în numele: Microsoft vă mai întreabă o dată la prima trimitere."
+
+#. interface
+#: crates/ui-egui/src/dialogs.rs
+msgid "Opened with {owner}'s sign-in. It needs Full Access to the mailbox, which your organisation's administrator gives. What you change in it goes to it. Mail you write in it is from its address, and sending as it needs Send As or Send on Behalf permission, which the administrator also gives."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/attachment_open.rs
@@ -9733,7 +9805,7 @@ msgid "Pending development"
 msgstr "În dezvoltare"
 
 #. command label, interface, name, ribbon location
-#: crates/engine/src/cmd/people.rs crates/engine/src/cmd/people_merge.rs crates/engine/src/cmd/view.rs crates/engine/src/session.rs crates/ui-egui/src/people_view.rs
+#: crates/engine/src/cmd/contacts_opened.rs crates/engine/src/cmd/people.rs crates/engine/src/cmd/people_merge.rs crates/engine/src/cmd/view.rs crates/engine/src/session.rs crates/ui-egui/src/people_view.rs
 #, fuzzy
 msgid "People"
 msgstr "Persoane"
@@ -10210,6 +10282,16 @@ msgstr "Citiți acum din nou Favoritele din Outlook"
 
 #. interface
 #: crates/ui-egui/src/dialogs.rs
+msgid "Read with {owner}'s sign-in, for as long as you keep it: the person has to have shared their address book with you. It is kept on this computer only, and read at the next Send/Receive."
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/dialogs.rs
+msgid "Read with {owner}'s sign-in, for as long as you keep it: the person has to have shared their calendar with you. It is kept on this computer only, and read at the next Send/Receive."
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/dialogs.rs
 #, fuzzy
 msgid "Read with {owner}'s sign-in, for as long as you keep it: the person has to have shared their calendar with you. It is kept on this computer only: it won't appear in Outlook or on your other devices. Microsoft asks you once to let MailCraft read other people's calendars."
 msgstr "Citit cu conectarea lui {owner}, cât timp îl păstrați: persoana trebuie să-și fi partajat calendarul cu dvs. Se păstrează doar pe acest computer: nu va apărea în Outlook sau pe celelalte dispozitive. Microsoft vă întreabă o dată dacă permiteți ca MailCraft să citească calendarele altor persoane."
@@ -10501,6 +10583,11 @@ msgstr "Eliminare cheie publică"
 #, fuzzy
 msgid "Remove Recurrence"
 msgstr "Eliminare recurență"
+
+#. command label
+#: crates/engine/src/cmd/contacts_opened.rs
+msgid "Remove Shared Address Book"
+msgstr ""
 
 #. command label, interface
 #: crates/engine/src/cmd/calendar_opened.rs crates/ui-egui/src/calendar_view.rs crates/ui-egui/src/dialogs.rs
@@ -11595,7 +11682,7 @@ msgid "Send & Receive"
 msgstr "Trimitere și primire"
 
 #. ribbon location
-#: crates/engine/src/cmd/account.rs crates/engine/src/cmd/auto_replies.rs crates/engine/src/cmd/calendar_settings.rs crates/engine/src/cmd/ews_mail.rs crates/engine/src/cmd/graph_mail.rs crates/engine/src/cmd/graph_send.rs crates/engine/src/cmd/jmap_mail.rs crates/engine/src/cmd/remote.rs crates/engine/src/cmd/rules_remote.rs crates/engine/src/cmd/send_receive.rs crates/engine/src/cmd/snooze.rs crates/engine/src/cmd/sync_progress.rs crates/engine/src/cmd/tasks_remote.rs crates/ui-egui/src/lib.rs
+#: crates/engine/src/cmd/account.rs crates/engine/src/cmd/auto_replies.rs crates/engine/src/cmd/calendar_settings.rs crates/engine/src/cmd/ews_directory.rs crates/engine/src/cmd/ews_mail.rs crates/engine/src/cmd/graph_mail.rs crates/engine/src/cmd/graph_send.rs crates/engine/src/cmd/jmap_mail.rs crates/engine/src/cmd/remote.rs crates/engine/src/cmd/rules_remote.rs crates/engine/src/cmd/send_receive.rs crates/engine/src/cmd/snooze.rs crates/engine/src/cmd/sync_progress.rs crates/engine/src/cmd/tasks_remote.rs crates/ui-egui/src/lib.rs
 #, fuzzy
 msgid "Send / Receive"
 msgstr "Trimitere / primire"
@@ -12469,6 +12556,11 @@ msgid "Sign in securely with Google in your browser. Your Google password is nev
 msgstr "Conectați-vă securizat cu Google în browser. Parola Google nu se introduce niciodată în MailCraft."
 
 #. interface
+#: crates/ui-egui/src/account_setup.rs
+msgid "Sign in there and allow MailCraft on {computer}. This window carries on by itself once you have."
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/account_setup/help.rs
 #, fuzzy
 msgid "Sign in there as {address}. This window carries on by itself once you have."
@@ -13338,6 +13430,11 @@ msgid "That is not a sender's address"
 msgstr "Aceasta nu este adresa unui expeditor"
 
 #. what a command says
+#: crates/engine/src/cmd/contacts_opened.rs
+msgid "That is this account's own address: its own address book is there already."
+msgstr ""
+
+#. what a command says
 #: crates/engine/src/cmd/calendar_opened.rs
 #, fuzzy
 msgid "That is this account's own address: its own calendar is there already."
@@ -13426,6 +13523,21 @@ msgstr "Toată seria"
 
 #. interface
 #: crates/ui-egui/src/account_setup.rs
+msgid "The Linchange address isn't a server address"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/account_setup.rs
+msgid "The Linchange approval didn't finish"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/lib.rs
+msgid "The Linchange sign-in stopped unexpectedly"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "The account changed since its settings were opened. Reopen Account Settings before switching sign-in methods."
 msgstr "Contul s-a schimbat de când i-au fost deschise setările. Redeschideți Setări cont înainte de a schimba metoda de conectare."
@@ -13501,6 +13613,31 @@ msgstr "Serverul contului nu i-a dat încă acestei întâlniri un link de parti
 #, fuzzy
 msgid "The account's server makes it when the meeting is sent; the link to join by comes back with it."
 msgstr "Serverul contului îl creează când se trimite întâlnirea; linkul de participare vine odată cu ea."
+
+#. what a command says
+#: crates/engine/src/cmd/people.rs
+msgid "The address book \"{name}\" can only be read: the server hasn't given this account permission to change its contacts."
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/people.rs
+msgid "The address book \"{name}\" is no longer available. Send/Receive may bring it back, and the contact can be changed then."
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/forms.rs
+msgid "The address book chosen is no longer available. Send/Receive may bring it back, and the contact can be saved then."
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/contacts_opened.rs
+msgid "The address book of {address} is open already."
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/people_view.rs
+msgid "The address book this contact came from is no longer in the account's list, so changes here could not reach the server. Send/Receive may bring it back."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/approval.rs
@@ -13751,6 +13888,11 @@ msgstr "Contactul {id} este numit de două ori."
 msgid "The contact's form was closed: open it again to add the key"
 msgstr "Formularul contactului a fost închis: deschideți-l din nou ca să adăugați cheia"
 
+#. interface
+#: crates/ui-egui/src/dav_sync.rs
+msgid "The contacts couldn't be saved: {error}"
+msgstr ""
+
 #. interface, what a command says
 #: crates/engine/src/sync_driver/calendar_plan.rs crates/ui-egui/src/dav_sync.rs crates/ui-egui/src/lib.rs
 #, fuzzy
@@ -13813,6 +13955,11 @@ msgstr ""
 #. interface
 #: crates/ui-egui/src/account_setup/exchange.rs
 msgid "The domain {domain} names a server for automatic setup (Autodiscover). Exchange servers are found that way, and some hosting providers use it for their IMAP mail too. Which is yours? Only the DNS was asked to find it, never the server itself."
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/dialogs.rs
+msgid "The e-mail address of the person whose address book you want to open"
 msgstr ""
 
 #. interface
@@ -14139,6 +14286,11 @@ msgstr "Proprietarul nu a permis verificarea actualizărilor."
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 msgid "The password above is for these calendars and address books."
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/account_setup.rs
+msgid "The password you type there is never given to MailCraft; the page creates a separate application password for this computer."
 msgstr ""
 
 #. interface
@@ -14980,6 +15132,11 @@ msgstr "Această versiune nu poate accesa serverul contului."
 #, fuzzy
 msgid "This build can't reach the server to change automatic replies. Use the desktop app."
 msgstr "Această versiune nu poate accesa serverul pentru a modifica răspunsurile automate. Folosiți aplicația desktop."
+
+#. interface
+#: crates/ui-egui/src/lib.rs
+msgid "This build can't sign in to Linchange"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/lib.rs
@@ -15907,10 +16064,15 @@ msgid "Try Signing In Again"
 msgstr "Încercați din nou conectarea"
 
 #. interface
-#: crates/ui-egui/src/account_setup/help.rs crates/ui-egui/src/nav.rs crates/ui-egui/src/reading/remote.rs crates/ui-egui/src/report_problem.rs
+#: crates/ui-egui/src/account_setup.rs crates/ui-egui/src/account_setup/help.rs crates/ui-egui/src/nav.rs crates/ui-egui/src/reading/remote.rs crates/ui-egui/src/report_problem.rs
 #, fuzzy
 msgid "Try again"
 msgstr "Încercați din nou"
+
+#. interface
+#: crates/ui-egui/src/account_setup.rs
+msgid "Try again to open the page, or cancel and check the server's address."
+msgstr ""
 
 #. date and time, name
 #: crates/i18n/src/date.rs crates/time/src/lib.rs
@@ -16006,6 +16168,11 @@ msgstr "Scrieți adresa de e-mail și MailCraft găsește restul: Microsoft 365,
 #, fuzzy
 msgid "Typing * or - and a space at the start of a line starts a bulleted list, 1. or 1) a numbered one. Undo puts what you typed back."
 msgstr "Dacă scrieți * sau - și un spațiu la începutul unui rând, începe o listă cu marcatori, iar 1. sau 1) începe una numerotată. Anulare readuce ce ați scris."
+
+#. interface
+#: crates/ui-egui/src/people_view.rs
+msgid "Unavailable"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/import_pst.rs
@@ -17473,6 +17640,11 @@ msgstr "adăugați întâi un cont (Fișier › Adăugare cont)"
 msgid "add at least one recipient"
 msgstr "adăugați cel puțin un destinatar"
 
+#. what a command says, why a command can't run
+#: crates/engine/src/cmd/contacts_opened.rs
+msgid "address books open under an Exchange server account"
+msgstr ""
+
 #. what a command says
 #: crates/engine/src/cmd/account.rs
 #, fuzzy
@@ -18023,7 +18195,7 @@ msgid "no account here keeps its rules on its server"
 msgstr "niciun cont de aici nu își păstrează regulile pe server"
 
 #. what a command says, why a command can't run
-#: crates/engine/src/cmd/ews_mail.rs
+#: crates/engine/src/cmd/ews_directory.rs crates/engine/src/cmd/ews_mail.rs
 #, fuzzy
 msgid "no account is an Exchange server account"
 msgstr "niciun cont nu este cont de server Exchange"
@@ -18059,10 +18231,20 @@ msgid "no account with id {account}"
 msgstr "nu există cont cu ID-ul {account}"
 
 #. what a command says
-#: crates/engine/src/cmd/account.rs crates/engine/src/cmd/calendar_opened.rs crates/engine/src/cmd/calendar_settings.rs crates/engine/src/cmd/compose.rs crates/engine/src/cmd/ews_mail.rs crates/engine/src/cmd/folder.rs crates/engine/src/cmd/graph_mail.rs crates/engine/src/cmd/graph_send.rs crates/engine/src/cmd/graph_switch.rs crates/engine/src/cmd/jmap_mail.rs crates/engine/src/cmd/offline.rs crates/engine/src/cmd/remote.rs crates/engine/src/cmd/rules.rs crates/engine/src/cmd/search_server.rs crates/engine/src/cmd/shared.rs crates/engine/src/cmd/signature.rs
+#: crates/engine/src/cmd/account.rs crates/engine/src/cmd/calendar_opened.rs crates/engine/src/cmd/calendar_settings.rs crates/engine/src/cmd/compose.rs crates/engine/src/cmd/ews_directory.rs crates/engine/src/cmd/ews_mail.rs crates/engine/src/cmd/folder.rs crates/engine/src/cmd/graph_mail.rs crates/engine/src/cmd/graph_send.rs crates/engine/src/cmd/graph_switch.rs crates/engine/src/cmd/jmap_mail.rs crates/engine/src/cmd/offline.rs crates/engine/src/cmd/remote.rs crates/engine/src/cmd/rules.rs crates/engine/src/cmd/search_server.rs crates/engine/src/cmd/shared.rs crates/engine/src/cmd/signature.rs
 #, fuzzy
 msgid "no account with id {id}"
 msgstr "nu există cont cu ID-ul {id}"
+
+#. why a command can't run
+#: crates/engine/src/cmd/contacts_opened.rs
+msgid "no address book was opened by address"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/contacts_opened.rs
+msgid "no address book {address} is open"
+msgstr ""
 
 #. why a mail server couldn't be used
 #: crates/net/src/transport.rs
@@ -18466,16 +18648,9 @@ msgid "select an appointment first"
 msgstr "selectați întâi o programare"
 
 #. what a command says, why a command can't run
-#: crates/engine/src/cmd/shared.rs
-#, fuzzy
-msgid "shared mailboxes open under an account kept in step through Microsoft Graph"
-msgstr "cutiile poștale partajate se deschid sub un cont sincronizat prin Microsoft Graph"
-
-#. what a command says
-#: crates/model/src/mailbox.rs
-#, fuzzy
-msgid "shared mailboxes open under an account that is kept in step through Microsoft Graph"
-msgstr "cutiile poștale partajate se deschid sub un cont sincronizat prin Microsoft Graph"
+#: crates/engine/src/cmd/shared.rs crates/model/src/mailbox.rs
+msgid "shared mailboxes open under a Microsoft or Exchange server account"
+msgstr ""
 
 #. why a mail server couldn't be used
 #: crates/net/src/lib.rs
@@ -18500,6 +18675,11 @@ msgstr "conectarea a eșuat: {reason}"
 #, fuzzy
 msgid "someone@example.org or @example.org"
 msgstr "cineva@example.org sau @example.org"
+
+#. what a command says
+#: crates/engine/src/cmd/contacts_opened.rs
+msgid "that account can't open an address book by address"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/calendar.rs
@@ -18628,7 +18808,7 @@ msgid "the account has no user name or e-mail address to sign in with"
 msgstr "contul nu are nume de utilizator sau adresă de e-mail cu care să se conecteze"
 
 #. what a command says
-#: crates/engine/src/cmd/calendar/invitation.rs crates/engine/src/cmd/calendar_opened.rs crates/engine/src/cmd/compose.rs
+#: crates/engine/src/cmd/calendar/invitation.rs crates/engine/src/cmd/calendar_opened.rs crates/engine/src/cmd/compose.rs crates/engine/src/cmd/contacts_opened.rs
 #, fuzzy
 msgid "the account is gone"
 msgstr "contul nu mai există"
@@ -18964,7 +19144,7 @@ msgid "the result would make this account keep more sync state than is taken in"
 msgstr "rezultatul ar face ca acest cont să păstreze mai multă stare de sincronizare decât se poate prelua"
 
 #. what a command says
-#: crates/engine/src/cmd/ews_mail.rs
+#: crates/engine/src/cmd/ews_directory.rs crates/engine/src/cmd/ews_mail.rs
 #, fuzzy
 msgid "the result {why}"
 msgstr "rezultatul {why}"
@@ -19527,11 +19707,21 @@ msgstr "acest cont nu are dosarul {folder}"
 msgid "this account may not save it"
 msgstr "acest cont nu are voie să-l salveze"
 
+#. interface
+#: crates/ui-egui/src/account_setup.rs
+msgid "this computer"
+msgstr ""
+
 #. what a command says
 #: crates/engine/src/cmd/people.rs
 #, fuzzy
 msgid "this contact has no e-mail address"
 msgstr "acest contact nu are adresă de e-mail"
+
+#. what a command says
+#: crates/engine/src/cmd/ews_directory.rs
+msgid "this directory was for another account, not for {name}"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/remote.rs
@@ -20185,7 +20375,12 @@ msgid "{name} has declined this meeting."
 msgstr "{name} a refuzat această întâlnire."
 
 #. what a command says
-#: crates/engine/src/cmd/ews_mail.rs
+#: crates/engine/src/cmd/ews_directory.rs crates/engine/src/cmd/ews_mail.rs
+msgid "{name} has no Exchange server account it is opened through"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/ews_directory.rs crates/engine/src/cmd/ews_mail.rs
 #, fuzzy
 msgid "{name} has no Exchange server address that can be used"
 msgstr "{name} nu are o adresă de server Exchange utilizabilă"
@@ -20287,7 +20482,7 @@ msgid "{name} isn't a shared mailbox: remove it with account.remove"
 msgstr "{name} nu este o cutie poștală partajată: eliminați-o cu account.remove"
 
 #. what a command says
-#: crates/engine/src/cmd/account.rs crates/engine/src/cmd/ews_mail.rs
+#: crates/engine/src/cmd/account.rs crates/engine/src/cmd/ews_directory.rs crates/engine/src/cmd/ews_mail.rs
 #, fuzzy
 msgid "{name} isn't an Exchange server account"
 msgstr "{name} nu este un cont de server Exchange"
@@ -21350,6 +21545,14 @@ msgstr "„{subject}” era prea mare pentru descărcare: aici e doar antetul lu
 #, fuzzy
 msgid "“{subject}” wasn't found on its server, so it can't be forwarded as an attachment"
 msgstr "„{subject}” nu a fost găsit pe server, deci nu poate fi redirecționat ca atașament"
+
+#, fuzzy
+#~ msgid "shared mailboxes open under an account kept in step through Microsoft Graph"
+#~ msgstr "cutiile poștale partajate se deschid sub un cont sincronizat prin Microsoft Graph"
+
+#, fuzzy
+#~ msgid "shared mailboxes open under an account that is kept in step through Microsoft Graph"
+#~ msgstr "cutiile poștale partajate se deschid sub un cont sincronizat prin Microsoft Graph"
 
 #, fuzzy
 #~ msgid "Google sign-in is open only to invited testers while Google reviews MailCraft. To join, email systems@ucscaregroup.co.uk."
