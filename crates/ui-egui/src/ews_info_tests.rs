@@ -75,7 +75,11 @@ fn a_dav_accounts_secret_is_kept_under_its_servers_too() {
         kind: AccountKind::Imap,
         incoming: Some(Server { host: "mail.example.org".into(), port: 993, ..Default::default() }),
         outgoing: Some(Server { host: "mail.example.org".into(), port: 587, ..Default::default() }),
-        dav: Some(DavServer { caldav: "https://mail.example.org/caldav/".into(), carddav: "https://mail.example.org/carddav/".into() }),
+        dav: Some(DavServer {
+            caldav: "https://mail.example.org/caldav/".into(),
+            carddav: "https://mail.example.org/carddav/".into(),
+            ..Default::default()
+        }),
         ..Default::default()
     };
     let key = MailApp::secret_key("password", &account);

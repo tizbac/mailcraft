@@ -124,9 +124,9 @@ pub fn finish(server: &str, grant: &AppTokenGrant, cancel: &AtomicBool) -> Resul
                 }
             }
             _ => {
-                return Err(NetError::Proto(mailcraft_proto::ProtoError::Rejected(format!(
-                    "the Linchange server answered {status} to the approval"
-                ))));
+                return Err(NetError::Proto(mailcraft_proto::ProtoError::Rejected(
+                    format!("the Linchange server answered {status} to the approval").into(),
+                )));
             }
         }
         // Sleep in short pieces, so Cancel is noticed promptly.

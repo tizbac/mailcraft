@@ -1158,7 +1158,7 @@ fn services(
                     match mailcraft_net::probe_linchange(&host) {
                         Ok(Some(found)) => {
                             return Ok(Some(mailcraft_ui_egui::DavFound {
-                                services: mailcraft_model::DavServer { caldav: found.caldav, carddav: found.carddav },
+                                services: mailcraft_model::DavServer { caldav: found.caldav, carddav: found.carddav, ..Default::default() },
                                 linchange: found.linchange,
                             }));
                         }

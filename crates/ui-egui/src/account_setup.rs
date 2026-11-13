@@ -310,15 +310,6 @@ pub fn address(text: &str) -> Option<(&str, &str)> {
 /// by.)
 const NO_PASSWORD_HERE: &str = "sign-in failed: the server doesn't take a password on this connection";
 
-/// What the host said went wrong, in the interface language where it is one of the host's own
-/// sentences; what a server said for itself is left as it said it.
-fn in_own_words(error: &str) -> String {
-    match error {
-        NO_PASSWORD_HERE => tl!("sign-in failed: the server doesn't take a password on this connection").to_string(),
-        _ => error.to_string(),
-    }
-}
-
 /// The name of this computer, for naming an application password (`MailCraft on the laptop`).
 fn this_computer() -> String {
     #[cfg(not(target_arch = "wasm32"))]
@@ -1499,7 +1490,7 @@ impl AccountSetup {
         if kind == Kind::Linchange
             && app.services.probe_dav.is_some()
             && let Some((_, domain)) = address(&self.email)
-            && let Some(lookup) = app.services.lookup_mx.as_ref().filter(|_| !app.offline())
+            && let Some(lookup) = app.services.discover.as_ref().filter(|_| !app.offline())
         {
             self.lookup = Some(lookup(domain.to_ascii_lowercase()));
             self.go(Page::Detecting);
@@ -2292,14 +2283,12 @@ impl AccountSetup {
             no = button(ui, tl!("Don't send"), false, true).clicked();
         });
         if no { Some(Action::Back) } else { (yes || pass.submit).then_some(Action::Go) }
-
     }
 
     /// Ask Linchange's own page for an application password, in the system browser. The account
     /// password and its second factor are typed there, never here.
     fn start_linchange_sign_in(&mut self, app: &mut MailApp) {
-        let Some(dav) = self.dav.clone() else { return };
-        let mut server = dav.caldav.trim_end_matches('/');
+        let mut server = self.dav.caldav.trim().trim_end_matches('/');
         if let Some(base) = server.strip_suffix("/caldav") {
             server = base;
         }
@@ -3420,7 +3409,11 @@ mod tests {
     /// for the calendar and address books, and an application password from its own page.
     #[test]
     fn a_linchange_server_at_the_mail_exchanger_is_found() {
-        let dav = DavServer { caldav: "https://mail.example.org/caldav/".into(), carddav: "https://mail.example.org/carddav/".into() };
+        let dav = DavServer {
+            caldav: "https://mail.example.org/caldav/".into(),
+            carddav: "https://mail.example.org/carddav/".into(),
+            ..Default::default()
+        };
         let mut a = app(false);
         lookups(&mut a, Some(Ok(vec!["mail.example.org"])));
         let asked = dav_probes(&mut a, Some(Ok(Some(DavFound { services: dav.clone(), linchange: true }))));
@@ -3431,7 +3424,7 @@ mod tests {
         assert_eq!(asked.lock().unwrap().as_slice(), [vec!["mail.example.org".to_string()]]);
         let w = wizard(&h).unwrap();
         assert_eq!((w.service.as_str(), w.incoming.host.as_str(), w.outgoing.host.as_str()), ("Linchange", "mail.example.org", "mail.example.org"));
-        assert_eq!(w.dav, Some(dav));
+        assert_eq!(w.dav.server().ok().flatten(), Some(dav));
         assert!(w.waiting && says(&h, "Linchange's sign-in page is open in your browser"));
         let asked = sign_ins.lock().unwrap();
         assert_eq!(asked.len(), 1);
