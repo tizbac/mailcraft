@@ -56,6 +56,29 @@ pub fn writes_original(message: &Message) -> bool {
     mime::writes_original(&from_model(message))
 }
 
+
+/// The body of `message` as the entity a Digital signature is made over (#30,
+/// [`mailcraft_mime::signable`]).
+pub fn signable(message: &Message) -> Vec<u8> {
+    mime::signable(&from_model(message))
+}
+
+/// Whether `message` was to be Digitally signed at Send ([`Message::sign_with`]) and what it would
+/// be written as isn't a signed message of that key's form: no signed body kept, one that isn't
+/// `multipart/signed` with a signature, or one signed in the other form (S/MIME for an OpenPGP
+/// key, or the other way round; [`mailcraft_mime::signed_kind`]). Every path that sends mail
+/// refuses such a message (#30).
+pub fn signature_missing(message: &Message) -> bool {
+    use mailcraft_model::digital_signature::SignatureFormat;
+    let Some(key) = &message.sign_with else { return false };
+    let wanted = match key.format {
+        SignatureFormat::Smime => mime::SignedKind::SmimeDetached,
+        SignatureFormat::OpenPgp => mime::SignedKind::PgpDetached,
+    };
+    mime::signed_kind(&from_model(message)) != Some(wanted)
+}
+
+
 /// Write messages as an mbox file ([`mailcraft_mime::write_mbox`]).
 pub fn write_mbox(messages: &[&Message], opts: &WriteOptions) -> Vec<u8> {
     let converted: Vec<mime::Message> = messages.iter().map(|m| from_model(m)).collect();
@@ -198,5 +221,7 @@ fn addresses(list: Vec<mime::Address>) -> Vec<Address> {
 
 #[cfg(test)]
 mod adapter_tests;
+#[cfg(test)]
+mod signing_tests;
 #[cfg(test)]
 mod tests;
