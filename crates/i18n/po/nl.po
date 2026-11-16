@@ -6836,6 +6836,11 @@ msgid "Importing a .pst file isn't supported in the browser yet."
 msgstr "Een .pst-bestand importeren wordt in de browser nog niet ondersteund."
 
 #. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Importing mail"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/security.rs
 #, fuzzy
 msgid "Importing…"
@@ -7585,6 +7590,16 @@ msgid "Larger messages download when you open them. Choosing less removes nothin
 msgstr "Grotere berichten worden gedownload wanneer u ze opent. Minder kiezen verwijdert niets wat al is gedownload."
 
 #. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Largest file to import"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Largest folder import"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/mail_view.rs
 #, fuzzy
 msgid "Largest on top"
@@ -8254,6 +8269,11 @@ msgstr "MailCraft installeert updates nu zelf. Schakel dit uit in Bestand › In
 #, fuzzy
 msgid "MailCraft reaches this account's rules on the server once it switches to Microsoft Graph"
 msgstr "MailCraft bereikt de regels van dit account op de server zodra het overstapt op Microsoft Graph"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "MailCraft reads a mail file whole into memory before it adds anything, and a folder import holds every message it reads until it is done. A limit near this computer's free memory can make MailCraft slow or stop it responding, so raise these only when there is memory to spare."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/security.rs
@@ -8956,6 +8976,16 @@ msgstr "Meer resultaten op de server kunnen nu niet worden opgevraagd"
 #, fuzzy
 msgid "More than one person matches \"{name}\". Choose one:"
 msgstr "Meer dan één persoon komt overeen met „{name}”. Kies er een:"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Most messages from one file"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Most messages in a folder import"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/reading/warnings.rs
@@ -23470,7 +23500,7 @@ msgid "{name} is being sent and received now. Use Stop."
 msgstr "{name} wordt nu verzonden en ontvangen. Gebruik Stoppen."
 
 #. interface, what a command says
-#: crates/engine/src/cmd/attach_item.rs crates/engine/src/cmd/compose.rs crates/ui-egui/src/files.rs
+#: crates/engine/src/cmd/attach_item.rs crates/engine/src/cmd/compose.rs crates/engine/src/cmd/mod.rs crates/engine/src/io.rs crates/ui-egui/src/files.rs
 #, fuzzy
 msgid "{name} is larger than {mb} MB"
 msgstr "{name} is groter dan {mb} MB"

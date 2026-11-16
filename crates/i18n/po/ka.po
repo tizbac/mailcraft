@@ -7103,6 +7103,11 @@ msgid "Importing a .pst file isn't supported in the browser yet."
 msgstr ".pst ფაილის იმპორტი ბრაუზერში ჯერ არ არის მხარდაჭერილი."
 
 #. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Importing mail"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/security.rs
 #, fuzzy
 msgid "Importing…"
@@ -7872,6 +7877,16 @@ msgid "Larger messages download when you open them. Choosing less removes nothin
 msgstr "უფრო დიდი წერილები გახსნისას ჩამოიტვირთება. ნაკლების არჩევა უკვე ჩამოტვირთულს არ შლის."
 
 #. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Largest file to import"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Largest folder import"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/mail_view.rs
 #, fuzzy
 msgid "Largest on top"
@@ -8548,6 +8563,11 @@ msgstr "MailCraft ახლა განახლებებს თავად
 #, fuzzy
 msgid "MailCraft reaches this account's rules on the server once it switches to Microsoft Graph"
 msgstr "MailCraft ამ ანგარიშის სერვერზე არსებულ წესებს მიწვდება, როგორც კი Microsoft Graph-ზე გადაერთვება"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "MailCraft reads a mail file whole into memory before it adds anything, and a folder import holds every message it reads until it is done. A limit near this computer's free memory can make MailCraft slow or stop it responding, so raise these only when there is memory to spare."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/security.rs
@@ -9273,6 +9293,16 @@ msgstr "სერვერზე მეტი შედეგის მოთხ
 #, fuzzy
 msgid "More than one person matches \"{name}\". Choose one:"
 msgstr "სახელს „{name}“ ერთზე მეტი ადამიანი შეესაბამება. აირჩიეთ ერთი:"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Most messages from one file"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Most messages in a folder import"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/reading/warnings.rs
@@ -24012,7 +24042,7 @@ msgid "{name} is being sent and received now. Use Stop."
 msgstr "ანგარიშის {name} გაგზავნა/მიღება ახლა მიმდინარეობს. გამოიყენეთ „შეჩერება“."
 
 #. interface, what a command says
-#: crates/engine/src/cmd/attach_item.rs crates/engine/src/cmd/compose.rs crates/ui-egui/src/files.rs
+#: crates/engine/src/cmd/attach_item.rs crates/engine/src/cmd/compose.rs crates/engine/src/cmd/mod.rs crates/engine/src/io.rs crates/ui-egui/src/files.rs
 #, fuzzy
 msgid "{name} is larger than {mb} MB"
 msgstr "{name} {mb} მბ-ზე დიდია"

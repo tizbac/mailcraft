@@ -5898,6 +5898,11 @@ msgid "Importing a .pst file isn't supported in the browser yet."
 msgstr ""
 
 #. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Importing mail"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/security.rs
 msgid "Importing…"
 msgstr ""
@@ -6540,6 +6545,16 @@ msgid "Larger messages download when you open them. Choosing less removes nothin
 msgstr ""
 
 #. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Largest file to import"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Largest folder import"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/mail_view.rs
 msgid "Largest on top"
 msgstr ""
@@ -7112,6 +7127,11 @@ msgstr ""
 #. name
 #: crates/engine/src/cmd/rules.rs
 msgid "MailCraft reaches this account's rules on the server once it switches to Microsoft Graph"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "MailCraft reads a mail file whole into memory before it adds anything, and a folder import holds every message it reads until it is done. A limit near this computer's free memory can make MailCraft slow or stop it responding, so raise these only when there is memory to spare."
 msgstr ""
 
 #. interface
@@ -7714,6 +7734,16 @@ msgstr ""
 #. interface
 #: crates/ui-egui/src/check_names.rs
 msgid "More than one person matches \"{name}\". Choose one:"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Most messages from one file"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Most messages in a folder import"
 msgstr ""
 
 #. interface
@@ -20004,7 +20034,7 @@ msgid "{name} is being sent and received now. Use Stop."
 msgstr ""
 
 #. interface, what a command says
-#: crates/engine/src/cmd/attach_item.rs crates/engine/src/cmd/compose.rs crates/ui-egui/src/files.rs
+#: crates/engine/src/cmd/attach_item.rs crates/engine/src/cmd/compose.rs crates/engine/src/cmd/mod.rs crates/engine/src/io.rs crates/ui-egui/src/files.rs
 msgid "{name} is larger than {mb} MB"
 msgstr ""
 
