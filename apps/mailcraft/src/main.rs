@@ -1278,7 +1278,7 @@ fn services(
         // window shows its progress and cancels it.
         import_tree: Some(Box::new(move |job: mailcraft_ui_egui::import_tree::TreeJob| {
             background(&tree_ctx, "folder import", move || {
-                mailcraft_engine::import_tree::load_path(&job.path, None, job.count_only, &job.progress).map_err(|e| e.to_string())
+                mailcraft_engine::import_tree::load_path_with(&job.path, None, job.count_only, &job.progress, &job.limits).map_err(|e| e.to_string())
             })
         })),
         // A .pst file's mail, read off the window's thread a batch at a time (#815): a small

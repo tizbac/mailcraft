@@ -10,7 +10,9 @@ use serde_json::{Value, json};
 use crate::cmd::{bad, fail};
 use crate::{CmdError, Session};
 
-/// Largest file read (512 MB).
+/// Largest file read by the commands that aren't the owner's import (512 MB), and the default
+/// limit for one imported mail file. The owner may raise or lower an import's own limit in
+/// File › Options, within [`crate::Prefs`]'s range; everything else stops here.
 pub const MAX_FILE: u64 = 512 << 20;
 
 /// Largest mailbox file read whole in the JSON forms (formats 1 and 2: one self-contained file, or
@@ -299,7 +301,8 @@ pub struct SaveReport {
     pub result: Result<(), String>,
 }
 
-/// Most messages one import takes from an mbox file; the rest are left.
+/// Most messages one import takes from an mbox file by default; the rest are left. The owner may
+/// set this in File › Options ([`crate::Prefs::import_max_messages`]).
 pub const MAX_IMPORT_MESSAGES: usize = 200_000;
 
 /// Why a file named from outside wasn't read ([`read_regular_file`]).
@@ -343,14 +346,21 @@ pub fn regular_file(path: &std::path::Path) -> Result<std::fs::File, ReadError> 
 /// The bytes of a file named from outside ([`regular_file`]), at most [`MAX_FILE`] of them.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn read_regular_file(path: &std::path::Path) -> Result<Vec<u8>, ReadError> {
+    read_regular_file_with_max(path, MAX_FILE)
+}
+
+/// The bytes of a file named from outside, at most `max` of them: the import limits the owner
+/// set, or [`MAX_FILE`] elsewhere.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn read_regular_file_with_max(path: &std::path::Path, max: u64) -> Result<Vec<u8>, ReadError> {
     use std::io::Read as _;
     let file = regular_file(path)?;
-    if file.metadata().map_err(ReadError::Io)?.len() > MAX_FILE {
+    if file.metadata().map_err(ReadError::Io)?.len() > max {
         return Err(ReadError::TooLarge);
     }
     let mut bytes = Vec::new();
-    file.take(MAX_FILE.saturating_add(1)).read_to_end(&mut bytes).map_err(ReadError::Io)?;
-    if u64::try_from(bytes.len()).map_or(true, |n| n > MAX_FILE) {
+    file.take(max.saturating_add(1)).read_to_end(&mut bytes).map_err(ReadError::Io)?;
+    if u64::try_from(bytes.len()).map_or(true, |n| n > max) {
         return Err(ReadError::TooLarge);
     }
     Ok(bytes)
@@ -538,15 +548,21 @@ pub fn import(s: &mut Session, name: &str, bytes: &[u8], folder: Option<Id>) -> 
     match format {
         Format::Mailbox => Err(bad(format!("{name} is a whole mailbox; open it with File › Open"))),
         Format::Eml | Format::Mbox => {
-            // At most MAX_IMPORT_MESSAGES are taken from a file; the one after them tells whether
-            // the file went on ("stopped after N").
+            // The owner's limits (File › Options), kept in range whatever the settings file says.
+            let max_bytes = s.prefs.import_file_bytes();
+            if u64::try_from(bytes.len()).map_or(true, |n| n > max_bytes) {
+                return Err(failed!("{name} is larger than {mb} MB", name, mb = max_bytes >> 20));
+            }
+            // At most the most messages the owner allows are taken from a file; the one after them
+            // tells whether the file went on ("stopped after N").
+            let max_messages = s.prefs.import_max_messages();
             let mut messages: Vec<_> = if format == Format::Eml {
                 vec![mailcraft_mime_model::parse_fetched(bytes)]
             } else {
-                mailcraft_mime_model::mbox_messages(bytes).take(MAX_IMPORT_MESSAGES + 1).collect()
+                mailcraft_mime_model::mbox_messages(bytes).take(max_messages.saturating_add(1)).collect()
             };
-            let stopped = messages.len() > MAX_IMPORT_MESSAGES;
-            messages.truncate(MAX_IMPORT_MESSAGES);
+            let stopped = messages.len() > max_messages;
+            messages.truncate(max_messages);
             if messages.is_empty() {
                 return Err(failed!("{name} has no messages", name));
             }
