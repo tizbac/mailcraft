@@ -546,7 +546,9 @@ An `.eml`, `.mbox`, `.ics`, `.vcf` or `.mailcraft` file from somewhere else.
   `Bcc` together; `Reply-To` as many again), 500 categories and 4 MB of header fields
   (`crates/mime/src/parse.rs`, `header.rs`); the reading pane lists the first 50 names and draws 8
   category chips, and a quote under a reply or forward the first 100 names, each with a count of the
-  rest. An mbox import takes 200,000 messages and says it stopped (`crates/engine/src/io.rs`).
+  rest. An mbox import takes what File › Options allows (by default 200,000 messages and 512 MB
+  a file, 500,000 messages and 4 GB in all, and the settings are kept within fixed ranges), and
+  says when it stopped (`crates/engine/src/io.rs`, `session.rs`).
   A `.mailcraft` file is counted while it is read (`crates/model/src/load_limit.rs`): one that holds
   more items (messages, contacts, events, tasks, accounts, folders, categories) than four times the
   body budget allows at a kilobyte each is refused before it uses the memory. Loading keeps at most

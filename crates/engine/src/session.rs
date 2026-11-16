@@ -988,6 +988,19 @@ pub struct Prefs {
     /// through [`Prefs::undo_send`], which keeps it to what the choice offers.
     #[serde(skip_serializing_if = "is_zero_u8")]
     pub undo_send_secs: u8,
+    /// Most bytes of one imported file (`.eml`, `.mbox`), in mebibytes (`file.import`). Read
+    /// through [`Prefs::import_file_bytes`], which keeps it in range whatever the settings file
+    /// says. A mail file is read whole before it is parsed, so this is memory too.
+    pub import_max_file_mb: u64,
+    /// Most messages one imported mbox file brings in (`file.import`); the rest are left and the
+    /// answer says `stoppedAfter`. Read through [`Prefs::import_max_messages`].
+    pub import_max_messages: u64,
+    /// Most bytes of all the files of one folder import, in mebibytes
+    /// (`file.importFolderTree`). Read through [`Prefs::import_tree_bytes`].
+    pub import_tree_max_mb: u64,
+    /// Most messages one folder import brings in (`file.importFolderTree`). Read through
+    /// [`Prefs::import_tree_messages`].
+    pub import_tree_max_messages: u64,
 }
 
 impl Default for Prefs {
@@ -1026,6 +1039,10 @@ impl Default for Prefs {
             recent_searches: Vec::new(),
             offline: false,
             undo_send_secs: 0,
+            import_max_file_mb: Prefs::IMPORT_FILE_MB_DEFAULT,
+            import_max_messages: Prefs::IMPORT_MESSAGES_DEFAULT,
+            import_tree_max_mb: Prefs::IMPORT_TREE_MB_DEFAULT,
+            import_tree_max_messages: Prefs::IMPORT_TREE_MESSAGES_DEFAULT,
         }
     }
 }
@@ -1051,6 +1068,42 @@ impl Prefs {
     /// The most searches the list of recent ones keeps, and the most characters of each.
     pub const RECENT_SEARCHES: usize = 10;
     pub const RECENT_SEARCH_CHARS: usize = 200;
+    /// The defaults of the import limits, and the ranges a settings file is kept in: a file is
+    /// read whole, so a limit past these is a machine's memory gone.
+    pub const IMPORT_FILE_MB_DEFAULT: u64 = 512;
+    pub const IMPORT_FILE_MB_MIN: u64 = 1;
+    pub const IMPORT_FILE_MB_MAX: u64 = 16 * 1024;
+    pub const IMPORT_MESSAGES_DEFAULT: u64 = 200_000;
+    pub const IMPORT_MESSAGES_MIN: u64 = 1;
+    pub const IMPORT_MESSAGES_MAX: u64 = 10_000_000;
+    pub const IMPORT_TREE_MB_DEFAULT: u64 = 4 * 1024;
+    pub const IMPORT_TREE_MB_MIN: u64 = 1;
+    pub const IMPORT_TREE_MB_MAX: u64 = 64 * 1024;
+    pub const IMPORT_TREE_MESSAGES_DEFAULT: u64 = 500_000;
+    pub const IMPORT_TREE_MESSAGES_MIN: u64 = 1;
+    pub const IMPORT_TREE_MESSAGES_MAX: u64 = 10_000_000;
+
+    /// The most bytes one imported file may have, in range (a settings file may say anything).
+    pub fn import_file_bytes(&self) -> u64 {
+        self.import_max_file_mb.clamp(Self::IMPORT_FILE_MB_MIN, Self::IMPORT_FILE_MB_MAX).saturating_mul(1 << 20)
+    }
+
+    /// The most messages one imported mbox file takes, in range.
+    pub fn import_max_messages(&self) -> usize {
+        usize::try_from(self.import_max_messages.clamp(Self::IMPORT_MESSAGES_MIN, Self::IMPORT_MESSAGES_MAX)).unwrap_or(usize::MAX)
+    }
+
+    /// The most bytes of all the files of one folder import, in range, and never less than one
+    /// file's own limit.
+    pub fn import_tree_bytes(&self) -> u64 {
+        let mb = self.import_tree_max_mb.clamp(Self::IMPORT_TREE_MB_MIN, Self::IMPORT_TREE_MB_MAX);
+        mb.max(self.import_max_file_mb.clamp(Self::IMPORT_FILE_MB_MIN, Self::IMPORT_FILE_MB_MAX)).saturating_mul(1 << 20)
+    }
+
+    /// The most messages one folder import takes, in range.
+    pub fn import_tree_messages(&self) -> usize {
+        usize::try_from(self.import_tree_max_messages.clamp(Self::IMPORT_TREE_MESSAGES_MIN, Self::IMPORT_TREE_MESSAGES_MAX)).unwrap_or(usize::MAX)
+    }
 
     /// The zoom of the message being read, in percent, in range (a settings file may say anything).
     pub fn zoom_percent(&self) -> u16 {

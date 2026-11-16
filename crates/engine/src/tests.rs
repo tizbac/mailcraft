@@ -3142,6 +3142,47 @@ fn an_mbox_import_stops_after_the_most_it_takes() {
 }
 
 #[test]
+fn the_import_limits_are_settings() {
+    let mut s = session();
+    let one = b"From a@example.org Tue Jul  1 08:52:37 2003\nSubject: x\n\nx\n\n";
+    // Fewer messages than the default: the rest are left, and the answer says so.
+    s.prefs.import_max_messages = 2;
+    let r = crate::io::import(&mut s, "two.mbox", &one.repeat(3), None).unwrap();
+    assert_eq!((r["messages"].as_u64(), r["stoppedAfter"].as_u64()), (Some(2), Some(2)));
+    // A file larger than the limit is refused, not cut.
+    s.prefs.import_max_file_mb = 1;
+    let mut big = one.repeat(3);
+    big.extend(std::iter::repeat_n(b'x', (1 << 20) + 1));
+    let e = crate::io::import(&mut s, "big.mbox", &big, None).unwrap_err().to_string();
+    assert!(e.contains("larger than 1 MB"), "{e}");
+    // A file named by path (the window's Import) is held to the same limit before it is read.
+    let dir = std::env::temp_dir().join(format!("mailcraft-import-limit-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("big.mbox");
+    std::fs::write(&path, &big).unwrap();
+    let e = s.run("file.import", &json!({"path": path.to_string_lossy()})).unwrap_err().to_string();
+    assert!(e.contains("larger than 1 MB"), "{e}");
+    let _ = std::fs::remove_dir_all(&dir);
+    // `file.options` keeps the limits in their ranges, whatever a script or a settings file says.
+    s.run(
+        "file.options",
+        &json!({"importMaxFileMb": 0, "importMaxMessages": 999_999_999_u64, "importTreeMaxMb": 999_999, "importTreeMaxMessages": 0}),
+    )
+    .unwrap();
+    assert_eq!(
+        (s.prefs.import_max_file_mb, s.prefs.import_max_messages, s.prefs.import_tree_max_mb, s.prefs.import_tree_max_messages),
+        (1, 10_000_000, 65_536, 1)
+    );
+    // They are kept in the settings, and a settings file from before them has the defaults.
+    assert_eq!(serde_json::to_value(&s.prefs).unwrap()["importMaxFileMb"], 1);
+    let old: crate::Prefs = serde_json::from_str("{}").unwrap();
+    assert_eq!(
+        (old.import_max_file_mb, old.import_max_messages, old.import_tree_max_mb, old.import_tree_max_messages),
+        (512, 200_000, 4_096, 500_000)
+    );
+}
+
+#[test]
 fn a_reply_quotes_only_the_first_names_of_a_long_list() {
     let mut s = session();
     let inbox = kind(&s, FolderKind::Inbox);

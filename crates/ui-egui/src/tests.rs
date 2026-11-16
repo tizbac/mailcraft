@@ -2239,6 +2239,21 @@ fn a_search_is_said_over_the_list_and_ended_by_its_cross_or_esc() {
     assert!(h.state().session.view.search.is_empty());
 }
 
+/// The import limits are the owner's to set, and File › Options says what raising them costs in
+/// memory.
+#[test]
+fn options_has_the_import_limits_and_says_what_they_cost() {
+    use egui_kittest::kittest::Queryable as _;
+    let mut harness = window(app());
+    harness.state_mut().execute("ui.dismissReminder", json!({"all": true})).unwrap();
+    harness.state_mut().execute("ui.backstage", json!({"value": true, "page": "options"})).unwrap();
+    harness.run_steps(3);
+    // (The four controls' labels are painted along their rows, as the options page's are; the
+    // section and the sentence below them are text the accessibility tree carries.)
+    assert!(harness.query_by_label_contains("Importing mail").is_some(), "no section");
+    assert!(harness.query_by_label_contains("reads a mail file whole into memory").is_some(), "no memory disclaimer");
+}
+
 /// #122: signatures have one place in File, their own page; File › Options no longer has a
 /// Signatures section with a button that opens that page.
 #[test]

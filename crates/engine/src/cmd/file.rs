@@ -36,7 +36,7 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("file.exportContacts", "Export Contacts", "File › Open & Export", export_contacts).pure().params(r#"{"ids"?: [number], "path"?: string} — .vcf"#),
         CommandSpec::new("file.info", "Info", "File › Info", info).pure(),
         CommandSpec::new("file.options", "Options", "File", options).pure().params(
-            r#"{"clock"?: "auto" (the interface language's) | "12" | "24" (independent of the language), "twelveHour"?: bool, "weekStart"?: "sun"|"mon"|…, "workDays"?: ["mon",…], "workStart"?: 0-23, "workEnd"?: 1-24, "markReadOnOpen"?: bool, "defaultReminder"?: minutes | null, "quoteOnReply"?: bool, "autoLists"?: bool, "previewLines"?: 0-3, "syncLimit"?: number, "syncMinutes"?: 0-1440 (0: only when asked)}"#,
+            r#"{"clock"?: "auto" (the interface language's) | "12" | "24" (independent of the language), "twelveHour"?: bool, "weekStart"?: "sun"|"mon"|…, "workDays"?: ["mon",…], "workStart"?: 0-23, "workEnd"?: 1-24, "markReadOnOpen"?: bool, "defaultReminder"?: minutes | null, "quoteOnReply"?: bool, "autoLists"?: bool, "previewLines"?: 0-3, "syncLimit"?: number, "syncMinutes"?: 0-1440 (0: only when asked), "importMaxFileMb"?: 1-16384 (the most one imported file may be), "importMaxMessages"?: 1-10000000 (the most one imported mbox file brings in), "importTreeMaxMb"?: 1-65536 (the most one folder import may be), "importTreeMaxMessages"?: 1-10000000 (the most one folder import brings in)}"#,
         ),
     ]
 }
@@ -334,10 +334,12 @@ fn same_file(a: &std::path::Path, b: &std::path::Path) -> bool {
 }
 
 fn import(s: &mut Session, v: &Value) -> CmdResult {
-    let (name, bytes) = source(v)?;
     if p::bool(v, "opened") == Some(true) {
+        let (name, bytes) = source(v)?;
         return crate::io::import_opened(s, &name, &bytes);
     }
+    // The owner's limit for the size of a mail file (File › Options).
+    let (name, bytes) = crate::cmd::source_with_max(v, s.prefs.import_file_bytes())?;
     crate::io::import(s, &name, &bytes, p::id(v, "folder"))
 }
 
@@ -548,6 +550,18 @@ fn options(s: &mut Session, v: &Value) -> CmdResult {
     }
     if let Some(n) = p::u64(v, "syncMinutes") {
         prefs.sync_minutes = n.min(1440) as u32;
+    }
+    if let Some(n) = p::u64(v, "importMaxFileMb") {
+        prefs.import_max_file_mb = n.clamp(crate::Prefs::IMPORT_FILE_MB_MIN, crate::Prefs::IMPORT_FILE_MB_MAX);
+    }
+    if let Some(n) = p::u64(v, "importMaxMessages") {
+        prefs.import_max_messages = n.clamp(crate::Prefs::IMPORT_MESSAGES_MIN, crate::Prefs::IMPORT_MESSAGES_MAX);
+    }
+    if let Some(n) = p::u64(v, "importTreeMaxMb") {
+        prefs.import_tree_max_mb = n.clamp(crate::Prefs::IMPORT_TREE_MB_MIN, crate::Prefs::IMPORT_TREE_MB_MAX);
+    }
+    if let Some(n) = p::u64(v, "importTreeMaxMessages") {
+        prefs.import_tree_max_messages = n.clamp(crate::Prefs::IMPORT_TREE_MESSAGES_MIN, crate::Prefs::IMPORT_TREE_MESSAGES_MAX);
     }
     s.prefs = prefs;
     serde_json::to_value(&s.prefs).map_err(|e| fail(e.to_string()))

@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::sync::mpsc::{Receiver, TryRecvError};
 
 use egui::{RichText, Ui, vec2};
-use mailcraft_engine::import_tree::{Parsed, Progress};
+use mailcraft_engine::import_tree::{Limits, Parsed, Progress};
 use serde_json::{Value, json};
 
 use crate::MailApp;
@@ -27,6 +27,8 @@ pub struct TreeJob {
     pub path: String,
     pub count_only: bool,
     pub progress: Arc<Progress>,
+    /// The owner's import limits at the time the dialog opened (File › Options).
+    pub limits: Limits,
 }
 
 /// What the dialog is doing.
@@ -77,13 +79,14 @@ impl ImportTree {
     /// Start the work off the window's thread, or, where there is no host for it, do it now.
     fn start(&mut self, app: &mut MailApp, count_only: bool) {
         self.progress = Arc::default();
+        let limits = Limits::from_prefs(&app.session.prefs);
         if let Some(spawn) = &app.services.import_tree {
-            let rx = spawn(TreeJob { path: self.path.clone(), count_only, progress: self.progress.clone() });
+            let rx = spawn(TreeJob { path: self.path.clone(), count_only, progress: self.progress.clone(), limits });
             self.phase = if count_only { Phase::Scanning(rx) } else { Phase::Importing(rx) };
             return;
         }
         #[cfg(not(target_arch = "wasm32"))]
-        let done = mailcraft_engine::import_tree::load_path(&self.path, None, count_only, &self.progress).map_err(|e| e.to_string());
+        let done = mailcraft_engine::import_tree::load_path_with(&self.path, None, count_only, &self.progress, &limits).map_err(|e| e.to_string());
         #[cfg(target_arch = "wasm32")]
         let done: Result<Parsed, String> = Err(tl!("the browser can't read folders by path").to_string());
         self.arrived(app, count_only, done);
