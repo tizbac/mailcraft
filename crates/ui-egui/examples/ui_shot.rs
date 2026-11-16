@@ -612,7 +612,9 @@ fn stand_in(host: &Arc<Mutex<Host>>) -> Services {
             let dir = tree.lock().map(|host| host.tree_dir.clone()).unwrap_or_default();
             if !dir.is_empty() {
                 // Answered at once from a folder on this computer (`treeDir`).
-                return answered(mailcraft_engine::import_tree::load_path(&dir, None, job.count_only, &job.progress).map_err(|e| e.to_string()));
+                return answered(
+                    mailcraft_engine::import_tree::load_path_with(&dir, None, job.count_only, &job.progress, &job.limits).map_err(|e| e.to_string()),
+                );
             }
             let (tx, rx) = channel();
             if let Ok(mut host) = tree.lock() {

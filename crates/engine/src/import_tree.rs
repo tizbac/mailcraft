@@ -25,16 +25,45 @@ pub const MAX_TREE_DEPTH: usize = 12;
 pub const MAX_TREE_ENTRIES: usize = 20_000;
 /// Most folders made.
 pub const MAX_TREE_FOLDERS: usize = 5_000;
-/// Most messages taken from one file.
+/// Most messages taken from one file (the default; the owner may set another in File › Options).
 pub const MAX_FILE_MESSAGES: usize = crate::io::MAX_IMPORT_MESSAGES;
-/// Most messages taken in all.
-pub const MAX_TREE_MESSAGES: usize = 500_000;
-/// Most bytes of mbox files read in all (4 GB).
-pub const MAX_TREE_BYTES: u64 = 4 << 30;
+/// Most messages taken in all (the default).
+pub const MAX_TREE_MESSAGES: usize = crate::Prefs::IMPORT_TREE_MESSAGES_DEFAULT as usize;
+/// Most bytes of mbox files read in all (4 GB; the default).
+pub const MAX_TREE_BYTES: u64 = crate::Prefs::IMPORT_TREE_MB_DEFAULT << 20;
 /// Most skipped files listed by name in the answer (the rest are counted).
 const MAX_LISTED: usize = 50;
 /// Longest a folder's name is kept, in characters.
 const MAX_FOLDER_NAME: usize = 120;
+
+/// What one import takes, from the owner's settings (File › Options): the most bytes one file may
+/// have, the most messages one file brings in, and the most of either all the files together.
+/// A file is read whole, so the byte limits are memory too.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Limits {
+    pub file_bytes: u64,
+    pub file_messages: usize,
+    pub tree_bytes: u64,
+    pub tree_messages: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self { file_bytes: crate::io::MAX_FILE, file_messages: MAX_FILE_MESSAGES, tree_bytes: MAX_TREE_BYTES, tree_messages: MAX_TREE_MESSAGES }
+    }
+}
+
+impl Limits {
+    /// The limits the owner set, kept in range whatever the settings file says.
+    pub fn from_prefs(prefs: &crate::Prefs) -> Self {
+        Self {
+            file_bytes: prefs.import_file_bytes(),
+            file_messages: prefs.import_max_messages(),
+            tree_bytes: prefs.import_tree_bytes(),
+            tree_messages: prefs.import_tree_messages(),
+        }
+    }
+}
 
 /// How far a scan or an import has come, and whether its owner has had enough. Shared between the
 /// thread that does the work and the window that shows it: counts only go up, and `cancel` is
@@ -164,7 +193,7 @@ fn file_name(raw: &str) -> String {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn walk_dir(root: &std::path::Path, w: &mut Walk, progress: &Progress) -> Result<(), CmdError> {
+fn walk_dir(root: &std::path::Path, w: &mut Walk, progress: &Progress, limits: &Limits) -> Result<(), CmdError> {
     use std::io::Read;
     let meta = std::fs::symlink_metadata(root).map_err(|e| fail(format!("{}: {e}", root.display())))?;
     if !meta.is_dir() {
@@ -212,7 +241,7 @@ fn walk_dir(root: &std::path::Path, w: &mut Walk, progress: &Progress) -> Result
                     subdirs.push((path, below, depth + 1));
                 }
             } else if kind.is_file() {
-                if meta.len() > crate::io::MAX_FILE {
+                if meta.len() > limits.file_bytes {
                     w.skip(shown, "too large");
                     continue;
                 }
@@ -222,7 +251,7 @@ fn walk_dir(root: &std::path::Path, w: &mut Walk, progress: &Progress) -> Result
                     w.skip(shown, "can't be read");
                 } else if !looks_like_mbox(&head) {
                     w.skip(shown, "not a mailbox file");
-                } else if w.bytes.saturating_add(meta.len()) > MAX_TREE_BYTES {
+                } else if w.bytes.saturating_add(meta.len()) > limits.tree_bytes {
                     w.skip(shown, "over the size one import takes");
                 } else {
                     w.bytes += meta.len();
@@ -239,7 +268,7 @@ fn walk_dir(root: &std::path::Path, w: &mut Walk, progress: &Progress) -> Result
 }
 
 /// Files handed over as `{"path": "Mail/Inbox.sbd/Sent", "data": base64}`.
-fn from_entries(list: &[Value], w: &mut Walk, progress: &Progress) -> Result<(), CmdError> {
+fn from_entries(list: &[Value], w: &mut Walk, progress: &Progress, limits: &Limits) -> Result<(), CmdError> {
     for (i, e) in list.iter().enumerate() {
         progress.check()?;
         if i >= MAX_TREE_ENTRIES {
@@ -267,7 +296,7 @@ fn from_entries(list: &[Value], w: &mut Walk, progress: &Progress) -> Result<(),
         };
         if !looks_like_mbox(bytes.get(..2048).unwrap_or(&bytes)) {
             w.skip(raw.chars().take(80).collect(), "not a mailbox file");
-        } else if w.bytes.saturating_add(bytes.len() as u64) > MAX_TREE_BYTES || bytes.len() as u64 > crate::io::MAX_FILE {
+        } else if w.bytes.saturating_add(bytes.len() as u64) > limits.tree_bytes || bytes.len() as u64 > limits.file_bytes {
             w.skip(raw.chars().take(80).collect(), "over the size one import takes");
         } else {
             w.bytes += bytes.len() as u64;
@@ -278,15 +307,15 @@ fn from_entries(list: &[Value], w: &mut Walk, progress: &Progress) -> Result<(),
     Ok(())
 }
 
-fn read(source: &Source) -> Option<Vec<u8>> {
+fn read(source: &Source, max: u64) -> Option<Vec<u8>> {
     match source {
         Source::Bytes(b) => Some(b.clone()),
         #[cfg(not(target_arch = "wasm32"))]
         Source::File(path) => {
             use std::io::Read;
             let mut out = Vec::new();
-            std::fs::File::open(path).ok()?.take(crate::io::MAX_FILE + 1).read_to_end(&mut out).ok()?;
-            (out.len() as u64 <= crate::io::MAX_FILE).then_some(out)
+            std::fs::File::open(path).ok()?.take(max.saturating_add(1)).read_to_end(&mut out).ok()?;
+            (out.len() as u64 <= max).then_some(out)
         }
     }
 }
@@ -336,7 +365,7 @@ fn child(mb: &mut Mailbox, account: Id, parent: Option<Id>, name: &str, create: 
 
 /// Read and parse what the walk found. This is the heavy part (every file is read and every
 /// message parsed), which is why it takes no `Session`: a host runs it on a thread.
-fn parse_found(mut w: Walk, top: String, count_only: bool, progress: &Progress) -> Result<Parsed, CmdError> {
+fn parse_found(mut w: Walk, top: String, count_only: bool, progress: &Progress, limits: &Limits) -> Result<Parsed, CmdError> {
     w.found.sort_by(|a, b| (&a.dirs, &a.name).cmp(&(&b.dirs, &b.name)));
     let found = std::mem::take(&mut w.found);
     let mut files = Vec::new();
@@ -346,12 +375,12 @@ fn parse_found(mut w: Walk, top: String, count_only: bool, progress: &Progress) 
         progress.check()?;
         let fname = file_name(&f.name);
         let shown = f.dirs.iter().map(String::as_str).chain(std::iter::once(fname.as_str())).collect::<Vec<_>>().join("/");
-        if messages_total >= MAX_TREE_MESSAGES {
+        if messages_total >= limits.tree_messages {
             stopped = true;
             w.skip(shown, "over the number of messages one import takes");
             continue;
         }
-        let Some(bytes) = read(&f.source) else {
+        let Some(bytes) = read(&f.source, limits.file_bytes) else {
             w.skip(shown, "can't be read");
             continue;
         };
@@ -359,7 +388,7 @@ fn parse_found(mut w: Walk, top: String, count_only: bool, progress: &Progress) 
             w.skip(shown, "not a mailbox file");
             continue;
         }
-        let limit = MAX_FILE_MESSAGES.min(MAX_TREE_MESSAGES - messages_total);
+        let limit = limits.file_messages.min(limits.tree_messages - messages_total);
         let mut ids = Vec::new();
         let mut messages = Vec::new();
         let mut more = false;
@@ -386,23 +415,35 @@ fn parse_found(mut w: Walk, top: String, count_only: bool, progress: &Progress) 
 }
 
 /// Walk the folder at `path`, read every mbox file in it and parse the messages: no `Session`, so
-/// a host can do it on a thread. `count_only` keeps only the Message-IDs (for a preview).
+/// a host can do it on a thread. `count_only` keeps only the Message-IDs (for a preview). The
+/// defaults of File › Options' limits are used; [`load_path_with`] takes the owner's.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn load_path(path: &str, name: Option<&str>, count_only: bool, progress: &Progress) -> Result<Parsed, CmdError> {
-    let root = std::path::Path::new(path);
-    let mut w = Walk::default();
-    walk_dir(root, &mut w, progress)?;
-    let top =
-        name.map(tidy_name).or_else(|| root.file_name().map(|n| tidy_name(&n.to_string_lossy()))).unwrap_or_else(|| "Imported mail".to_string());
-    parse_found(w, top, count_only, progress)
+    load_path_with(path, name, count_only, progress, &Limits::default())
 }
 
-/// The same for files handed over as `entries`.
-pub fn load_entries(list: &[Value], name: Option<&str>, count_only: bool, progress: &Progress) -> Result<Parsed, CmdError> {
+/// The same, with the limits the owner set.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn load_path_with(path: &str, name: Option<&str>, count_only: bool, progress: &Progress, limits: &Limits) -> Result<Parsed, CmdError> {
+    let root = std::path::Path::new(path);
     let mut w = Walk::default();
-    from_entries(list, &mut w, progress)?;
+    walk_dir(root, &mut w, progress, limits)?;
+    let top =
+        name.map(tidy_name).or_else(|| root.file_name().map(|n| tidy_name(&n.to_string_lossy()))).unwrap_or_else(|| "Imported mail".to_string());
+    parse_found(w, top, count_only, progress, limits)
+}
+
+/// The same for files handed over as `entries`, with the default limits.
+pub fn load_entries(list: &[Value], name: Option<&str>, count_only: bool, progress: &Progress) -> Result<Parsed, CmdError> {
+    load_entries_with(list, name, count_only, progress, &Limits::default())
+}
+
+/// The same for files handed over as `entries`, with the limits the owner set.
+pub fn load_entries_with(list: &[Value], name: Option<&str>, count_only: bool, progress: &Progress, limits: &Limits) -> Result<Parsed, CmdError> {
+    let mut w = Walk::default();
+    from_entries(list, &mut w, progress, limits)?;
     let top = name.map(tidy_name).unwrap_or_else(|| "Imported mail".to_string());
-    parse_found(w, top, count_only, progress)
+    parse_found(w, top, count_only, progress, limits)
 }
 
 #[derive(Default)]
@@ -419,15 +460,16 @@ pub fn run(s: &mut Session, v: &Value) -> Result<Value, CmdError> {
     let dry = p::bool(v, "dryRun").unwrap_or(false);
     let name = p::str(v, "name");
     let progress = Progress::default();
+    let limits = Limits::from_prefs(&s.prefs);
     let parsed = if p::bool(v, "staged").unwrap_or(false) {
         // Read and parsed by the window, off its thread, and handed over by `Session::stage_tree`.
         s.staged_tree.take().ok_or_else(|| fail("nothing is waiting to be imported"))?
     } else if let Some(list) = v.get("entries").and_then(Value::as_array) {
-        load_entries(list, name, dry, &progress)?
+        load_entries_with(list, name, dry, &progress, &limits)?
     } else if let Some(path) = p::str(v, "path") {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            load_path(path, name, dry, &progress)?
+            load_path_with(path, name, dry, &progress, &limits)?
         }
         #[cfg(target_arch = "wasm32")]
         {
