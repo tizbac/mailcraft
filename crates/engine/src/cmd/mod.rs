@@ -506,17 +506,26 @@ pub(crate) fn deliver(v: &Value, name: &str, bytes: Vec<u8>) -> CmdResult {
 
 /// The bytes a command reads: base64 `data`, or the file at `path`.
 pub(crate) fn source(v: &Value) -> Result<(String, Vec<u8>), CmdError> {
+    source_with_max(v, crate::io::MAX_FILE)
+}
+
+/// The bytes a command reads, taking at most `max` of them from a file or of base64 `data`.
+pub(crate) fn source_with_max(v: &Value, max: u64) -> Result<(String, Vec<u8>), CmdError> {
     let name = p::str(v, "name").or(p::str(v, "path")).unwrap_or("").to_string();
     if let Some(data) = p::str(v, "data") {
-        return Ok((name, base64_decode(data)?));
+        let bytes = base64_decode(data)?;
+        if u64::try_from(bytes.len()).map_or(true, |n| n > max) {
+            return Err(failed!("{name} is larger than {mb} MB", name, mb = max >> 20));
+        }
+        return Ok((name, bytes));
     }
     let path = p::req_str(v, "path")?;
     #[cfg(not(target_arch = "wasm32"))]
     {
         // Opened once, checked through that handle, read from it (`io::read_regular_file`).
-        match crate::io::read_regular_file(std::path::Path::new(path)) {
+        match crate::io::read_regular_file_with_max(std::path::Path::new(path), max) {
             Ok(bytes) => Ok((name, bytes)),
-            Err(crate::io::ReadError::TooLarge) => Err(failed!("{path} is larger than {mb} MB", path, mb = crate::io::MAX_FILE >> 20)),
+            Err(crate::io::ReadError::TooLarge) => Err(failed!("{path} is larger than {mb} MB", path, mb = max >> 20)),
             Err(e) => Err(fail(format!("{path}: {e}"))),
         }
     }
