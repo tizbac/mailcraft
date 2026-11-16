@@ -861,6 +861,53 @@ fn options(app: &mut MailApp, ui: &mut Ui, t: &Tokens) {
     });
     // (Whose Favorites the folder pane shows, for an account that signs in with Microsoft.)
     crate::favorites_sync::options(app, ui, t);
+    section(ui, tl!("Importing mail"), t);
+    // The limits on what File › Import takes, with what they cost in memory said plainly: a mail
+    // file is read whole, and a folder import keeps every message until it is done.
+    let mut max_file = prefs.import_max_file_mb;
+    row(ui, tl!("Largest file to import"), |ui| {
+        let edit = egui::DragValue::new(&mut max_file)
+            .range(mailcraft_engine::Prefs::IMPORT_FILE_MB_MIN..=mailcraft_engine::Prefs::IMPORT_FILE_MB_MAX)
+            .suffix(" MB")
+            .speed(4.0);
+        if crate::text_menu::field(ui.add(edit)).changed() {
+            set(app, json!({"importMaxFileMb": max_file}));
+        }
+    });
+    let mut max_messages = prefs.import_max_messages;
+    row(ui, tl!("Most messages from one file"), |ui| {
+        let edit = egui::DragValue::new(&mut max_messages)
+            .range(mailcraft_engine::Prefs::IMPORT_MESSAGES_MIN..=mailcraft_engine::Prefs::IMPORT_MESSAGES_MAX)
+            .speed(100.0);
+        if crate::text_menu::field(ui.add(edit)).changed() {
+            set(app, json!({"importMaxMessages": max_messages}));
+        }
+    });
+    let mut tree_mb = prefs.import_tree_max_mb;
+    row(ui, tl!("Largest folder import"), |ui| {
+        let edit = egui::DragValue::new(&mut tree_mb)
+            .range(mailcraft_engine::Prefs::IMPORT_TREE_MB_MIN..=mailcraft_engine::Prefs::IMPORT_TREE_MB_MAX)
+            .suffix(" MB")
+            .speed(16.0);
+        if crate::text_menu::field(ui.add(edit)).changed() {
+            set(app, json!({"importTreeMaxMb": tree_mb}));
+        }
+    });
+    let mut tree_messages = prefs.import_tree_max_messages;
+    row(ui, tl!("Most messages in a folder import"), |ui| {
+        let edit = egui::DragValue::new(&mut tree_messages)
+            .range(mailcraft_engine::Prefs::IMPORT_TREE_MESSAGES_MIN..=mailcraft_engine::Prefs::IMPORT_TREE_MESSAGES_MAX)
+            .speed(100.0);
+        if crate::text_menu::field(ui.add(edit)).changed() {
+            set(app, json!({"importTreeMaxMessages": tree_messages}));
+        }
+    });
+    ui.label(
+        egui::RichText::new(tl!(
+            "MailCraft reads a mail file whole into memory before it adds anything, and a folder import holds every message it reads until it is done. A limit near this computer's free memory can make MailCraft slow or stop it responding, so raise these only when there is memory to spare."
+        ))
+        .color(t.text_dim),
+    );
     // Where the system can show them (not in the browser).
     if app.services.alert.is_some() {
         section(ui, tl!("Desktop alerts"), t);

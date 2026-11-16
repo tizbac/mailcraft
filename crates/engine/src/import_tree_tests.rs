@@ -110,6 +110,30 @@ fn a_second_import_adds_nothing_already_here() {
 }
 
 #[test]
+fn the_owners_limits_cap_a_folder_import() {
+    // One message a file is taken, and each file says when it stopped.
+    let mut s = session();
+    s.prefs.import_max_messages = 1;
+    let r = s.run("file.importFolderTree", &json!({"entries": tree(), "name": "Limited"})).unwrap();
+    assert_eq!(r["messages"], 3, "{r}");
+    assert!(r["notes"].as_array().unwrap().iter().any(|n| n.as_str().is_some_and(|n| n.contains("stopped after 1"))), "{r}");
+    // The whole import's count stops the rest.
+    let mut s = session();
+    s.prefs.import_tree_max_messages = 2;
+    let r = s.run("file.importFolderTree", &json!({"entries": tree(), "name": "Few"})).unwrap();
+    assert_eq!(r["messages"], 2, "{r}");
+    assert_eq!(r["stopped"], true, "{r}");
+    // A file over the size the owner allows is left out, not read and cut.
+    let mut s = session();
+    s.prefs.import_max_file_mb = 1;
+    let mut big = mbox(1, "big");
+    big.extend(std::iter::repeat_n(b'x', 1 << 20));
+    let r = s.run("file.importFolderTree", &json!({"entries": [entry("Big", &big)], "name": "Big"})).unwrap();
+    assert_eq!(r["messages"], 0, "{r}");
+    assert_eq!(r["skippedCount"], 1, "{r}");
+}
+
+#[test]
 fn a_file_is_an_mbox_by_its_bytes_not_its_name() {
     assert!(looks_like_mbox(&mbox(1, "a")));
     assert!(!looks_like_mbox(b"From the desk of nobody\nno header here"));
