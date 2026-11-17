@@ -21,9 +21,9 @@ FROM rust:${RUST_VERSION}-trixie
 # Debian suite name.
 ARG DEBIAN_FRONTEND=noninteractive
 # Wine 11.0 cannot load .NET 10's framework assemblies as IL-only images (Wine bug 59062); 11.x
-# fixed it. The development build carries that fix (the stable 11.0.0.0 does not yet).
+# fixed it. The development build carries that fix. Its version is not pinned: the repository's
+# newest is used, so an older package leaving the repository does not break the build.
 ARG WINE_PACKAGE=winehq-devel
-ARG WINE_VERSION=11.21~trixie-1
 # The Windows .NET SDK. WiX 5 targets net6.0 with rollForward=Major, so a newer runtime is fine.
 ARG DOTNET_VERSION=10.0.401
 # The version the release workflow pins as well (package.yml).
@@ -55,7 +55,7 @@ RUN set -eux; \
     curl -fsSLo /etc/apt/sources.list.d/winehq.sources \
       https://dl.winehq.org/wine-builds/debian/dists/trixie/winehq-trixie.sources; \
     apt-get update; \
-    apt-get install -y --no-install-recommends "${WINE_PACKAGE}=${WINE_VERSION}"; \
+    apt-get install -y --no-install-recommends "${WINE_PACKAGE}"; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/*
 

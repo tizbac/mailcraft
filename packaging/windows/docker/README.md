@@ -42,13 +42,14 @@ support and will be slower. `MAILCRAFT_DOCKER_PLATFORM` overrides the platform.
 | --- | --- |
 | `rust:1.98.1-trixie` plus `x86_64-pc-windows-msvc` | the same Rust version the release workflow pins |
 | `cargo-xwin` | cross-compiles the MSVC target on Linux: clang-cl, `lld-link`, and the Microsoft CRT/Windows SDK it downloads |
-| WineHQ's Wine 11.21 (development build) | runs the WiX command-line tool, which is a Windows .NET program; stable 11.0 predates the .NET 10 loader fix (Wine bug 59062) |
+| WineHQ's Wine (development build, newest) | runs the WiX command-line tool, which is a Windows .NET program; stable 11.0 predates the .NET 10 loader fix (Wine bug 59062) |
 | the Windows .NET SDK, unpacked under Wine | the runtime WiX needs |
 | WiX v5.0.2 with `WixToolset.UI` and `WixToolset.Util` | the MSI, its welcome/licence dialog and the "Launch MailCraft" finish page |
 
 The Rust and WiX versions are the release workflow's; .NET is the SDK the WiX tool runs on. They
 can be overridden with environment variables, e.g.
-`MAILCRAFT_WINE_VERSION=... packaging/windows/docker/build.sh` (see the top of `build.sh`).
+`MAILCRAFT_WIX_VERSION=5.0.2 packaging/windows/docker/build.sh` (see the top of `build.sh`). Wine
+is not version-pinned: the WineHQ repository's newest development build is used.
 
 The MSI embeds the license, built from `LICENSE-MIT` and `LICENSE-APACHE` by
 `make-license-rtf.py` exactly as `package.ps1` builds it, so it cannot drift from the repository.
