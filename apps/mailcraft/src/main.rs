@@ -1119,8 +1119,7 @@ fn services(
     let autodiscover_ctx = ctx.clone();
     let (keys_ctx, keys_store) = (ctx.clone(), secrets::store());
     let attachment_preview = attachment_render::service(&ctx);
-    let (sync_ctx, sign_in_ctx, graph_ctx, mx_ctx, linchange_ctx, test_ctx) =
-        (ctx.clone(), ctx.clone(), ctx.clone(), ctx.clone(), ctx.clone(), ctx);
+    let (sync_ctx, sign_in_ctx, graph_ctx, mx_ctx, linchange_ctx, test_ctx) = (ctx.clone(), ctx.clone(), ctx.clone(), ctx.clone(), ctx.clone(), ctx);
     let sync_cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let cancel = sync_cancel.clone();
     let idle_ctx = tasks_ctx.clone();
