@@ -152,6 +152,8 @@ this code base.
 | 2026-11-03 | minor | #757: gap 6: tables floated left and right that are all their holder holds stand side by side; an empty column of a layout table is dropped only when it is empty in every row, a cell spanning columns counted; tables laid out as boxes by `inline-block` stand in one line; the `align` of a cell, a row, a `<div>` or a `<p>` and a `<center>` stop at a table inside them |
 | 2026-11-03 | patch | #488: the update switches are in File › About, not File › Options |
 | 2026-11-02 | patch | Correct punctuation in the DAV foundation note |
+| 2026-11-02 | minor | Gap 5: contacts in a writable CardDAV book can be edited and deleted, queued until the server takes them; read-only books refuse both |
+| 2026-11-02 | patch | Gap 5: Linchange reports a read-only address book as read-only, a refused CardDAV deletion is settled and the server's contact returns, and Delete asks before removing a server contact |
 | 2026-11-01 | minor | #376: DAV model/document foundation; server discovery and sync remain unavailable |
 | 2026-11-01 | minor | Gap 2: a draft saved by itself every five minutes (#286) stays in Drafts here for an IMAP account, as Save Draft's does |
 | 2026-11-01 | minor | Gap 8: a frame of the window over 326,000 messages takes under 1 ms, was 59 ms (107 ms with a message open); the list is built from the folder's own messages; the frame after a change is 50–90 ms, was 100–130 |

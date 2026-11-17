@@ -736,6 +736,9 @@ pub fn contact_from_remote(remote: &RemoteContact) -> Contact {
         websites: remote.websites.clone(),
         birthday: remote.birthday,
         notes: remote.notes.clone(),
+        uid: remote.uid.clone(),
+        book: remote.book.clone(),
+        book_id: remote.book_id.clone(),
         origin: Origin { account: 0, id: remote.id.clone(), change_key: remote.change_key.clone(), ..Default::default() },
         ..Default::default()
     }
@@ -841,7 +844,7 @@ pub(crate) fn room_for_change(mailbox: &Mailbox) -> Result<(), CmdError> {
 
 /// A mark for a new event ([`EventChange::token`]), in the shape of a GUID: no two the same,
 /// whenever and wherever they were made.
-fn new_token(event: Id, salt: u64) -> String {
+pub(crate) fn new_token(event: Id, salt: u64) -> String {
     static MADE: AtomicU64 = AtomicU64::new(0);
     let mix = |mut x: u64| {
         x = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
@@ -3616,22 +3619,28 @@ pub fn take_in_events(s: &mut Session, download: &EventsDownload) -> Result<Merg
 
 /// Take in the contacts a host downloaded ([`merge_contacts`]). Not an undo step, as [`apply_events`].
 pub fn apply_contacts(s: &mut Session, download: &ContactsDownload) -> CmdResult {
+    let books = s.mailbox.contact_books.clone();
     let merged = merge_contacts(&mut s.mailbox, download)?;
-    if merged.changed() {
+    if merged.changed() || s.mailbox.contact_books != books {
         s.mailbox_changed();
     }
     Ok(merged.json(download.complete))
 }
 
-/// A contact's identity for comparisons: its path, without scheme or host. A server may name the
+/// A resource's identity for comparisons: its path, without scheme or host. A server may name the
 /// whole address in the answer to a write and only the path in a download, and the two are the
-/// same contact. Keeping the full spelling as the identity is how a just-sent contact became a
+/// same resource. Keeping the full spelling as the identity is how a just-sent item became a
 /// second copy on the next read.
-fn contact_key(id: &str) -> &str {
+fn resource_key(id: &str) -> &str {
     match id.split_once("://") {
         Some((_, rest)) => rest.find('/').map(|at| &rest[at..]).unwrap_or(rest),
         None => id,
     }
+}
+
+/// [`resource_key`] for a contact.
+fn contact_key(id: &str) -> &str {
+    resource_key(id)
 }
 
 
