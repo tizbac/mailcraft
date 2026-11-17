@@ -2089,7 +2089,6 @@ impl AccountSetup {
             no = button(ui, tl!("Don't send"), false, true).clicked();
         });
         if no { Some(Action::Back) } else { (yes || pass.submit).then_some(Action::Go) }
-
     }
 
     /// Ask Linchange's own page for an application password, in the system browser. The account
@@ -3173,8 +3172,14 @@ mod tests {
         // The application password is the account's, kept in memory for this session.
         let id = h.state().session.mailbox.accounts.iter().find(|a| a.email == "noor@example.org").map(|a| a.id);
         assert!(id.is_some_and(|id| h.state().passwords.get(&id).is_some_and(|secret| secret == "lcapp_prefix_secret")));
-        assert!(h.state().session.mailbox.accounts.iter().any(|a| a.email == "noor@example.org"
-            && a.incoming.as_ref().is_some_and(|server| server.host == "mail.example.org")));
+        assert!(
+            h.state()
+                .session
+                .mailbox
+                .accounts
+                .iter()
+                .any(|a| a.email == "noor@example.org" && a.incoming.as_ref().is_some_and(|server| server.host == "mail.example.org"))
+        );
     }
     /// What a sign-in was asked for: the address, the application ID, and the flag that stops it.
     type SignIns = Log<(String, String, Arc<AtomicBool>)>;
