@@ -910,6 +910,8 @@ fn contacts_come_page_by_page() {
             change_key: "EQAAABYAAAC".into(),
             // Microsoft's contacts are one list: no vCard UID and no book of their own.
             uid: String::new(),
+            book: String::new(),
+            book_id: String::new(),
             display_name: "Ada Lovelace".into(),
             first: "Ada".into(),
             middle: "King".into(),
@@ -939,8 +941,6 @@ fn contacts_come_page_by_page() {
             websites: vec!["https://engines.example".into()],
             birthday: Date::new(1815, 12, 10),
             notes: "Met at the\nRoyal Society.".into(),
-            book: String::new(),
-            book_id: String::new(),
             modified: at(2026, 9, 30, 10, 0),
         }
     );
