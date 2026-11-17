@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: MailCraft contributors
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Whether a new version of MailCraft is out: one question to GitHub's API about the newest
-//! release of the repository the build names (`CARGO_PKG_REPOSITORY`), and nothing else.
+//! release of the repository the build names (`mailcraft_model::update::UPDATE_REPOSITORY`,
+//! this fork's own), and nothing else.
 //!
 //! The request is a GET over HTTPS with the crate's fixed `User-Agent` (`MailCraft`, no version)
 //! and an `Accept` header: no account, address, mailbox detail, identifier or version of this
@@ -32,8 +33,9 @@ use crate::http::{self, Request, Url};
 /// (docs/releasing.md).
 pub const RELEASE_KEYS: [&str; 2] = ["Mu5RF5oJpFhDGfa5wpgznC39tDC8vbUbyNkiAMdluPQ=", "XV6WRgW06/mGhZCHhFVKMIEZDmLevQduZPLSj/UW5zI="];
 
-/// The repository this build came from: `https://github.com/{owner}/{repo}`.
-pub const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
+/// The repository this build came from: this fork's own
+/// (`mailcraft_model::update::UPDATE_REPOSITORY`), whose releases the update check reads.
+pub const REPOSITORY: &str = mailcraft_model::update::UPDATE_REPOSITORY;
 /// GitHub's API.
 const API: &str = "https://api.github.com";
 /// How long connecting may take, and so may the answer: ten seconds together at most.
@@ -476,8 +478,13 @@ mod tests {
         let server = FakeHttp::answering(answer(&release_of("v0.9.0")));
         assert_eq!(config(latest_at(&server.url(""), "https://example.org/a/b", false)), "this build names no repository on GitHub");
         assert_eq!(server.asked(), 0);
-        // The build's own is one.
-        assert!(owner_and_repo(REPOSITORY).is_some());
+        // The build's own is one, and it is this fork's, whose releases the update check reads.
+        assert_eq!(owner_and_repo(REPOSITORY), Some(("tizbac", "mailcraft")));
+    }
+
+    #[test]
+    fn updates_come_from_this_forks_releases() {
+        assert_eq!(REPOSITORY, "https://github.com/tizbac/mailcraft");
     }
 
     proptest! {
