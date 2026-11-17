@@ -339,11 +339,11 @@ MailCraft, and where each part stands:
 
 ## What the installers do
 
-- **Windows (`.msi`, WiX 5):** per-machine install into Program Files, a Start Menu shortcut, an
-  App Paths entry, and the registrations that let the owner choose MailCraft in Settings › Default
-  apps for `mailto:` links and `.eml`, `.ics` and `.vcf` files ("Open with" for `.mbox`). It never
-  takes a type over from another program; only MailCraft's own `.mailcraft` opens with it by
-  default. `mailcraft.exe` is a Windows program with no console window; `mailcraft-cli.exe` is the
+- **Windows (`.msi`, WiX 5):** per-machine install into Program Files, a Start Menu shortcut and a
+  desktop shortcut, an App Paths entry, and the registrations that let the owner choose MailCraft
+  in Settings › Default apps for `mailto:` links and `.eml`, `.ics` and `.vcf` files ("Open with"
+  for `.mbox`). It never takes a type over from another program; only MailCraft's own
+  `.mailcraft` opens with it by default. `mailcraft.exe` is a Windows program with no console window; `mailcraft-cli.exe` is the
   console program. The portable `.zip` holds the same two files and registers nothing.
 - **Linux (`.deb`, `.rpm`, `.AppImage`, `.tar.gz`):** `/usr/bin/mailcraft` and `mailcraft-cli`, a
   desktop entry that offers MailCraft for `mailto:` links, messages, calendar files and contact

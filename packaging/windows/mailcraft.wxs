@@ -7,8 +7,8 @@
     wix build mailcraft.wxs -arch x64 -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext
       -d Version=1.2.3 -d BinDir=... -d IconPath=... -d LicenseRtf=... -o out.msi
 
-  Per-machine install into Program Files with a Start Menu shortcut. The installer shows the
-  standard WiX dialogs: welcome + license, progress, and a finish page.
+  Per-machine install into Program Files with a Start Menu shortcut and a desktop shortcut. The
+  installer shows the standard WiX dialogs: welcome + license, progress, and a finish page.
 
   UpgradeCode and the component GUIDs below belong to MailCraft alone. Never copy them from (or
   into) a sibling Craft app: Windows Installer treats every package sharing an UpgradeCode as one
@@ -73,6 +73,7 @@
       <Directory Id="INSTALLFOLDER" Name="MailCraft" />
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder" />
+    <StandardDirectory Id="DesktopFolder" />
 
     <Feature Id="Main" Title="MailCraft" Level="1">
       <ComponentGroupRef Id="MailcraftFiles" />
@@ -89,6 +90,13 @@
             <!-- The AppUserModelID Windows knows MailCraft by: it shows the program's desktop
                  alerts (toasts) only for a program it knows by such a shortcut
                  (apps/mailcraft/src/alerts.rs). -->
+            <ShortcutProperty Key="System.AppUserModel.ID" Value="MailCraft.MailCraft" />
+          </Shortcut>
+          <!-- The desktop icon the installer puts on the all-users desktop (a per-machine
+               install). Built on Windows or on Linux with Docker, the same MSI makes it. -->
+          <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="MailCraft"
+              Description="MailCraft mail and calendar" WorkingDirectory="INSTALLFOLDER" Advertise="yes"
+              Icon="MailcraftIcon.ico" IconIndex="0">
             <ShortcutProperty Key="System.AppUserModel.ID" Value="MailCraft.MailCraft" />
           </Shortcut>
         </File>
