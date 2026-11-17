@@ -30,8 +30,8 @@
 # build with no signing secrets. Azure Artifact Signing and signtool stay on Windows/CI.
 #
 # Environment overrides for the tool versions (they default to the versions this script pins):
-#   MAILCRAFT_RUST_VERSION, MAILCRAFT_WINE_PACKAGE, MAILCRAFT_WINE_VERSION,
-#   MAILCRAFT_DOTNET_VERSION, MAILCRAFT_WIX_VERSION, MAILCRAFT_CARGO_XWIN_VERSION, MAILCRAFT_DOCKER_IMAGE,
+#   MAILCRAFT_RUST_VERSION, MAILCRAFT_WINE_PACKAGE, MAILCRAFT_DOTNET_VERSION,
+#   MAILCRAFT_WIX_VERSION, MAILCRAFT_CARGO_XWIN_VERSION, MAILCRAFT_DOCKER_IMAGE,
 #   MAILCRAFT_DOCKER_VOLUME_PREFIX, MAILCRAFT_DOCKER_PLATFORM (default linux/amd64).
 set -euo pipefail
 
@@ -41,7 +41,6 @@ root="$(cd "$here/../../.." && pwd)"
 image="${MAILCRAFT_DOCKER_IMAGE:-mailcraft-windows-x64-builder}"
 rust_version="${MAILCRAFT_RUST_VERSION:-1.98.1}"
 wine_package="${MAILCRAFT_WINE_PACKAGE:-winehq-devel}"
-wine_version="${MAILCRAFT_WINE_VERSION:-11.21~trixie-1}"
 dotnet_version="${MAILCRAFT_DOTNET_VERSION:-10.0.401}"
 wix_version="${MAILCRAFT_WIX_VERSION:-5.0.2}"
 cargo_xwin_version="${MAILCRAFT_CARGO_XWIN_VERSION:-0.23.1}"
@@ -127,7 +126,6 @@ echo "==> docker build $image"
 build_args=(
     --build-arg "RUST_VERSION=$rust_version"
     --build-arg "WINE_PACKAGE=$wine_package"
-    --build-arg "WINE_VERSION=$wine_version"
     --build-arg "DOTNET_VERSION=$dotnet_version"
     --build-arg "WIX_VERSION=$wix_version"
     --build-arg "CARGO_XWIN_VERSION=$cargo_xwin_version"
