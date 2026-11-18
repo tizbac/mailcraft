@@ -1325,7 +1325,7 @@ fn show_native(app: &mut MailApp, ctx: &egui::Context, window: &mut Open, last: 
         let dialog_here = |app: &MailApp, window: &Open| {
             !inside
                 && (window.what.compose().is_some() && dialog_compose(app) == window.what.compose()
-                    || app.dialog.as_ref().and_then(crate::dialogs::Dialog::window) == Some(window.id));
+                    || app.dialog.as_ref().and_then(crate::dialogs::Dialog::window) == Some(window.id))
         };
         let wish = if dialog_here(app, window) { Keys::default() } else { keys_of(&ctx, window, ui.layer_id()) };
         if !inside {
