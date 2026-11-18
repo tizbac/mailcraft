@@ -144,6 +144,78 @@ fn contacts_calendars_and_todos_go_up_and_come_back() {
         "the contact is gone"
     );
 
+    // ---- Three events made here all come back. ----
+    let now = mailcraft_time::now();
+    let starts = [now + 3_600, now + 7_200, now + 86_400];
+    let ops: Vec<EventOp> = starts
+        .iter()
+        .enumerate()
+        .map(|(index, start)| EventOp {
+            kind: EventChangeKind::Create,
+            event: 100 + index as u64,
+            token: format!("e2e-multi-{index}"),
+            fields: EventFields {
+                title: Some(format!("E2E Multi {index}")),
+                time: Some(EventTime { start: *start, end: *start + 1_800, all_day: false }),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .collect();
+    let sent = run(
+        &base,
+        &EwsDirectoryRequest {
+            changes: Some(mailcraft_model::remote::EventsUpload { account: 1, email: base.email.clone(), zone: "Europe/Berlin".into(), ops }),
+            ..request(&base)
+        },
+    );
+    let outcomes = sent.uploaded.as_ref().expect("an answer").outcomes.clone();
+    assert_eq!(outcomes.len(), 3, "{outcomes:?}");
+    assert!(outcomes.iter().all(|outcome| outcome.result == EventResult::Done), "{outcomes:?}");
+    let read = run(&base, &request(&base));
+    let titles: Vec<&str> = read.events.iter().flat_map(|download| &download.events).map(|event| event.title.as_str()).collect();
+    for index in 0..3 {
+        assert!(titles.contains(&format!("E2E Multi {index}").as_str()), "E2E Multi {index} came back: {titles:?}");
+    }
+    // The same three through the mailbox's own merge: all of them, not one.
+    let now = mailcraft_time::now();
+    let mut session = Session::at(mailcraft_engine::sample::mailbox(now, 0), now, 0);
+    let account = session
+        .run("account.add", &serde_json::json!({"email": base.email, "kind": "exchange", "ews": {"url": base.url, "username": base.username}}))
+        .unwrap()["id"]
+        .as_u64()
+        .unwrap();
+    let engine_base = EwsDirectoryRequest { account, ..base.clone() };
+    let first = run(&engine_base, &request(&engine_base));
+    mailcraft_engine::cmd::ews_directory::apply_ews_directory(&mut session, &first).unwrap();
+    let merged: Vec<&str> =
+        session.mailbox.events.values().map(|event| event.title.as_str()).filter(|title| title.starts_with("E2E Multi ")).collect();
+    assert_eq!(merged.len(), 3, "three events in the mailbox: {merged:?}");
+    drop(session);
+
+    // Take them away again.
+    let removes: Vec<EventOp> = read
+        .events
+        .iter()
+        .flat_map(|download| &download.events)
+        .filter(|event| event.title.starts_with("E2E Multi "))
+        .map(|event| EventOp { kind: EventChangeKind::Delete, event: 1, remote: event.id.clone(), ..Default::default() })
+        .collect();
+    if !removes.is_empty() {
+        let _ = run(
+            &base,
+            &EwsDirectoryRequest {
+                changes: Some(mailcraft_model::remote::EventsUpload {
+                    account: 1,
+                    email: base.email.clone(),
+                    zone: "Europe/Berlin".into(),
+                    ops: removes,
+                }),
+                ..request(&base)
+            },
+        );
+    }
+
     // ---- An event made here, changed, and deleted. ----
     let start = mailcraft_time::now() + 3_600;
     let event = Event {
