@@ -11,6 +11,8 @@ pub mod rich;
 use mailcraft_mime as mime;
 use mailcraft_model::{Address, Attachment, Body, FlagStatus, Importance, Message, Original};
 
+pub mod msg;
+
 pub use mailcraft_mime::WriteOptions;
 
 /// Read an Internet message (an `.eml` file, or what a server hands over) as a message of the

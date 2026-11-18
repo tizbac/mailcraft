@@ -70,8 +70,13 @@ fn export_name(app: &MailApp, id: &str, params: &Value) -> Option<String> {
         // The message named (a Save As that waited for its download names it), else the selected,
         // by the name the command gives it.
         "file.exportMessage" => {
+            let format = params
+                .get("format")
+                .and_then(Value::as_str)
+                .and_then(mailcraft_engine::SaveMessageFormat::parse)
+                .unwrap_or(s.prefs.save_message_format);
             let message = params.get("id").and_then(Value::as_u64).and_then(|id| s.mailbox.message(id)).or_else(|| s.focused_message());
-            message.map_or_else(|| clean("message", "eml"), mailcraft_engine::cmd::file::eml_name)
+            message.map_or_else(|| clean("message", format.extension()), |m| mailcraft_engine::cmd::file::message_name(m, format))
         }
         "file.exportFolder" => clean(&s.mailbox.folder(s.view.folder).map(|f| f.name.clone()).unwrap_or_default(), "mbox"),
         "file.exportCalendar" => clean(

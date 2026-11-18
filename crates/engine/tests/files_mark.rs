@@ -32,6 +32,7 @@ const OTHER_WRITERS: &[(&str, &str)] = &[
     ("crates/engine/src/store_pack.rs", "the packs of header blocks in the mailbox's content folder"),
     ("crates/engine/src/store_before.rs", "its tests"),
     ("crates/engine/src/words.rs", "the search index"),
+    ("crates/mime-model/src/msg.rs", "a message as a .msg file's bytes; it writes no path"),
     ("crates/engine/src/io.rs", "reads a file named from outside"),
     ("crates/engine/src/import_pst.rs", "the import's own report"),
     ("crates/net/src/update_download.rs", "a new version of the program, checked by its signature"),
