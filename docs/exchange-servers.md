@@ -31,6 +31,12 @@ not used for the answers below: the account was added and driven through the con
 screen was locked), so the certificate question and the Add Account pages were not looked at
 against this server.
 
+`scripts/grommunio-e2e.sh` starts a current Grommunio container again, makes the domain and one
+made-up mailbox, trusts the server's own certificate by its fingerprint, and runs
+`apps/mailcraft/src/grommunio_e2e_tests.rs`: a contact, an event and a to-do are made, changed,
+read back and deleted through the same Exchange Web Services path the desktop uses. The facts and
+the manual steps are in [`grommunio-testing.md`](grommunio-testing.md).
+
 | What | Result | Notes |
 |---|---|---|
 | Autodiscover | Reader works; the search was not run end to end | The server answers `/autodiscover/autodiscover.xml` with a Basic challenge, then with its Exchange Web Services address (`EXHTTP`, `EXCH`; the `EXPR` protocol has no address, and the `EXCH` server is a mailbox identifier, not a host). MailCraft reads that shape (a test keeps it). The test domain had no name that led to the server, so the three places Autodiscover looks were not tried from an address; the server's address was typed instead |
