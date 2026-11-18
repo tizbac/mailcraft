@@ -899,7 +899,7 @@ struct CategoriesGraph<'a> {
 
 /// [`mailcraft_host::graph::graph`], with what is to go Digitally signed signed first (#30): what
 /// can't be is held and never sent unsigned.
-fn signed_graph(mut request: GraphRequest) -> GraphResult {
+fn signed_graph(mut request: GraphRequest) -> mailcraft_host::graph::GraphResult {
     let mut unsigned = signing::sign_outbox(&mut request.outbox);
     // (A run kept in step through Graph says them here too: its mail may come back in pieces.)
     unsigned.extend(request.mail.as_mut().map(|mail| signing::sign_sends(&mut mail.sends)).unwrap_or_default());

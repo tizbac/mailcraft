@@ -237,7 +237,7 @@ pub(crate) fn sign_by(m: &mut Message, signer: &Signer<'_>) -> Result<(), String
     let Some(key) = m.sign_with.clone() else { return Ok(()) };
     m.original = None;
     let key = key.checked().ok_or_else(|| mailcraft_engine::cmd::signing::NO_USABLE_KEY.to_string())?;
-    let entity = mailcraft_mime::signable(m);
+    let entity = mailcraft_mime_model::signable(m);
     let (kind, micalg, signature) = signer(&key, &entity)?;
     finish(m, &entity, kind, micalg, &signature)
 }
@@ -246,7 +246,7 @@ pub(crate) fn sign_by(m: &mut Message, signer: &Signer<'_>) -> Result<(), String
 pub(crate) fn finish(m: &mut Message, entity: &[u8], kind: mailcraft_mime::SignatureKind, micalg: &str, signature: &[u8]) -> Result<(), String> {
     let body = mailcraft_mime::multipart_signed(entity, kind, micalg, signature).map_err(|e| e.to_string())?;
     m.original = Original::new(body);
-    if mailcraft_mime::signature_missing(m) {
+    if mailcraft_mime_model::signature_missing(m) {
         m.original = None;
         return Err("the signed message is too large".into());
     }

@@ -3122,6 +3122,7 @@ dependencies = [
  "mailcraft-jmap",
  "mailcraft-link",
  "mailcraft-mime",
+ "mailcraft-mime-model",
  "mailcraft-model",
  "mailcraft-names",
  "mailcraft-net",
