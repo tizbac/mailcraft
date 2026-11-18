@@ -939,7 +939,7 @@ fn kept_in(app: &MailApp, c: &Contact) -> Option<String> {
 /// Whether the contact is a copy of what its account's server keeps, which can't be changed here
 /// (`remote::changeable`): the card says so beside whose it is, before Edit or Delete is tried.
 fn read_only_here(app: &MailApp, c: &Contact) -> bool {
-    mailcraft_engine::cmd::remote::keeper(&app.session.mailbox, &c.origin).is_some()
+    c.origin.account != 0 && !contact_writable(app, c) && !book_unavailable(app, c)
 }
 
 fn card_account(app: &MailApp, ui: &mut Ui, c: &Contact) {
@@ -950,9 +950,12 @@ fn card_account(app: &MailApp, ui: &mut Ui, c: &Contact) {
                 "The address book this contact came from is no longer in the account's list, so changes here could not reach the server. Send/Receive may bring it back."
             ));
         } else if read_only_here(app, c) {
-            field(ui, "account", &place, tl!("Read-only"), false).on_hover_text(tl!(
-                "This account's server keeps this contact. Changes made here aren't sent back yet, so it can't be edited or deleted here. Favorite and categories are kept on this computer."
-            ));
+            let why = if c.book_id.is_empty() {
+                tl!("This account's server keeps this contact. Changes made here aren't sent back yet, so it can't be edited or deleted here. Favorite and categories are kept on this computer.").to_string()
+            } else {
+                tl!("The address book this contact came from can only be read: the server hasn't given this account permission to change its contacts.").to_string()
+            };
+            field(ui, "account", &place, tl!("Read-only"), false).on_hover_text(why);
         } else {
             field(ui, "account", &place, "", false);
         }

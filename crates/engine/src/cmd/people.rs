@@ -19,6 +19,8 @@ mod address_book_tests;
 #[cfg(test)]
 mod book_tests;
 #[cfg(test)]
+mod ews_contact_tests;
+#[cfg(test)]
 mod share_tests;
 
 pub fn specs() -> Vec<CommandSpec> {
