@@ -369,6 +369,7 @@ const SAFE: &[&str] = &[
     "people.select",
     "people.get",
     "people.list",
+    "people.addressBooks",
     "people.search",
     "people.arrange",
     "people.favorite",
@@ -526,6 +527,10 @@ const ACCOUNTS: &[&str] = &[
     "calendar.subscribe",
     "calendar.unsubscribe",
     "calendar.subscriptionSettings",
+    // Another person's address book, opened by address (#252): it reaches that person's mailbox
+    // with the owner's sign-in, and removing one removes what is kept of it here.
+    "contacts.openShared",
+    "contacts.removeShared",
     // A shared mailbox's calendar listed twice (#70): hiding the copy removes it and its events
     // from this computer.
     "calendar.hideListedCopy",
@@ -632,6 +637,8 @@ const NEVER: &[&str] = &[
     "sync.applyJmapFetch",
     "sync.ewsRequest",
     "sync.applyEws",
+    "sync.ewsDirectoryRequest",
+    "sync.applyEwsDirectory",
     "sync.ewsFetchRequest",
     "sync.applyEwsFetch",
     // Calendars and contacts on a server (#209), likewise.

@@ -64,14 +64,17 @@ impl MailApp {
     /// the one typed this session, or else the one the operating system was asked to remember (what
     /// the background read of the store brought, never the store itself, #613).
     pub(crate) fn ews_secret(&self, account: Id) -> Option<String> {
+        // A shared mailbox is read with the sign-in of the account it is opened through.
+        let account = self.session.mailbox.owner_of(account).map_or(account, |owner| owner.id);
         if let Some(typed) = self.passwords.get(&account) {
             return Some(typed.clone());
         }
         self.remembered("password", account)
     }
 
-    /// The server of `account` turned its password down: the next Send/Receive asks for it again,
-    /// and no round by itself goes back until then. What the system remembered is no good either.
+    /// The server turned the password of `account` down: the next Send/Receive asks for it again,
+    /// and no round by itself (nor a read of the calendar, [`crate::ews_calendar`]) goes back until
+    /// then. What the system remembered is no good either.
     pub(crate) fn ews_password_refused(&mut self, account: Id) {
         self.passwords.remove(&account);
         self.jmap_refused.insert(account);
@@ -94,15 +97,17 @@ impl MailApp {
     /// A Send/Receive of the Exchange server account `account`; `p` may carry the password the owner
     /// has just typed, and `inboxPass` asks for the Inbox alone. Asks for the password the first time.
     pub(crate) fn start_ews_mail(&mut self, account: Id, quiet: bool, p: &Value) -> Result<Value, String> {
+        // A shared mailbox is read with the sign-in of the account it is opened through.
+        let password_account = self.session.mailbox.owner_of(account).map_or(account, |owner| owner.id);
         if let Some(typed) = p.get("password").and_then(Value::as_str).filter(|typed| !typed.is_empty()) {
-            self.passwords.insert(account, typed.to_string());
+            self.passwords.insert(password_account, typed.to_string());
         }
         // The owner asked: a password turned down before is tried again.
         if !quiet {
             self.jmap_refused.remove(&account);
         }
         let Some(secret) = self.ews_secret(account) else {
-            self.dialog = dialogs::Dialog::open("password", self, &json!({"account": account}));
+            self.dialog = dialogs::Dialog::open("password", self, &json!({"account": password_account}));
             return Ok(json!({"pending": "password"}));
         };
         let inbox_pass = p.get("inboxPass").and_then(Value::as_bool).unwrap_or(false);
@@ -117,6 +122,9 @@ impl MailApp {
             return Err(tl!("This build can't connect to mail servers").to_string());
         }
         self.services.sync_cancel.store(false, Ordering::Relaxed);
+        // A read of the calendar alone may have been asked for before what this run sends: it is
+        // called off, and the run reads the calendar itself (#1274).
+        self.ews_calendar_stop();
         let sent = Some(secret.clone());
         // What it sends is marked so, on disk, before it leaves (AU3-26).
         let pieces = self.hand_ews(account, EwsJob { request, secret, cancel: self.services.sync_cancel.clone() })?;
@@ -177,6 +185,10 @@ impl MailApp {
             if untrusted {
                 self.ews_certificate.insert(account, piece.untrusted.clone());
             }
+            // The stretch of the calendar it read counts as read (#1274).
+            if let Some(directory) = piece.directory.as_deref() {
+                self.ews_calendar_send_receive_read(directory);
+            }
             match apply_ews_mail(&mut self.session, piece) {
                 Ok(said) => {
                     // The folders the run could not read: File › Info names them until the next run.
@@ -205,6 +217,8 @@ impl MailApp {
                     }
                 }
             }
+            // A shared mailbox being added is kept once its Inbox is read, not after all its mail.
+            self.shared_check_piece(account, last);
             if !last {
                 continue;
             }

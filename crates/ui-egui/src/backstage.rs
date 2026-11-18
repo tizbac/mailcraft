@@ -124,6 +124,10 @@ pub(crate) fn account_detail(app: &MailApp, a: &mailcraft_model::Account) -> Str
         },
         AccountKind::Local => tl!("On this device only: no mail server").to_string(),
         AccountKind::Microsoft => tl!("Signs in with Microsoft · folders kept in step through Microsoft Graph (testing)").to_string(),
+        AccountKind::Exchange if a.is_shared() => match app.session.mailbox.owner_of(a.id) {
+            Some(owner) => crate::i18n::fmt(tl!("Shared mailbox · opened with {owner}'s sign-in"), &[("owner", &owner.email)]),
+            None => tl!("Shared mailbox · the account it was opened through is gone: remove it").to_string(),
+        },
         // A JMAP account names its server.
         AccountKind::Jmap => jmap_line(a),
         // An Exchange server account names its server, and says why it isn't kept in step.

@@ -48,10 +48,19 @@ impl std::fmt::Display for Unsendable {
 }
 
 /// Where a folder is named: by its distinguished name, or by id.
-fn folder_ref(holder: &str, distinguished: &str, id: Option<&str>) -> Element {
+/// A folder in the mailbox at `mailbox` rather than the account's own: a shared mailbox's Drafts
+/// or Sent Items. The mailbox is named only under a distinguished folder; a folder id is already
+/// the mailbox's own.
+fn folder_ref_in(holder: &str, distinguished: &str, id: Option<&str>, mailbox: &str) -> Element {
     let inner = match id {
         Some(id) if !id.is_empty() => id_element("t:FolderId", id, None),
-        _ => Element::new("t:DistinguishedFolderId").attr("Id", distinguished),
+        _ => {
+            let mut distinguished = Element::new("t:DistinguishedFolderId").attr("Id", distinguished);
+            if !mailbox.trim().is_empty() {
+                distinguished = distinguished.child(crate::folder::mailbox(mailbox));
+            }
+            distinguished
+        }
     };
     Element::new(holder).child(inner)
 }
@@ -107,6 +116,7 @@ impl std::fmt::Debug for DraftContent {
 pub struct CreateDraft {
     folder: Option<String>,
     content: DraftContent,
+    mailbox: String,
 }
 
 impl std::fmt::Debug for CreateDraft {
@@ -118,7 +128,15 @@ impl std::fmt::Debug for CreateDraft {
 impl CreateDraft {
     /// Makes `content` in the folder `drafts` (its server id; none: the Drafts folder by its name).
     pub fn new(drafts: Option<&str>, content: DraftContent) -> Self {
-        Self { folder: drafts.map(str::to_owned), content }
+        Self { folder: drafts.map(str::to_owned), content, mailbox: String::new() }
+    }
+
+    /// Makes it in the Drafts of the mailbox at `address` rather than the account's own: a shared
+    /// mailbox, with the owner's sign-in.
+    #[must_use]
+    pub fn in_mailbox(mut self, address: &str) -> Self {
+        self.mailbox = address.trim().to_owned();
+        self
     }
 
     /// The operation: `SavedItemFolderId` and `Items`, with `MessageDisposition="SaveOnly"`.
@@ -153,7 +171,7 @@ impl CreateDraft {
         }
         Element::new("m:CreateItem")
             .attr("MessageDisposition", "SaveOnly")
-            .child(folder_ref("m:SavedItemFolderId", "drafts", self.folder.as_deref()))
+            .child(folder_ref_in("m:SavedItemFolderId", "drafts", self.folder.as_deref(), &self.mailbox))
             .child(Element::new("m:Items").child(message))
     }
 
@@ -181,6 +199,7 @@ pub struct FindDraft {
     marker: String,
     /// The change key last known of the draft ("" when none was).
     known: String,
+    mailbox: String,
 }
 
 impl std::fmt::Debug for FindDraft {
@@ -192,7 +211,15 @@ impl std::fmt::Debug for FindDraft {
 impl FindDraft {
     /// Looks in `drafts` (its server id; none: the Drafts folder by its name) for `marker`.
     pub fn new(drafts: Option<&str>, marker: &str) -> Self {
-        Self { folder: drafts.map(str::to_owned), marker: marker.to_owned(), known: String::new() }
+        Self { folder: drafts.map(str::to_owned), marker: marker.to_owned(), known: String::new(), mailbox: String::new() }
+    }
+
+    /// Looks in the Drafts of the mailbox at `address` rather than the account's own: a shared
+    /// mailbox, with the owner's sign-in.
+    #[must_use]
+    pub fn in_mailbox(mut self, address: &str) -> Self {
+        self.mailbox = address.trim().to_owned();
+        self
     }
 
     /// Of several drafts with the marker, the one with this change key is the one (else the newest).
@@ -209,7 +236,13 @@ impl FindDraft {
             .child(Element::new("t:FieldURIOrConstant").child(Element::new("t:Constant").attr("Value", &self.marker)));
         let parent = match self.folder.as_deref() {
             Some(id) if !id.is_empty() => id_element("t:FolderId", id, None),
-            _ => Element::new("t:DistinguishedFolderId").attr("Id", "drafts"),
+            _ => {
+                let mut drafts = Element::new("t:DistinguishedFolderId").attr("Id", "drafts");
+                if !self.mailbox.is_empty() {
+                    drafts = drafts.child(crate::folder::mailbox(&self.mailbox));
+                }
+                drafts
+            }
         };
         Element::new("m:FindItem")
             .attr("Traversal", "Shallow")
@@ -342,6 +375,7 @@ impl RemoveAttachments {
 #[derive(Clone, PartialEq, Eq)]
 pub struct SendMessage {
     mime: Vec<u8>,
+    mailbox: String,
 }
 
 impl std::fmt::Debug for SendMessage {
@@ -351,9 +385,10 @@ impl std::fmt::Debug for SendMessage {
 }
 
 impl SendMessage {
-    /// Writes `message` as it goes. Not a message that can go (no recipient, an address that isn't
-    /// one, too large) is said so, and nothing is sent.
-    pub fn new(message: &Message) -> Result<Self, Unsendable> {
+    /// Writes `message` as it goes, filing its sent copy in the mailbox at `mailbox` when that is
+    /// not the account's own (a shared mailbox, at its address). Not a message that can go (no
+    /// recipient, an address that isn't one, too large) is said so, and nothing is sent.
+    pub fn new(message: &Message, mailbox: &str) -> Result<Self, Unsendable> {
         let mut anyone = false;
         for address in message.recipients() {
             let email = address.email.trim();
@@ -377,7 +412,7 @@ impl SendMessage {
         if mime.len() > MAX_MIME {
             return Err(Unsendable::TooLarge);
         }
-        Ok(Self { mime })
+        Ok(Self { mime, mailbox: mailbox.trim().to_owned() })
     }
 
     /// The operation: `SavedItemFolderId` and `Items` with the MIME content.
@@ -385,7 +420,7 @@ impl SendMessage {
         let message = Element::new("t:Message").child(Element::new("t:MimeContent").attr("CharacterSet", "UTF-8").text(&base64(&self.mime)));
         Element::new("m:CreateItem")
             .attr("MessageDisposition", "SendAndSaveCopy")
-            .child(folder_ref("m:SavedItemFolderId", "sentitems", None))
+            .child(folder_ref_in("m:SavedItemFolderId", "sentitems", None, &self.mailbox))
             .child(Element::new("m:Items").child(message))
     }
 

@@ -527,6 +527,12 @@ pub struct Account {
     /// other account, and in a file from before there were any.
     #[serde(skip_serializing_if = "Vec::is_empty", deserialize_with = "crate::sync::lenient_list")]
     pub opened_calendars: Vec<crate::OpenedCalendar>,
+    /// For an Exchange server account: the address books its owner opened by their owner's
+    /// address (Open Shared Address Book), kept here only, at most
+    /// [`crate::MAX_OPENED_ADDRESS_BOOKS`]. Empty for every other account, and in a file from
+    /// before there were any.
+    #[serde(skip_serializing_if = "Vec::is_empty", deserialize_with = "crate::sync::lenient_list")]
+    pub opened_address_books: Vec<crate::OpenedAddressBook>,
     /// For a Microsoft account: the shared mailboxes open under it whose calendar its server lists
     /// among its own calendars as well, and whether that copy is hidden ([`crate::ListedTwice`],
     /// #70), at most [`MAX_SHARED`]. An entry says the owner was asked: MailCraft offers once.
@@ -615,6 +621,17 @@ impl Account {
             kept.push(opened);
         }
         self.opened_calendars = kept;
+        let mut books: Vec<crate::OpenedAddressBook> = Vec::new();
+        for mut opened in std::mem::take(&mut self.opened_address_books) {
+            opened.address = crate::calendar::flat_line(&opened.address, crate::calendar::MAX_OWNER_ADDRESS).replace(' ', "");
+            opened.name = crate::calendar::flat_line(&opened.name, crate::MAX_NAME);
+            let known = books.iter().any(|have| have.address.eq_ignore_ascii_case(&opened.address));
+            if opened.address.is_empty() || known || books.len() >= crate::MAX_OPENED_ADDRESS_BOOKS {
+                continue;
+            }
+            books.push(opened);
+        }
+        self.opened_address_books = books;
         let mut twice: Vec<crate::ListedTwice> = Vec::new();
         for mut entry in std::mem::take(&mut self.listed_twice) {
             entry.address = crate::calendar::flat_line(&entry.address, crate::calendar::MAX_OWNER_ADDRESS).replace(' ', "");
@@ -852,9 +869,12 @@ impl Account {
         self.shared_of.is_some()
     }
 
-    /// Whether Microsoft keeps its to-dos: it signs in with Microsoft and is not a shared mailbox.
+    /// Whether its server keeps its to-dos: it signs in with Microsoft or is an Exchange server
+    /// account, and is not a shared mailbox.
     pub fn keeps_tasks(&self) -> bool {
-        !self.is_shared() && self.kind != AccountKind::Jmap && self.oauth.as_ref().is_some_and(|o| o.provider == OAuthProvider::Microsoft)
+        !self.is_shared()
+            && self.kind != AccountKind::Jmap
+            && (self.kind == AccountKind::Exchange || self.oauth.as_ref().is_some_and(|o| o.provider == OAuthProvider::Microsoft))
     }
 
     /// Whether its contacts are read from Microsoft: as for its to-dos ([`Account::keeps_tasks`]).
@@ -1245,6 +1265,15 @@ pub struct Mailbox {
     pub messages: Messages,
     #[serde(deserialize_with = "crate::load_limit::capped_map")]
     pub contacts: BTreeMap<Id, Arc<Contact>>,
+    /// The address books the accounts' servers list, each with the id a contact is sent to
+    /// ([`crate::ContactBook`]). Empty for accounts whose contacts are one list and for a
+    /// mailbox from before there were any.
+    #[serde(default, skip_serializing_if = "Vec::is_empty", deserialize_with = "crate::load_limit::capped_vec")]
+    pub contact_books: Vec<crate::ContactBook>,
+    /// Changes to contacts that an account's server is yet to receive, oldest first
+    /// ([`crate::remote::ContactChange`]).
+    #[serde(default, skip_serializing_if = "Vec::is_empty", deserialize_with = "crate::load_limit::capped_vec")]
+    pub contact_changes: Vec<crate::remote::ContactChange>,
     pub calendars: Vec<Calendar>,
     #[serde(deserialize_with = "crate::load_limit::capped_map")]
     pub events: BTreeMap<Id, Arc<Event>>,
@@ -1405,6 +1434,8 @@ impl Default for Mailbox {
             folders: Vec::new(),
             messages: Messages::new(),
             contacts: BTreeMap::new(),
+            contact_books: Vec::new(),
+            contact_changes: Vec::new(),
             calendars: Vec::new(),
             events: BTreeMap::new(),
             tasks: BTreeMap::new(),
@@ -1706,7 +1737,7 @@ impl Mailbox {
 
     pub fn owner_of(&self, account: Id) -> Option<&Account> {
         let owner = self.account(account)?.shared_of.filter(|owner| *owner != account)?;
-        self.account(owner).filter(|o| o.kind == AccountKind::Microsoft && !o.is_shared())
+        self.account(owner).filter(|o| matches!(o.kind, AccountKind::Microsoft | AccountKind::Exchange) && !o.is_shared())
     }
 
     /// The accounts in the order the folder pane lists them: each account of its own, in the
@@ -1769,20 +1800,20 @@ impl Mailbox {
         Ok(moved)
     }
 
-    /// Open the shared mailbox at `address` under the Microsoft account `owner`: an account of
-    /// its own kind ([`AccountKind::Microsoft`]) with its standard folders, read with the owner's
-    /// sign-in ([`Account::shared_of`]). Nothing is asked of any server here: whether the owner
-    /// may open it is found at its first Send/Receive. Its id.
+    /// Open the shared mailbox at `address` under the account `owner`: an account of its own kind
+    /// with its standard folders, read with the owner's sign-in ([`Account::shared_of`]). Nothing
+    /// is asked of any server here: whether the owner may open it is found at its first
+    /// Send/Receive. Its id.
     pub fn add_shared_mailbox(&mut self, owner: Id, address: &str) -> Result<Id, ModelError> {
         let address = crate::mailbox_address(address).ok_or_else(|| invalid("that isn't an e-mail address"))?;
         let o = self.account(owner).ok_or(not_found("account", owner))?;
         if o.is_shared() {
             return Err(invalid("a shared mailbox can't open another one: name the account it is opened through"));
         }
-        if o.kind != AccountKind::Microsoft {
-            return Err(invalid("shared mailboxes open under an account that is kept in step through Microsoft Graph"));
+        if !matches!(o.kind, AccountKind::Microsoft | AccountKind::Exchange) {
+            return Err(invalid("shared mailboxes open under a Microsoft or Exchange server account"));
         }
-        if o.oauth.as_ref().is_some_and(|oauth| oauth.is_personal(&o.email)) {
+        if o.kind == AccountKind::Microsoft && o.oauth.as_ref().is_some_and(|oauth| oauth.is_personal(&o.email)) {
             return Err(invalid("a personal Microsoft account (Outlook.com) has no shared mailboxes: they are Microsoft 365's"));
         }
         if o.email.trim().eq_ignore_ascii_case(&address) {
@@ -1795,11 +1826,18 @@ impl Mailbox {
             return Err(invalid(format!("an account opens {MAX_SHARED} shared mailboxes at most")));
         }
         let download_in_full = o.download_in_full;
+        // An Exchange shared mailbox keeps the folder list's own state, while its address, its
+        // sign-in and the certificate the owner trusts stay the owner's.
+        let mut ews = o.ews.clone();
+        if let Some(server) = ews.as_mut() {
+            server.hierarchy.clear();
+        }
         let shared = Account {
             name: address.clone(),
             email: address,
-            kind: AccountKind::Microsoft,
+            kind: o.kind,
             download_in_full,
+            ews,
             shared_of: Some(owner),
             // A colour of its own, as `account.add` gives a new account (#893).
             color: Some(self.unused_account_color()),

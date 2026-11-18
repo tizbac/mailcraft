@@ -62,6 +62,8 @@ mod favorites_flow;
 mod favorites_organisation_flow;
 mod file_dialogs;
 mod file_launcher;
+#[cfg(test)]
+mod grommunio_e2e_tests;
 #[cfg(windows)]
 mod recent_attachments;
 // OpenPGP keys kept in GnuPG, through gpg-agent (#30): signing and decrypting (parts 5 and 6) use it.
@@ -1104,7 +1106,8 @@ fn services(
     let check_ctx = ctx.clone();
     let approval_ctx = ctx.clone();
     let fetch_ctx = ctx.clone();
-    let (ews_ctx, ews_fetch_ctx, ews_setup_ctx, ews_resolve_ctx) = (ctx.clone(), ctx.clone(), ctx.clone(), ctx.clone());
+    let (ews_ctx, ews_fetch_ctx, ews_setup_ctx, ews_resolve_ctx, ews_calendar_ctx) =
+        (ctx.clone(), ctx.clone(), ctx.clone(), ctx.clone(), ctx.clone());
     let search_ctx = ctx.clone();
     let tasks_ctx = ctx.clone();
     let rules_ctx = ctx.clone();
@@ -1214,6 +1217,8 @@ fn services(
         // An Exchange server account (#252): read through Exchange Web Services, and its messages fetched whole.
         ews: Some(Box::new(move |job| ews_runner::run_mail(job, &ews_ctx))),
         ews_fetch: Some(Box::new(move |job| ews_runner::run_fetch(job, &ews_fetch_ctx))),
+        // Its calendar alone, for the days the owner went to (#1274).
+        ews_calendar: Some(Box::new(move |job| ews_runner::run_calendar(job, &ews_calendar_ctx))),
         ews_setup: Some(Box::new(move |job| ews_setup::run_setup(job, &ews_setup_ctx))),
         // Names looked up in its address list, on the owner's Check Names (#1262).
         ews_resolve: Some(Box::new(move |job| ews_runner::run_resolve(job, &ews_resolve_ctx))),
