@@ -94,25 +94,42 @@ pub fn has_address_list(mb: &Mailbox, account: Id) -> bool {
 
 /// The account `account` and its server, when it is an Exchange server account whose server
 /// settings may be used ([`EwsServer::problem`]: a mailbox file can say anything).
-fn ews_account(mb: &Mailbox, account: Id) -> Result<(&Account, &EwsServer), CmdError> {
+fn ews_account(mb: &Mailbox, account: Id) -> Result<(&Account, &Account, &EwsServer), CmdError> {
     let a = mb.account(account).ok_or_else(|| failed!("no account with id {id}", id = account))?;
     if a.kind != AccountKind::Exchange {
         return Err(failed!("{name} isn't an Exchange server account", name = a.name));
     }
-    let server = a.ews.as_ref().filter(|server| server.problem().is_none());
-    let server = server.ok_or_else(|| failed!("{name} has no Exchange server address that can be used", name = a.name))?;
-    Ok((a, server))
+    // A shared mailbox is reached through the Exchange server account it is opened through.
+    let signer = if a.is_shared() {
+        mb.owner_of(account)
+            .filter(|owner| owner.kind == AccountKind::Exchange)
+            .ok_or_else(|| failed!("{name} has no Exchange server account it is opened through", name = a.name))?
+    } else {
+        a
+    };
+    let server = signer.ews.as_ref().filter(|server| server.problem().is_none());
+    let server = server.ok_or_else(|| failed!("{name} has no Exchange server address that can be used", name = signer.name))?;
+    Ok((a, signer, server))
+}
+
+/// The name a server signs the account in with: the one its settings name, or the account's own
+/// address when they name none.
+fn auth_name(account: &Account, server: &EwsServer) -> String {
+    if server.username.trim().is_empty() { account.email.clone() } else { server.username.clone() }
 }
 
 /// The request for `account` with what every run says: where the server is, whose mailbox it is.
 fn base(s: &Session, account: Id) -> Result<EwsMailRequest, CmdError> {
-    let (a, server) = ews_account(&s.mailbox, account)?;
+    let (a, signer, server) = ews_account(&s.mailbox, account)?;
     Ok(EwsMailRequest {
         account,
         email: a.email.clone(),
         url: server.url.clone(),
-        username: server.username.clone(),
+        // (A shared mailbox is read with the owner's sign-in: its own name would be the wrong one.)
+        username: if a.is_shared() { auth_name(signer, server) } else { server.username.clone() },
         trusted: server.trusted.clone(),
+        // (A shared mailbox is read at its own address with the owner's server.)
+        mailbox: if a.is_shared() { a.email.clone() } else { String::new() },
         ..Default::default()
     })
 }
@@ -131,7 +148,7 @@ fn base(s: &Session, account: Id) -> Result<EwsMailRequest, CmdError> {
 ///   ([`ews_inbox_request`]) sends and changes nothing.
 pub fn ews_mail_request(s: &Session, account: Id, light: bool) -> Result<EwsMailRequest, CmdError> {
     let mut request = base(s, account)?;
-    let (_, server) = ews_account(&s.mailbox, account)?;
+    let (_, _, server) = ews_account(&s.mailbox, account)?;
     let mb = &s.mailbox;
     let listed = mb.folders.iter().any(|f| f.account == account && f.server.is_some());
     let server_id = |folder: Id| mb.folder(folder).filter(|f| f.account == account).and_then(|f| f.server.as_ref()).map(|server| server.id.clone());
@@ -148,8 +165,15 @@ pub fn ews_mail_request(s: &Session, account: Id, light: bool) -> Result<EwsMail
     request.drafts = super::graph_drafts::draft_changes(s, account, MAX_DRAFTS).0;
     request.sends = super::graph_send::sends(s, account);
     request.list_folders = !light || !listed;
-    // (A folder list read before the folder above each was asked for is read afresh, once.)
-    request.hierarchy = if server.parents { server.hierarchy.clone() } else { String::new() };
+    // A shared mailbox's folder list goes on from its own state, never its owner's. And a folder
+    // list read before the folder above each was asked for is read afresh, once.
+    request.hierarchy = if !request.mailbox.is_empty() {
+        s.mailbox.account(account).and_then(|a| a.ews.as_ref()).map(|server| server.hierarchy.clone()).unwrap_or_default()
+    } else if server.parents {
+        server.hierarchy.clone()
+    } else {
+        String::new()
+    };
     let wanted = |id: &str| match &request.scope {
         EwsScope::All => true,
         EwsScope::Light { also } => inbox.as_deref() == Some(id) || also.iter().any(|a| a == id),
@@ -163,6 +187,14 @@ pub fn ews_mail_request(s: &Session, account: Id, light: bool) -> Result<EwsMail
         .take(MAX_EWS_STATES)
         .map(|server| EwsFolderState { folder: server.id.clone(), state: server.sync_state.clone() })
         .collect();
+    // The calendar, contacts and to-dos after the mail: a full run only (not an Inbox pass or a
+    // light look), so that the lists on screen stay current without holding mail up. The calendar
+    // a month back and a year ahead (#1274).
+    if !light && !request.inbox_pass {
+        use super::ews_directory::{Part, ews_directory_request, send_receive_stretch};
+        let (from, to) = send_receive_stretch(s);
+        request.directory = Some(Box::new(ews_directory_request(s, account, Some(from), Some(to), Part::Whole, false)?));
+    }
     // The conversation ids of mail listed before they were asked for, in a run of every folder (#795).
     if !light {
         request.threads = super::thread_ids::to_ask(mb, account);
@@ -203,7 +235,7 @@ fn request(s: &mut Session, v: &Value) -> CmdResult {
 /// within the account's mail to keep offline and its Download messages in full
 /// ([`graph_down::fetch_queue_passing_over`]).
 pub fn ews_fetch_request(s: &Session, account: Id, message: Option<Id>, most: usize) -> Result<EwsFetchRequest, CmdError> {
-    let (a, server) = ews_account(&s.mailbox, account)?;
+    let (a, signer, server) = ews_account(&s.mailbox, account)?;
     let ids = match message {
         Some(id) => {
             let m = s
@@ -226,7 +258,8 @@ pub fn ews_fetch_request(s: &Session, account: Id, message: Option<Id>, most: us
         account,
         email: a.email.clone(),
         url: server.url.clone(),
-        username: server.username.clone(),
+        // (A shared mailbox's messages are fetched with the owner's sign-in.)
+        username: if a.is_shared() { auth_name(signer, server) } else { server.username.clone() },
         trusted: server.trusted.clone(),
         ids,
         background: message.is_none(),
@@ -294,7 +327,7 @@ fn apply_fetch(s: &mut Session, v: &Value) -> CmdResult {
 /// one's folders to a stranger's server; so would an answer from the server an account named
 /// before its address was changed.)
 fn receiving(mb: &Mailbox, account: Id, email: &str, url: &str) -> Result<String, CmdError> {
-    let (a, server) = ews_account(mb, account)?;
+    let (a, _, server) = ews_account(mb, account)?;
     if !email.is_empty() && !a.email.trim().eq_ignore_ascii_case(email.trim()) {
         return Err(failed!("this Send/Receive was for another account, not for {name}", name = a.name));
     }
@@ -338,7 +371,7 @@ fn take_in(s: &mut Session, result: EwsMailResult) -> CmdResult {
     result.check().map_err(|why| failed!("the result {why}", why = mailcraft_i18n::Arg::words(why)))?;
     let account = result.account;
     let name = receiving(&s.mailbox, account, &result.email, &result.url)?;
-    let (result, cut) = ews_down::bounded(result);
+    let (mut result, cut) = ews_down::bounded(result);
     if ews_down::state_bytes_after(&s.mailbox, account, &result) > MAX_EWS_STATE_BYTES {
         // (The sync states kept for one account are held to a total, as one is held to a size: a
         // piece that would go over is refused whole, and what it was for is read again.)
@@ -427,6 +460,23 @@ fn take_in(s: &mut Session, result: EwsMailResult) -> CmdResult {
     }
     s.graph_index = index;
     down.end_piece(s, account, result.partial);
+    // The calendar, contacts and to-dos the run brought after its mail. A part that goes wrong is
+    // said and leaves the mail it brought as it is.
+    let mut directory_auth = false;
+    if let Some(directory) = &result.directory {
+        match super::ews_directory::apply_ews_directory(s, directory) {
+            Ok(applied) => {
+                if let Some(lines) = applied.get("errors").and_then(Value::as_array) {
+                    errors.extend(lines.iter().filter_map(Value::as_str).map(str::to_owned));
+                }
+                directory_auth = applied.get("authRefused").and_then(Value::as_bool).unwrap_or(false);
+            }
+            Err(e) => errors.push(e.to_string()),
+        }
+    }
+    if directory_auth {
+        result.auth_refused = true;
+    }
     // A rule moved new mail out of the account (#567): there is no going back past it
     // ([`super::graph_mail::apply_graph_mail`] says why).
     if down.left > 0 {
