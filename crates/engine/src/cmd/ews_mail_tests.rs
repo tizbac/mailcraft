@@ -19,6 +19,22 @@ fn session() -> (Session, Id) {
     (s, added["id"].as_u64().unwrap())
 }
 
+#[test]
+fn a_shared_mailbox_is_read_at_its_own_address_with_the_owners_server() {
+    let (mut s, owner) = session();
+    s.mailbox.account_mut(owner).unwrap().ews.as_mut().unwrap().hierarchy = "the owner's state".into();
+    let shared = s.run("account.addSharedMailbox", &json!({"account": owner, "address": "team@example.org"})).unwrap()["id"].as_u64().unwrap();
+    let (account, signer, server) = ews_account(&s.mailbox, shared).unwrap();
+    assert_eq!((account.id, signer.id, server.url.as_str()), (shared, owner, URL));
+    let request = ews_mail_request(&s, shared, false).unwrap();
+    assert_eq!((request.email.as_str(), request.mailbox.as_str()), ("team@example.org", "team@example.org"));
+    assert_eq!(request.username, ME, "the owner's sign-in reaches the shared mailbox");
+    assert!(request.hierarchy.is_empty(), "the shared mailbox's folder list starts from its own state");
+    assert_eq!(request.url, URL);
+    assert_eq!(ews_fetch_request(&s, shared, None, 1).unwrap().username, ME);
+    assert_eq!(ews_mail_request(&s, owner, false).unwrap().mailbox, "");
+}
+
 fn folder(id: &str, parent: &str, name: &str, kind: FolderKind) -> GraphFolder {
     GraphFolder { id: id.into(), parent: parent.into(), name: name.into(), kind, ..Default::default() }
 }
@@ -225,6 +241,26 @@ fn a_deleted_folder_goes_with_its_mail_and_a_renamed_one_keeps_where_it_went_on_
     apply_ews_mail(&mut s, EwsMailResult { folders: Some(all), hierarchy: "HIER-3".into(), ..piece(account) }).unwrap();
     assert!(s.mailbox.folder_by_server(account, "F5").is_none());
     assert!(s.mailbox.folder_of_kind(account, FolderKind::Inbox).is_some());
+}
+
+#[test]
+fn a_folder_moved_on_the_server_follows_it_into_deleted_items() {
+    let (mut s, account) = session();
+    list(&mut s, account);
+    let projects = s.mailbox.folder_by_server(account, "F5").unwrap();
+    // Webmail deletes the folder: the server moves it into Deleted Items, which comes as an
+    // Update of the same folder whose parent is now that folder (#252).
+    let delta = EwsFolderDeltas {
+        changed: vec![folder("F9", "", "Deleted Items", FolderKind::Deleted), folder("F5", "F9", "Projects", FolderKind::Custom)],
+        afresh: false,
+        ..Default::default()
+    };
+    apply_ews_mail(&mut s, EwsMailResult { folders: Some(delta), hierarchy: "HIER-2".into(), ..piece(account) }).unwrap();
+    let deleted = s.mailbox.folder_by_server(account, "F9").unwrap();
+    let moved = s.mailbox.folder_by_server(account, "F5").unwrap();
+    assert_eq!(moved, projects, "the same local folder, with its mail");
+    assert_eq!(s.mailbox.folder(moved).unwrap().parent, Some(deleted), "it lies under Deleted Items here too");
+    assert_eq!(s.mailbox.folder(moved).unwrap().server.as_ref().unwrap().parent, "F9");
 }
 
 #[test]
