@@ -392,7 +392,7 @@ impl SendMessage {
     /// not the account's own (a shared mailbox, at its address). Not a message that can go (no
     /// recipient, an address that isn't one, too large) is said so, and nothing is sent.
     pub fn new(message: &Message, mailbox: &str) -> Result<Self, Unsendable> {
-        if mailcraft_mime::signature_missing(message) {
+        if mailcraft_mime_model::signature_missing(message) {
             return Err(Unsendable::NotSigned);
         }
         let mut anyone = false;

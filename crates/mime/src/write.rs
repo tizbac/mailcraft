@@ -324,7 +324,7 @@ fn body(message: &Message, signing: bool) -> Part {
         None => {
             // A reaction (RFC 9078) goes first, the same emoji as plain text after it for a reader
             // that doesn't know the disposition.
-            forms.extend(reaction_part(message));
+            forms.extend(reaction_part(message, signing));
             forms.push(text);
         }
         Some(html) => {
@@ -364,7 +364,7 @@ fn body(message: &Message, signing: bool) -> Part {
 /// without spaces or control characters, as `text/plain; charset=utf-8` with
 /// `Content-Disposition: reaction`. `None` for a message that isn't one, or whose text isn't
 /// fit to be one: it is then written as the plain message it is.
-fn reaction_part(message: &Message) -> Option<Part> {
+fn reaction_part(message: &Message, signing: bool) -> Option<Part> {
     if !message.reaction {
         return None;
     }
@@ -372,7 +372,7 @@ fn reaction_part(message: &Message) -> Option<Part> {
     if emoji.is_empty() || emoji.len() > MAX_REACTION || emoji.chars().any(|c| c.is_whitespace() || c.is_control()) {
         return None;
     }
-    let mut part = text_part("plain", emoji);
+    let mut part = text_part("plain", emoji, signing);
     part.fields.push(("Content-Disposition", "reaction".to_string()));
     Some(part)
 }
