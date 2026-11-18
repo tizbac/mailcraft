@@ -62,6 +62,8 @@ mod failing_messages_tests;
 mod favorites_tests;
 pub mod file;
 #[cfg(test)]
+mod file_msg_tests;
+#[cfg(test)]
 mod file_print_tests;
 pub mod folder;
 #[cfg(test)]
