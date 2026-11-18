@@ -831,6 +831,37 @@ pub struct Doc<'a> {
     pub plain: bool,
 }
 
+/// The format Save Message As writes by default: an Internet message (`.eml`) or an Outlook
+/// message (`.msg`); the owner chooses in File › Options (`saveMessageFormat`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SaveMessageFormat {
+    /// One Internet message, as it came or as its parts are written.
+    #[default]
+    Eml,
+    /// An Outlook `.msg` file ([MS-OXMSG]).
+    Msg,
+}
+
+impl SaveMessageFormat {
+    /// The extension the file takes.
+    pub fn extension(self) -> &'static str {
+        match self {
+            Self::Eml => "eml",
+            Self::Msg => "msg",
+        }
+    }
+
+    /// The format an option's word names, `None` for a word that isn't one.
+    pub fn parse(text: &str) -> Option<Self> {
+        match text.trim().to_ascii_lowercase().as_str() {
+            "eml" | "msg822" => Some(Self::Eml),
+            "msg" => Some(Self::Msg),
+            _ => None,
+        }
+    }
+}
+
 /// Preferences the engine acts on (File › Options); the front end saves them between runs.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -929,6 +960,9 @@ pub struct Prefs {
     /// through [`Prefs::undo_send`], which keeps it to what the choice offers.
     #[serde(skip_serializing_if = "is_zero_u8")]
     pub undo_send_secs: u8,
+    /// What File › Save As writes by default, an `.eml` or an Outlook `.msg` (`file.options`).
+    #[serde(default)]
+    pub save_message_format: SaveMessageFormat,
 }
 
 impl Default for Prefs {
@@ -966,6 +1000,7 @@ impl Default for Prefs {
             recent_searches: Vec::new(),
             offline: false,
             undo_send_secs: 0,
+            save_message_format: SaveMessageFormat::Eml,
         }
     }
 }

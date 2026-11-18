@@ -7360,6 +7360,11 @@ msgid "Interface theme"
 msgstr "Tema de la interfaz"
 
 #. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Internet message (.eml)"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/import_pst.rs
 #, fuzzy
 msgid "Into your contacts on this computer, each marked as imported from the file."
@@ -8970,6 +8975,11 @@ msgstr ""
 #, fuzzy
 msgid "Message Preview"
 msgstr "Vista previa del mensaje"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Message file (.msg)"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ComposeHost.kt

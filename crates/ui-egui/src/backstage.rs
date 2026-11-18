@@ -986,6 +986,27 @@ fn options(app: &mut MailApp, ui: &mut Ui, t: &Tokens) {
     }
     crate::reading::invitation_options(app, ui);
     time_zones(app, ui, &prefs);
+    row(ui, tl!("Save Message As"), |ui| {
+        let mut choice = prefs.save_message_format;
+        egui::ComboBox::from_id_salt("opt_save_message")
+            .selected_text(match choice {
+                mailcraft_engine::SaveMessageFormat::Eml => tl!("Internet message (.eml)"),
+                mailcraft_engine::SaveMessageFormat::Msg => tl!("Message file (.msg)"),
+            })
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut choice, mailcraft_engine::SaveMessageFormat::Eml, tl!("Internet message (.eml)"));
+                ui.selectable_value(&mut choice, mailcraft_engine::SaveMessageFormat::Msg, tl!("Message file (.msg)"));
+            });
+        if choice != prefs.save_message_format {
+            set(
+                app,
+                json!({"saveMessageFormat": match choice {
+                    mailcraft_engine::SaveMessageFormat::Eml => "eml",
+                    mailcraft_engine::SaveMessageFormat::Msg => "msg",
+                }}),
+            );
+        }
+    });
 }
 
 /// The time zone the calendar is shown in, and a second one for its time bar, each with a label
