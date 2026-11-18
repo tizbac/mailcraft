@@ -203,10 +203,7 @@ fn an_exchange_contact_in_a_writable_book_is_not_marked_read_only() {
     let mut w = testing::window("view.people");
     let account = w
         .state_mut()
-        .execute(
-            "account.add",
-            json!({"email": "ada@example.org", "kind": "exchange", "ews": {"url": "https://mail.example.org/EWS/Exchange.asmx"}}),
-        )
+        .execute("account.add", json!({"email": "ada@example.org", "kind": "exchange", "ews": {"url": "https://mail.example.org/EWS/Exchange.asmx"}}))
         .unwrap()["id"]
         .as_u64()
         .unwrap();

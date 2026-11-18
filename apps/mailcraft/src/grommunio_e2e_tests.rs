@@ -24,6 +24,7 @@ use mailcraft_model::sync::{EwsDirectoryRequest, EwsDirectoryResult};
 use mailcraft_model::{Contact, Event, Labeled, TaskPatch};
 
 use crate::ews_runner::{Transport, client};
+use mailcraft_engine::Session;
 
 fn env(name: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| panic!("{name} is not set"))
@@ -248,4 +249,42 @@ fn contacts_calendars_and_todos_go_up_and_come_back() {
     let outcome = sent.tasks_uploaded.as_ref().expect("an answer").outcomes.first().cloned().expect("one outcome");
     assert_eq!(outcome.result, TaskResult::Done, "to-do completed: {outcome:?}");
     let _ = Ordering::Relaxed;
+
+    // ---- A contact made in the window, in the Exchange book, reaches the server. ----
+    let now = mailcraft_time::now();
+    let mut session = Session::at(mailcraft_engine::sample::mailbox(now, 0), now, 0);
+    let account = session
+        .run("account.add", &serde_json::json!({"email": base.email, "kind": "exchange", "ews": {"url": base.url, "username": base.username}}))
+        .unwrap()["id"]
+        .as_u64()
+        .unwrap();
+    let engine_base = EwsDirectoryRequest { account, ..base.clone() };
+    let first = run(&engine_base, &request(&engine_base));
+    mailcraft_engine::cmd::ews_directory::apply_ews_directory(&mut session, &first).unwrap();
+    let book = session
+        .mailbox
+        .contact_books
+        .iter()
+        .find(|book| book.account == account && book.rights == mailcraft_model::Rights::Edit)
+        .map(|book| book.id.clone())
+        .unwrap_or_else(|| panic!("a writable Exchange address book: {:?}", session.mailbox.contact_books));
+    let made = session
+        .run("people.new", &serde_json::json!({"displayName": "E2E New Contact", "addressBook": book, "addressBookAccount": account}))
+        .unwrap();
+    let id = made["id"].as_u64().unwrap();
+    let asked = session.run("sync.ewsDirectoryRequest", &serde_json::json!({"account": account})).unwrap();
+    let asked: EwsDirectoryRequest = serde_json::from_value(asked).unwrap();
+    assert!(asked.contact_changes.as_ref().is_some_and(|upload| !upload.ops.is_empty()), "the new contact is in the request");
+    let sent = run(&base, &asked);
+    mailcraft_engine::cmd::ews_directory::apply_ews_directory(&mut session, &sent).unwrap();
+    let read = run(&base, &request(&base));
+    let found = read.contacts.as_ref().is_some_and(|contacts| contacts.contacts.iter().any(|contact| contact.display_name == "E2E New Contact"));
+    assert!(found, "the contact made here is on the server");
+    // Take it away again through the same path, so a second run starts as before.
+    if session.run("people.delete", &serde_json::json!({"id": id})).is_ok() {
+        let asked = session.run("sync.ewsDirectoryRequest", &serde_json::json!({"account": account})).unwrap();
+        let asked: EwsDirectoryRequest = serde_json::from_value(asked).unwrap();
+        let sent = run(&base, &asked);
+        mailcraft_engine::cmd::ews_directory::apply_ews_directory(&mut session, &sent).unwrap();
+    }
 }
