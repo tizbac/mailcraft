@@ -913,6 +913,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cfb"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d38f2da7a0a2c4ccf0065be06397cc26a81f4e528be095826eee9d4adbb8c60f"
+dependencies = [
+ "byteorder",
+ "fnv",
+ "uuid",
+]
+
+[[package]]
 name = "cfb-mode"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3366,6 +3377,7 @@ dependencies = [
 name = "mailcraft-mime-model"
 version = "0.14.0"
 dependencies = [
+ "cfb",
  "mailcraft-html",
  "mailcraft-mime",
  "mailcraft-model",

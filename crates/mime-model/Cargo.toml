@@ -9,6 +9,7 @@ description = "MailCraft's messages as Internet messages: mailcraft-mime's reade
 workspace = true
 
 [dependencies]
+cfb = "0.7.3"
 mailcraft-mime = { workspace = true }
 mailcraft-model = { workspace = true }
 mailcraft-html = { workspace = true }
