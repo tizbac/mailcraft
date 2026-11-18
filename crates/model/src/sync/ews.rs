@@ -172,6 +172,11 @@ pub struct EwsDirectoryRequest {
     pub from: i64,
     #[serde(skip_serializing_if = "is_zero")]
     pub to: i64,
+    /// Read for a stretch only (the calendar's own job, #1274), not the account's whole
+    /// directory: a calendar download is then never taken for the list of all its events, so
+    /// what it didn't bring is not removed here.
+    #[serde(skip_serializing_if = "is_false")]
+    pub partial: bool,
     /// Other mailboxes whose calendar or address book is read with the same sign-in.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub shared: Vec<EwsSharedMailbox>,
