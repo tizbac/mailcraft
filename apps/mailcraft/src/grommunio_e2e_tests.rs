@@ -186,7 +186,11 @@ fn contacts_calendars_and_todos_go_up_and_come_back() {
         .as_u64()
         .unwrap();
     let engine_base = EwsDirectoryRequest { account, ..base.clone() };
-    let first = run(&engine_base, &request(&engine_base));
+    let narrow = session
+        .run("sync.ewsDirectoryRequest", &serde_json::json!({"account": account, "calendarOnly": true, "from": now - 86_400, "to": now + 3 * 86_400}))
+        .unwrap();
+    let narrow: EwsDirectoryRequest = serde_json::from_value(narrow).unwrap();
+    let first = run(&engine_base, &narrow);
     mailcraft_engine::cmd::ews_directory::apply_ews_directory(&mut session, &first).unwrap();
     let merged: Vec<&str> =
         session.mailbox.events.values().map(|event| event.title.as_str()).filter(|title| title.starts_with("E2E Multi ")).collect();
