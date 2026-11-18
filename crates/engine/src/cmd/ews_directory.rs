@@ -162,6 +162,7 @@ pub fn ews_directory_request(
         tasks: whole && a.keeps_tasks(),
         from,
         to,
+        partial: !whole,
         shared,
         changes,
         contact_changes,
