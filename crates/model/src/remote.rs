@@ -341,6 +341,9 @@ impl RemoteContact {
     pub fn tidy(&mut self) {
         self.id = key(&self.id);
         self.change_key = key(&self.change_key);
+        self.uid = line(&self.uid, MAX_KEY);
+        self.book = line(&self.book, MAX_NAME);
+        self.book_id = key(&self.book_id);
         for name in [
             &mut self.display_name,
             &mut self.first,
@@ -1094,7 +1097,6 @@ impl EventOutcome {
         self.op.tidy();
         self.remote = key(&self.remote);
         self.change_key = key(&self.change_key);
-        self.uid = line(&self.uid, MAX_KEY);
         self.error = line(&self.error, MAX_WHY);
         self.join_url = OnlineMeeting::clean_link(&self.join_url).unwrap_or_default();
         self.zone = line(&self.zone, 64);
