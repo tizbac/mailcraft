@@ -1,0 +1,1 @@
+- An Exchange server account's calendar is sometimes read for a few days at a time. That read no longer counts as the calendar's whole list: appointments it didn't ask about are not taken for deleted, so adding one no longer makes another disappear.

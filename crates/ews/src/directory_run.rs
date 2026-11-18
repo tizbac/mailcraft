@@ -275,6 +275,11 @@ impl<E: HttpExchange> Run<'_, E> {
             if !complete {
                 list.complete = false;
             }
+            // A calendar-only read is a stretch of the calendar, not the list of all its events:
+            // what it didn't bring is not taken for the server's own absence of it.
+            if request.partial {
+                download.complete = false;
+            }
             download.account = request.account;
             download.email = request.email.clone();
             download.has_categories = true;
