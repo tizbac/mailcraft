@@ -16,7 +16,6 @@ use mailcraft_model::signing::SigningKey;
 use serde_json::json;
 
 use super::{SigningChoice, SigningHost};
-use crate::own_keys::KeyPlace;
 use crate::{MailApp, Services};
 
 const NOW: i64 = 1_794_441_600;
@@ -32,7 +31,12 @@ impl SigningHost for OneKey {
         let key = SigningKey::new(SignatureFormat::OpenPgp, &"9C".repeat(20), "owner@example.org");
         let _ = tx.send(Ok(key
             .into_iter()
-            .map(|key| SigningChoice { key, addresses: vec!["owner@example.org".into()], place: KeyPlace::Gnupg, expires: 0 })
+            .map(|key| SigningChoice {
+                key,
+                addresses: vec!["owner@example.org".into()],
+                place: crate::digital_signatures::GNUPG.to_string(),
+                expires: 0,
+            })
             .collect()));
         rx
     }
@@ -46,7 +50,7 @@ impl SigningHost for OneKey {
 /// The window with Digital Signatures open for an IMAP account of owner@example.org; its id.
 fn opened() -> (Harness<'static, MailApp>, u64) {
     let mut app = MailApp::new(Session::at(mailcraft_model::Mailbox::with_local_account("", ""), NOW, 0), Services::default());
-    (app.autosave, app.auto_sync) = (false, false);
+    app.autosave = false;
     app.services.signing = Some(Arc::new(OneKey));
     let server = json!({"email": "owner@example.org", "incoming": {"host": "imap.example.org"}, "outgoing": {"host": "smtp.example.org"}});
     let id = app.execute("account.add", server).unwrap()["id"].as_u64().unwrap();

@@ -111,6 +111,8 @@ enum Setup {
     None,
     /// A message being written, with recipients and an attachment, that the owner wrote in.
     Writing,
+    /// A message being written whose owner turned Sign on, so turning it off is asked about.
+    Signing,
     /// A meeting in a window of its own.
     Meeting,
     /// A message in a window of its own.
@@ -136,6 +138,7 @@ enum Setup {
 const ROWS: &[(&str, &str, Setup)] = &[
     // Send.
     ("compose.send", "{}", Setup::Writing),
+    ("compose.sign", r#"{"value": false}"#, Setup::Signing),
     ("compose.sendLater", r#"{"at": 1900000000}"#, Setup::Writing),
     ("mail.setSendTime", r#"{"id": $message, "at": 1900000000}"#, Setup::None),
     ("account.setAutomaticReplies", r#"{"status": "disabled"}"#, Setup::None),
@@ -343,6 +346,14 @@ fn set_up(a: &mut MailApp, setup: Setup, i: &Ids) {
         Setup::Writing => {
             a.execute("mail.new", json!({"to": "alice@example.org", "subject": "Audit lunch"})).unwrap();
             a.execute("compose.attach", json!({"name": "notes.txt", "data": "AAAA"})).unwrap();
+        }
+        Setup::Signing => {
+            // Signing is offered only by an account whose mail goes from here.
+            if let Some(account) = a.session.mailbox.accounts.first_mut() {
+                account.kind = mailcraft_model::AccountKind::Imap;
+            }
+            a.execute("mail.new", json!({"to": "alice@example.org", "subject": "Audit lunch"})).unwrap();
+            a.execute("compose.sign", json!({"value": true})).unwrap();
         }
         Setup::Meeting => {
             a.execute("ui.openWindow", json!({"new": "meeting", "title": "Review", "attendees": "alice@example.org"})).unwrap();

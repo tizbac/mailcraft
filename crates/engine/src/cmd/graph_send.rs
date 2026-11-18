@@ -86,7 +86,7 @@ pub fn sends(s: &Session, account: Id) -> Vec<SendUp> {
                 mime: None,
                 discard: String::new(),
             },
-            _ => SendUp { message: m.id, draft: None, mime: Some(Box::new(m.as_ref().clone())), discard: String::new() },
+            _ => SendUp { message: m.id, draft: None, mime: Some(Box::new(m.clone())), discard: String::new() },
         })
         .collect()
 }
