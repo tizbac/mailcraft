@@ -28,7 +28,10 @@ the volumes.
 The test creates and then deletes a contact, an event and a to-do through the same
 `EwsDirectoryRequest` / `EwsDirectoryResult` path the desktop's Send/Receive uses, and checks each
 answer is `Done` and each item comes back from a fresh read (a changed contact with its company, a
-moved event, a completed to-do) before deleting it.
+moved event, a completed to-do) before deleting it. It then makes a contact **through the engine**
+(`people.new` with the account's writable Exchange address book), sends the request
+`sync.ewsDirectoryRequest` builds, and checks the contact is in a fresh read of the server —
+the path that failed while Exchange contacts were wrongly taken for read-only.
 
 ## Doing it by hand
 
