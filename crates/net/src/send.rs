@@ -31,7 +31,7 @@ impl Envelope {
     /// addresses (#797), else the account's own; and To + Cc + Bcc, each address once.
     pub(crate) fn of(account: &Account, message: &Message) -> Result<Envelope, NetError> {
         // A message to be Digitally signed that isn't goes nowhere (#30 R19).
-        if mailcraft_mime::signature_missing(message) {
+        if mailcraft_mime_model::signature_missing(message) {
             return Err(NetError::Config(said!("it was to be Digitally signed and wasn't, so it wasn't sent")));
         }
         let from = match account.sender_address(&message.from.email) {

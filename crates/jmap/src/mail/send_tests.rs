@@ -50,7 +50,7 @@ fn message(to: &[&str], cc: &[&str], bcc: &[&str]) -> Message {
 }
 
 fn outbox(id: u64, message: Message) -> SendUp {
-    SendUp { message: id, draft: None, mime: Some(Box::new(message)) }
+    SendUp { message: id, draft: None, mime: Some(Box::new(message)), discard: String::new() }
 }
 
 /// A message to one person, waiting in the Outbox as the message `id`.
@@ -692,7 +692,7 @@ fn an_address_that_could_end_a_line_or_begin_another_is_no_recipient_and_the_mes
 
     // A message with nobody to go to, with too many, and with nothing to send, are held without an upload.
     let fake = sender(|_, _| None);
-    let nothing = SendUp { message: 43, draft: None, mime: None };
+    let nothing = SendUp { message: 43, draft: None, mime: None, discard: String::new() };
     let pieces = send_fake(&fake, vec![outbox(41, message(&[], &[], &[])), outbox(42, message(&crowd, &[], &[])), nothing, simple(44)]);
     assert_eq!(sent_of(&pieces), [is(41, held(NO_RECIPIENTS)), is(42, held(TOO_MANY)), is(43, held(NOTHING)), is(44, SendOutcome::Sent)]);
     assert_eq!(fake.uploads().len(), 1);

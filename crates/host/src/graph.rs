@@ -93,6 +93,9 @@ pub struct GraphResult {
     /// Outbox messages that must not be sent another way in this run: whether they went is not
     /// known, or the server said to try later.
     pub held: Vec<Id>,
+    /// Messages that were to go Digitally signed and couldn't be: held in the Outbox, never sent
+    /// unsigned (#30).
+    pub unsigned: Vec<mailcraft_model::signing::Unsigned>,
     /// Those of `held` whose answer was lost after they were handed over (a timeout, a broken
     /// connection, an answer that doesn't say): they may have gone, and are held for the owner
     /// (AU3-26). The rest of `held` didn't go, and goes with the next run.

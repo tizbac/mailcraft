@@ -281,7 +281,7 @@ pub fn ews_resolve_request(s: &Session, texts: &[String]) -> Result<EwsResolveRe
 /// What the address list of the Exchange server account `account` is asked for `texts` (People's
 /// Address Book: what the owner searches for).
 pub fn ews_resolve_request_for(s: &Session, account: Id, texts: &[String]) -> Result<EwsResolveRequest, CmdError> {
-    let (a, server) = ews_account(&s.mailbox, account)?;
+    let (a, _, server) = ews_account(&s.mailbox, account)?;
     let mut asked: Vec<String> = Vec::new();
     for text in texts {
         let text = one_line(text, MAX_RESOLVE_TEXT);
