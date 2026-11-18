@@ -3981,6 +3981,7 @@ pub fn apply_calendars(s: &mut Session, download: &CalendarsDownload) -> CmdResu
     if !download.calendars.iter().any(|calendar| calendar.main) {
         return Ok(json!({"added": 0, "updated": 0, "removed": 0, "complete": false}));
     }
+    let exchange = s.mailbox.account(account).is_some_and(|a| a.kind == mailcraft_model::AccountKind::Exchange);
     let mailbox = &mut s.mailbox;
     let (mut added, mut updated) = (0usize, 0usize);
     let mut listed: HashSet<String> = HashSet::new();
@@ -4017,8 +4018,10 @@ pub fn apply_calendars(s: &mut Session, download: &CalendarsDownload) -> CmdResu
                 id,
                 name: title,
                 color,
-                // Only the account's own calendar is ticked to begin with.
-                visible: remote.main || own.is_some_and(|o| o.ticked),
+                // Only the account's own calendar is ticked to begin with for a Microsoft
+                // account; an Exchange server's calendars are all ticked, so what the owner put
+                // in another of them is not hidden.
+                visible: exchange || remote.main || own.is_some_and(|o| o.ticked),
                 origin,
                 rights: remote.rights,
                 owner: remote.owner.clone(),
