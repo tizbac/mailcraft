@@ -275,6 +275,11 @@ impl<E: HttpExchange> Run<'_, E> {
             if !complete {
                 list.complete = false;
             }
+            // A calendar-only read is a stretch of the calendar, not the list of all its events:
+            // what it didn't bring is not taken for the server's own absence of it.
+            if request.partial {
+                download.complete = false;
+            }
             download.account = request.account;
             download.email = request.email.clone();
             download.has_categories = true;
@@ -356,15 +361,8 @@ impl<E: HttpExchange> Run<'_, E> {
                     return Ok((download, false));
                 }
             }
-            if last || before == 0 {
+            if last || before == 0 || latest <= cursor {
                 view_complete = true;
-                break;
-            }
-            if latest <= cursor {
-                // The page didn't move the stretch on (a server that ignored the view's start,
-                // or repeated the same page): what is here is not the whole stretch, so nothing
-                // of it is taken for the server's absence. Ask no more.
-                view_complete = false;
                 break;
             }
             cursor = latest;
