@@ -198,6 +198,38 @@ fn refresh(app: &mut MailApp) {
         .collect();
     app.reminders.mail = mail_rows(app);
 }
+
+/// What a follow-up reminder is known by in [`State::announced`].
+fn mail_key(id: u64, at: i64) -> String {
+    format!("m{id}@{at}")
+}
+
+/// The follow-up reminders showing now, from the mailbox.
+fn mail_rows(app: &MailApp) -> Vec<MailRow> {
+    let (mb, now) = (&app.session.mailbox, app.session.now());
+    mb.due_follow_ups(now)
+        .into_iter()
+        .filter_map(|id| {
+            let m = mb.message(id)?;
+            let f = m.follow_up?;
+            let sent = mb.folder(m.folder).is_some_and(|x| matches!(x.kind, mailcraft_model::FolderKind::Sent | mailcraft_model::FolderKind::Outbox));
+            let who = if sent { m.to.iter().chain(&m.cc).map(|a| a.display()).collect::<Vec<_>>().join(", ") } else { m.from.display().to_string() };
+            Some(MailRow {
+                id,
+                subject: m.subject.clone(),
+                who,
+                at: f.at,
+                local: app.session.local(f.at),
+                no_reply: f.if_no_reply,
+                minutes: now.saturating_sub(f.at).div_euclid(60),
+            })
+        })
+        .collect()
+}
+
+/// Whether anything is showing: an event's reminder or a message's.
+fn anything(app: &MailApp) -> bool {
+    !app.reminders.showing.is_empty() || !app.reminders.mail.is_empty()
 }
 
 /// Dismiss one reminder (`event` and `occurrence`), or all that are showing.
