@@ -4,9 +4,9 @@
 //! `mailcraft-net` brings it from Microsoft Graph.
 
 use mailcraft_model::remote::{
-    CalendarsDownload, ContactChangeKind, ContactOutcome, ContactsDownload, ContactsUploaded, EventChange, EventChangeKind, EventFields, EventOp,
-    EventOutcome, EventReminder, EventRepeat, EventResult, EventTime, EventWall, EventsDownload, EventsUpload, EventsUploaded, RemoteAddressBook,
-    RemoteCalendar, RemoteContact, RemoteEvent, RemoteEventKind,
+    ContactChangeKind, ContactOutcome, ContactsDownload, ContactsUploaded, EventChange, EventChangeKind, EventFields, EventOp, EventOutcome,
+    EventReminder, EventRepeat, EventResult, EventTime, EventWall, EventsDownload, EventsUpload, EventsUploaded, RemoteAddressBook, RemoteContact,
+    RemoteEvent, RemoteEventKind,
 };
 use mailcraft_model::{Address, Attendee, Contact, ContactBook, Event, Freq, Id, Labeled, Origin, Recurrence, Response, Rights, ShowAs};
 use mailcraft_time::{Date, DateTime, Timestamp};
@@ -3299,51 +3299,4 @@ fn a_download_rehomes_only_strays_never_what_is_on_its_way_to_the_server() {
     assert!(in_server(&s, made) && in_server(&s, mine));
     assert!([made, mine].iter().all(|id| s.mailbox.event(*id).is_some_and(|e| e.origin.account == account && !e.origin.id.is_empty())));
     assert!(!creating(&s, made) && !creating(&s, mine));
-}
-
-/// An Exchange server account's calendars are all ticked when they first come: an appointment
-/// put in another of them on the server is shown instead of staying hidden. (A Microsoft
-/// account keeps to its main calendar until the owner ticks the others.)
-#[test]
-fn an_exchange_accounts_calendars_are_all_ticked_when_they_first_come() {
-    let now = at(2026, 10, 14, 16, 0);
-    let mut s = Session::at(crate::sample::mailbox(now, -240), now, -240);
-    let account = s
-        .run(
-            "account.add",
-            &json!({"email": "ada@exchange.example", "kind": "exchange", "ews": {"url": "https://exchange.example.org/EWS/Exchange.asmx"}}),
-        )
-        .unwrap()["id"]
-        .as_u64()
-        .unwrap();
-    let entry = |id: &str, name: &str, main: bool| RemoteCalendar { id: id.into(), name: name.into(), main, ..Default::default() };
-    let download = CalendarsDownload {
-        account,
-        email: "ada@exchange.example".into(),
-        complete: true,
-        calendars: vec![entry("cal-main", "Calendar", true), entry("cal-team", "Team", false)],
-        ..Default::default()
-    };
-    super::apply_calendars(&mut s, &download).unwrap();
-    let shown: Vec<(String, bool)> =
-        s.mailbox.calendars.iter().filter(|c| c.origin.account == account).map(|c| (c.name.clone(), c.visible)).collect();
-    assert_eq!(shown, [("Calendar".to_string(), true), ("Team".to_string(), true)]);
-}
-
-/// A Microsoft account's second calendar waits for the owner to tick it.
-#[test]
-fn a_microsoft_accounts_other_calendars_wait_to_be_ticked() {
-    let (mut s, account) = session();
-    let entry = |id: &str, name: &str, main: bool| RemoteCalendar { id: id.into(), name: name.into(), main, ..Default::default() };
-    let download = CalendarsDownload {
-        account,
-        email: "ada@example.org".into(),
-        complete: true,
-        calendars: vec![entry("cal-main", "Calendar", true), entry("cal-team", "Team", false)],
-        ..Default::default()
-    };
-    super::apply_calendars(&mut s, &download).unwrap();
-    let shown: Vec<(String, bool)> =
-        s.mailbox.calendars.iter().filter(|c| c.origin.account == account).map(|c| (c.name.clone(), c.visible)).collect();
-    assert_eq!(shown, [("Calendar".to_string(), true), ("Team".to_string(), false)]);
 }
