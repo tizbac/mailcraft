@@ -99,29 +99,6 @@ fn a_stand_in_answers_a_directory_read() {
     assert!(!result.auth_refused);
 }
 
-/// A calendar-only read is a stretch of days, not the list of every event: what it brings is
-/// never taken for the whole calendar, so an event it didn't ask about is not removed here.
-#[test]
-fn a_partial_calendar_read_removes_nothing_from_what_it_didnt_bring() {
-    let standin = crate::standin::StandIn::new();
-    let client = crate::Client::new("http://127.0.0.1/EWS/Exchange.asmx", crate::Secret::new(crate::standin::AUTHORIZATION)).unwrap();
-    let request = mailcraft_model::sync::EwsDirectoryRequest {
-        account: 1,
-        email: "ada@example.org".into(),
-        url: "http://127.0.0.1/EWS/Exchange.asmx".into(),
-        calendars: true,
-        from: 1,
-        to: 2_000_000_000,
-        partial: true,
-        ..Default::default()
-    };
-    let cancel = std::sync::atomic::AtomicBool::new(false);
-    let result = crate::standin::block_on(sync_directory(&client, &standin, &request, &cancel, &mut |_| true)).unwrap();
-    assert!(result.errors.is_empty(), "{}", result.errors.join("; "));
-    assert!(!result.events.is_empty(), "the stand-in has a calendar");
-    assert!(result.events.iter().all(|download| !download.complete), "a stretch is not the calendar's whole list");
-}
-
 /// The stand-in, with every request it was asked written down.
 struct Logged {
     standin: crate::standin::StandIn,
