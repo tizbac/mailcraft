@@ -1,0 +1,1 @@
+| 2026-11-18 | minor | Save Message As writes Outlook `.msg` files ([MS-OXMSG] over [MS-CFB]): the note's properties, its recipients and its attachments; File › Options chooses whether `.eml` or `.msg` is the default. Reading a `.msg` is not built |

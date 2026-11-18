@@ -1,0 +1,1 @@
+| 2026-11-18 | Save Message As writes Outlook `.msg` files: the message's properties, one storage per recipient and per attachment, from the parts this computer keeps; File › Options chooses whether `.eml` or `.msg` is the default, and `file.exportMessage` takes `"format"` to override it |
