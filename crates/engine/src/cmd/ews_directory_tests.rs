@@ -101,7 +101,7 @@ fn a_send_receive_reads_a_month_back_and_a_year_ahead() {
 fn a_shared_mailboxs_directory_is_read_with_the_owners_sign_in() {
     let (mut s, owner) = session();
     let shared = s.run("account.addSharedMailbox", &json!({"account": owner, "address": "team@example.org"})).unwrap()["id"].as_u64().unwrap();
-    let request = ews_directory_request(&s, shared, Some(1_000), Some(2_000), false).unwrap();
+    let request = ews_directory_request(&s, shared, Some(1_000), Some(2_000), Part::Whole, false).unwrap();
     assert_eq!((request.account, request.email.as_str(), request.mailbox.as_str()), (shared, "team@example.org", "team@example.org"));
     assert_eq!(request.username, ME);
 }
