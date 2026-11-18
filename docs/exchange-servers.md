@@ -3,9 +3,28 @@
 > **Last reviewed:** 2026-10-30 · **Last updated:** 2026-11-14 · **Change:** minor
 
 An Exchange server account (#252) reaches an organisation's own mail server through Exchange Web
-Services, for mail (its calendar and contacts are not kept in step yet). This page says what has been seen
-working on servers other than Microsoft's, one at a time, and what has not. Everything here was
-tried with made-up mail on a server running on the same computer; no real mailbox was used.
+Services: its mail, and now its calendars, address books and to-do lists, including a person's
+calendar or address book opened by address. This page says what has been seen working on servers
+other than Microsoft's, one at a time, and what has not. Everything here was tried with made-up
+data on a server running on the same computer; no real mailbox was used.
+
+A shared mailbox of the same server can be opened under the account (Add Shared Mailbox, or
+`account.addSharedMailbox`): it is read at its own address with the owner's sign-in, and its
+folders and mail are its own. Nothing is asked of any server when it is added; a server that won't
+let the owner in says so at that first Send/Receive. Mail written in it goes from its address when
+the owner has Send As or Send on Behalf permission there, and its copy is filed in its own Sent
+Items; without it the message is held with the reason, never sent from another address.
+
+The directory is read after the mail of a Send/Receive: the account's calendars, books and lists
+(the folders the server gives that kind), the events of a month back and a year ahead (with the
+days on screen when they are within two years of it), and every contact and to-do. What is made,
+changed or deleted here goes up before it is read. While the calendar is in front, days the owner
+goes to that weren't read in the last five minutes are read by themselves, the calendars alone and
+nothing sent, with the password the Send/Receive was given (#1274).
+Another mailbox's calendar or address book is read with the owner's sign-in by putting its address
+in every folder request; it is listed under Shared Calendars or with the account's books. Grommunio
+lets the owner into the shared folder it is given but not list that mailbox's other folders, so a
+shared calendar or book is read as its default folder there.
 
 ## Grommunio
 
@@ -15,6 +34,12 @@ not used for the answers below: the account was added and driven through the con
 screen was locked), so the certificate question and the Add Account pages were not looked at
 against this server.
 
+`scripts/grommunio-e2e.sh` starts a current Grommunio container again, makes the domain and one
+made-up mailbox, trusts the server's own certificate by its fingerprint, and runs
+`apps/mailcraft/src/grommunio_e2e_tests.rs`: a contact, an event and a to-do are made, changed,
+read back and deleted through the same Exchange Web Services path the desktop uses. The facts and
+the manual steps are in [`grommunio-testing.md`](grommunio-testing.md).
+
 | What | Result | Notes |
 |---|---|---|
 | Autodiscover | Reader works; the search was not run end to end | The server answers `/autodiscover/autodiscover.xml` with a Basic challenge, then with its Exchange Web Services address (`EXHTTP`, `EXCH`; the `EXPR` protocol has no address, and the `EXCH` server is a mailbox identifier, not a host). MailCraft reads that shape (a test keeps it). The test domain had no name that led to the server, so the three places Autodiscover looks were not tried from an address; the server's address was typed instead |
@@ -22,6 +47,7 @@ against this server.
 | Sign-in: Basic | Works | |
 | Sign-in: NTLM | Not offered | The server's challenge lists Basic only, so NTLM was not tried against a real server |
 | First download | Works | Folders, then headers with a preview, then whole messages; an accented subject and body, an attachment and a message in a folder made on the server all arrived. The server's folders for calendar, contacts, tasks, notes, journal and settings are left out: Grommunio's Default listing gives no folder class, so MailCraft now asks for it by name and also leaves out the calendar, contacts, tasks and search elements whatever class they say (before this, they showed as mail folders) |
+| Shared mailbox | Works | A mailbox the owner was given store-owner access to (`grommunio-admin user storeowner team@… add ada@…`; delegate access alone wasn't enough for EWS) was opened under the account. Its Inbox message came down with its whole body, and its folder list is its own rather than the owner's. With Send As granted (`grommunio-admin user sendas team@… add ada@…`), a message written there went to another mailbox from the shared address, and its copy was filed in the shared Sent Items. Calendar, contacts and to-dos of the shared mailbox are not read there yet |
 | Delta after a new message | Works | A message delivered after the first run came with the next one, and nothing came twice |
 | Read, flag, categories | Work | Seen on the server afterwards. Importance of a message already received cannot be changed from here, so it was not tried |
 | Move, copy | Work | Between folders made on the server |
@@ -33,6 +59,19 @@ against this server.
 | Bcc | Does not leak | The To recipient's copy has no Bcc, and the Bcc recipient got the message |
 | Copy in Sent Items | Works (fixed) | Sending the saved draft with `SendItem` delivered it but filed no copy in Sent Items and left the draft in Drafts. Every send, a saved draft too, now goes as one `CreateItem` with `SendAndSaveCopy` and the message's own content, and the draft is then taken away with a soft delete, only after a clear success. Tried again after the fix: delivered once to the To and Bcc recipients, one copy in Sent Items, no draft left. **Not yet checked against Exchange Server itself**, which filed the copy for `SendItem` and is expected to do the same here |
 | Undo of a move | Works | The message went back to where it was, on the server too |
+| Calendar read | Works | The account's main calendar came down with its subject, place, body, times, importance and people invited; a shared calendar's events came too |
+| Contacts read | Works | Names, company, job title, e-mail addresses, phone numbers and notes came down. A physical address did not: Grommunio answers `FindItem` without `PhysicalAddresses` even when it is asked for (see Not fixed) |
+| To-dos read | Works | Subject, notes, start, due, importance and status came down |
+| Calendar made, changed, deleted | Works | An appointment made in the window arrived on the server; changing its title, place and time and then deleting it was seen on the server after the next Send/Receive |
+| Contact made, changed, deleted | Works (fixed) | A contact made here arrived, a change to its company and title arrived, and a deletion took it from the server. A deletion first sent no request at all (it was taken for a card that couldn't be read); with that fixed it goes as one `DeleteItem` |
+| To-do made, changed, deleted | Works | A to-do made here arrived in the server's Tasks folder; a change to its due date and importance arrived, and a deletion took it away |
+| Shared calendar by address | Works | The calendar of another mailbox that gave the owner reading rights came down after Open Shared Calendar, and its events showed. Grommunio refuses `FindFolder` on the shared mailbox's top, so only its default calendar is found there (its other calendars wait for a server that lists them) |
+| Shared address book by address | Works | The address book of another mailbox that gave the owner reading rights came down as a book of its own, named after its owner; the same `FindFolder` limit applies |
+
+This table's calendar, contact and to-do rows were tried on a Grommunio container (gromox-core,
+openSUSE Leap 16, 2026-11-04) through the desktop window's control channel, with two made-up users
+and the window's own commands; the server was checked directly with `FindItem` afterwards. None of
+it has been tried against Exchange Server itself.
 
 ### How sending keeps to "never twice"
 
@@ -43,6 +82,10 @@ This does not close every window. If MailCraft is killed, or the computer loses 
 ### Not fixed
 
 - A Calendar (or Contacts, Tasks) folder taken in as a mail folder by the earlier trial build stays in the folder list as an empty stub on a delta run, until the next fresh read of the folders. It only affects accounts added with that build, which needed a testing switch to add one.
+- Grommunio's `FindItem` does not return a contact's physical addresses, even when `contacts:PhysicalAddresses` is asked for; the other fields of a contact do come. A server that returns them is read as any other field.
+- A shared mailbox's other calendars and address books are not found on Grommunio, which refuses `FindFolder` on that mailbox's top: only the default calendar and address book of a person whose folder is shared are read.
+- A recurring series is read as the occurrences the server gives and the master when its rule can be said here; whether Exchange Server and Grommunio agree on the series' time zone over a daylight-saving change has not been tried.
+- Changing a shared calendar's or address book's items needs the same editing rights Grommunio's `grant` names; only reading was tried there.
 
 ## Exchange Server 2019
 
@@ -93,8 +136,9 @@ flag isn't read from the server.
 
 ## Not yet tried
 
-Exchange Server Subscription Edition, SmarterMail, changes sent up and sending against Exchange Server itself, NTLM against a real server, Kerberos
-and modern sign-in (not built), a shared mailbox, and Autodiscover from an address.
+Exchange Server Subscription Edition, SmarterMail, changes sent up and sending against Exchange Server
+itself (calendars, address books and to-dos have been tried only on Grommunio), NTLM against a real
+server, Kerberos and modern sign-in (not built), a shared mailbox, and Autodiscover from an address.
 
 ## Revision history
 
@@ -102,6 +146,7 @@ and modern sign-in (not built), a shared mailbox, and Autodiscover from an addre
 |---|---|---|
 | 2026-11-14 | minor | #1349: Exchange Server 2010: what the reporter's server refused and how MailCraft now asks it; not yet tried again against that server |
 | 2026-11-04 | patch | #746: Exchange Server 2019 seen working for mail (Basic over TLS, 24,574 messages, exact folder counts), and taken off the not yet tried list |
+| 2026-11-04 | minor | #252: calendars, contacts and to-dos kept in step both ways, and a person's calendar or address book opened by address; tried on a Grommunio container, including the shared folders and the limits there |
 | 2026-11-01 | minor | #252: Exchange server accounts are on for everyone, for mail; the testing switch is gone |
 | 2026-10-30 | major | First version: what was seen on Grommunio (#252, E8) |
 | 2026-10-30 | minor | Sending a saved draft, the Archive folder, the folder class and the log line, fixed and tried again on Grommunio |

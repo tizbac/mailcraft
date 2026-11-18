@@ -57,15 +57,16 @@ fn page(account: Id, email: &str, ids: &[&str]) -> GraphMailResult {
 }
 
 #[test]
-fn a_shared_mailbox_is_added_under_a_microsoft_account_and_removed_again() {
+fn a_shared_mailbox_is_added_under_its_owners_account_and_removed_again() {
     let (mut s, local, owner) = session();
     let shared = add(&mut s, json!({"address": SHARED})).unwrap();
     let a = s.mailbox.account(shared).unwrap();
     assert_eq!((a.email.as_str(), a.kind, a.shared_of), (SHARED, AccountKind::Microsoft, Some(owner)));
     let listed = s.run("account.list", &json!({})).unwrap();
     assert!(listed["accounts"].as_array().unwrap().iter().any(|a| a["sharedOf"] == json!(owner) && a["email"] == SHARED));
-    // Refused: under an account that isn't a Microsoft one, twice, an address that isn't one.
-    assert!(add(&mut s, json!({"account": local, "address": "sales@example.org"})).unwrap_err().contains("Microsoft Graph"));
+    // Refused: under an account that is neither Microsoft's nor an Exchange server's, twice, an
+    // address that isn't one.
+    assert!(add(&mut s, json!({"account": local, "address": "sales@example.org"})).unwrap_err().contains("Microsoft or Exchange"));
     assert!(add(&mut s, json!({"address": "Support@Example.org"})).unwrap_err().contains("already here"));
     assert!(add(&mut s, json!({"address": "support@example.org/../../me"})).unwrap_err().contains("isn't an e-mail address"));
     assert!(add(&mut s, json!({"account": shared, "address": "sales@example.org"})).unwrap_err().contains("can't open another"));

@@ -157,6 +157,9 @@ pub(crate) struct Run<'a, E: HttpExchange> {
     pub(crate) needs_change_key: bool,
     /// The recipients of some messages couldn't be had with `GetItem`: said once a run.
     pub(crate) recipients_unsaid: bool,
+    /// The mailbox the run reads, when it is not the account's own: a shared mailbox, at its
+    /// address. Empty for the account itself.
+    pub(crate) mailbox: String,
 }
 
 impl<'a, E: HttpExchange> Run<'a, E> {
@@ -173,6 +176,7 @@ impl<'a, E: HttpExchange> Run<'a, E> {
             reread_folders: false,
             needs_change_key: false,
             recipients_unsaid: false,
+            mailbox: String::new(),
         }
     }
 }
@@ -361,8 +365,8 @@ impl<E: HttpExchange> Run<'_, E> {
         Ok(found)
     }
 
-    async fn specials(&mut self) -> Result<Specials, Asked> {
-        let get = GetFolder::new(&KNOWN.map(|(folder, _)| folder));
+    async fn specials(&mut self, mailbox: &str) -> Result<Specials, Asked> {
+        let get = GetFolder::new(&KNOWN.map(|(folder, _)| folder)).in_mailbox(mailbox);
         let found = self.ask(&get.element(), &|reply| get.answer(reply)).await?;
         let mut out = Specials::default();
         for ((folder, kind), info) in KNOWN.iter().zip(found) {
@@ -387,14 +391,14 @@ impl<E: HttpExchange> Run<'_, E> {
     /// The folder list from `state`: all of it (a read afresh when the state is lost). A read afresh
     /// that passed over a mail folder it couldn't read says where that folder lies, so that the
     /// folder (and the mail kept of it) isn't taken away for not being in it (#1108).
-    async fn folders(&mut self, state: &str, specials: &Specials) -> Result<(EwsFolderDeltas, String), Asked> {
+    async fn folders(&mut self, state: &str, specials: &Specials, mailbox: &str) -> Result<(EwsFolderDeltas, String), Asked> {
         let (mut state, mut deltas, mut tried_afresh) =
             (state.to_owned(), EwsFolderDeltas { afresh: state.is_empty(), ..EwsFolderDeltas::default() }, false);
         let mut skipped = 0usize;
         // (What is in `unreadable_in` already, looked up in one step: a server may name thousands.)
         let mut seen = std::collections::HashSet::new();
         for _ in 0..MAX_HIERARCHY_PAGES {
-            let op = SyncFolderHierarchy::new(&state);
+            let op = SyncFolderHierarchy::new(&state).in_mailbox(mailbox);
             match self.ask(&op.element(), &|reply| op.answer(reply)).await {
                 Ok(page) => {
                     skipped = skipped.saturating_add(page.skipped);
@@ -475,6 +479,8 @@ pub async fn sync_mail<E: HttpExchange>(
     emit: &mut dyn FnMut(EwsMailResult),
 ) {
     let mut run = Run::new(client, exchange, cancel, wait);
+    // A shared mailbox is read at its own address, with the owner's sign-in.
+    run.mailbox = request.mailbox.trim().to_owned();
     let mut out = Outcome::default();
     if let Err(stop) = run.all(request, &mut out, emit).await {
         match stop {
@@ -484,6 +490,32 @@ pub async fn sync_mail<E: HttpExchange>(
                 out.line("The server's answer couldn't be used");
             }
         }
+    }
+    // The calendar, contacts and to-dos, in a run of their own after the mail: a part that fails
+    // does not make the mail fail, and the next run asks again.
+    if let Some(directory) = request.directory.as_deref().filter(|_| !out.auth_refused && !out.stopped) {
+        let mut result = crate::directory_run::sync_directory(client, exchange, directory, cancel, &mut *run.wait).await;
+        if !result.whole() {
+            out.incomplete = true;
+            if result.auth_refused {
+                out.auth_refused = true;
+            }
+            if let Some(seconds) = result.busy_for {
+                out.busy_for = Some(seconds);
+            }
+        }
+        out.errors.append(&mut result.errors);
+        log::info!(
+            "ews directory: {} calendars, {} event lists, {} contacts, {} to-dos, {} calendar changes, {} contact changes, {} to-do changes",
+            result.calendars.as_ref().map_or(0, |list| list.calendars.len()),
+            result.events.len(),
+            result.contacts.as_ref().map_or(0, |list| list.contacts.len()),
+            result.tasks.as_ref().map_or(0, |list| list.tasks.len()),
+            result.uploaded.as_ref().map_or(0, |upload| upload.outcomes.len()),
+            result.contacts_uploaded.as_ref().map_or(0, |upload| upload.outcomes.len()),
+            result.tasks_uploaded.as_ref().map_or(0, |upload| upload.outcomes.len()),
+        );
+        emit(EwsMailResult { directory: Some(Box::new(result)), partial: true, ..base(request) });
     }
     // Then the conversations of mail listed before they were asked for (#795), unless the run was
     // stopped or the server asked to be left alone. Never worth failing the run for.
@@ -559,7 +591,7 @@ impl<E: HttpExchange> Run<'_, E> {
             self.push(request, emit).await?;
         }
         // What the server calls its special folders: the Inbox first, and what each folder is.
-        let specials = self.specials().await?;
+        let specials = self.specials(&request.mailbox).await?;
         if specials.inbox.is_none() {
             out.incomplete = true;
             out.line("Couldn't find the Inbox on the server");
@@ -571,7 +603,7 @@ impl<E: HttpExchange> Run<'_, E> {
         if (request.list_folders || self.reread_folders) && !request.inbox_pass {
             // (A folder deleted here that the server keeps comes back only in a read afresh.)
             let from = if self.reread_folders { "" } else { request.hierarchy.as_str() };
-            let (mut deltas, state) = match self.folders(from, &specials).await {
+            let (mut deltas, state) = match self.folders(from, &specials, &request.mailbox).await {
                 Ok(found) => found,
                 Err(Asked::Stop(stop)) => return Err(Asked::Stop(stop)),
                 Err(_) => {
