@@ -1123,6 +1123,27 @@ fn options(app: &mut MailApp, ui: &mut Ui, t: &Tokens) {
             set(app, json!({"importTreeMaxMessages": tree_messages}));
         }
     });
+    row(ui, tl!("Save Message As"), |ui| {
+        let mut choice = prefs.save_message_format;
+        egui::ComboBox::from_id_salt("opt_save_message")
+            .selected_text(match choice {
+                mailcraft_engine::SaveMessageFormat::Eml => tl!("Internet message (.eml)"),
+                mailcraft_engine::SaveMessageFormat::Msg => tl!("Message file (.msg)"),
+            })
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut choice, mailcraft_engine::SaveMessageFormat::Eml, tl!("Internet message (.eml)"));
+                ui.selectable_value(&mut choice, mailcraft_engine::SaveMessageFormat::Msg, tl!("Message file (.msg)"));
+            });
+        if choice != prefs.save_message_format {
+            set(
+                app,
+                json!({"saveMessageFormat": match choice {
+                    mailcraft_engine::SaveMessageFormat::Eml => "eml",
+                    mailcraft_engine::SaveMessageFormat::Msg => "msg",
+                }}),
+            );
+        }
+    });
     ui.label(
         egui::RichText::new(tl!(
             "MailCraft reads a mail file whole into memory before it adds anything, and a folder import holds every message it reads until it is done. A limit near this computer's free memory can make MailCraft slow or stop it responding, so raise these only when there is memory to spare."
