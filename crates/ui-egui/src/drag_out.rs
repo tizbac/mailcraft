@@ -53,11 +53,13 @@ pub(crate) fn escalate(app: &mut MailApp, ctx: &egui::Context) {
     }
     let started = app.services.drag_out.as_ref().is_some_and(|start| {
         // X11 and Windows wait here until the drag is over; Wayland only starts it.
-        let served = start(&files).is_ok();
-        if !served {
-            log::info!("dragging files out isn't served here");
+        match start(&files) {
+            Ok(()) => true,
+            Err(why) => {
+                log::warn!("dragging files out failed: {why}");
+                false
+            }
         }
-        served
     });
     if started {
         if let Ok(mut last) = LAST.lock() {

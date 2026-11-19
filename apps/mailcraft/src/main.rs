@@ -1806,6 +1806,16 @@ fn main() -> eframe::Result {
                 let wake = cc.egui_ctx.clone();
                 limn_dnd::FileDnd::attach(window.as_ref(), move || wake.request_repaint())
             });
+            // Windows: the window a drag starts from, which the drag helper hands to `drag`.
+            #[cfg(windows)]
+            if let Some(window) = cc.winit_window() {
+                use winit::raw_window_handle::{HasWindowHandle as _, RawWindowHandle};
+                if let Ok(handle) = window.window_handle()
+                    && let RawWindowHandle::Win32(win32) = handle.as_raw()
+                {
+                    mailcraft_drag_out::set_window(win32.hwnd.get());
+                }
+            }
             let (first_prefs, host_updates) = (prefs.clone(), updates.clone());
             let build: mailcraft_ui_egui::opening::Build = Box::new(move |arrival| {
                 let (mailbox, path, unavailable, unchecked, damaged) =

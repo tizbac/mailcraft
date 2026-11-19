@@ -74,6 +74,12 @@ mod x11;
 #[cfg(windows)]
 mod windows_drag;
 
+/// Windows: the window a drag starts from, as the platform names it (given once, at startup).
+#[cfg(windows)]
+pub fn set_window(hwnd: isize) {
+    windows_drag::set_window(hwnd);
+}
+
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 mod platform {
     pub(super) fn start(paths: &[&std::path::Path]) -> Result<(), String> {
