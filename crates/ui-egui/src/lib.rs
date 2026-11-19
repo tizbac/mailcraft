@@ -2710,7 +2710,8 @@ impl MailApp {
                 }
             },
             // The Print dialog: it only collects what the owner chose, then runs `file.print`.
-            "ui.printDialog" => match print::Ask::open(self) {
+            // `window` is the message window it was asked from, so it comes up over that window.
+            "ui.printDialog" => match print::Ask::open(self, p.get("window").and_then(Value::as_u64).unwrap_or(0)) {
                 Err(why) => Err(why),
                 Ok(ask) => {
                     self.dialog = Some(dialogs::Dialog::Print(Box::new(ask)));

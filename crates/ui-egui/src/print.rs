@@ -173,6 +173,9 @@ pub fn page_count(pdf: &[u8]) -> usize {
 pub struct Ask {
     /// The message whose pages the dialog is making.
     pub message: Id,
+    /// The window of its own the dialog comes up over: `0` is the main window, the number of a
+    /// message window otherwise ([`crate::windows`]).
+    pub window: u64,
     pub subject: String,
     pub printers: Vec<Printer>,
     /// The printer chosen; `None` is the system's default.
@@ -182,9 +185,9 @@ pub struct Ask {
 }
 
 impl Ask {
-    /// The dialog for the message in view. `Err` when nothing is selected, or nothing can be
-    /// printed here.
-    pub fn open(app: &MailApp) -> Result<Ask, String> {
+    /// The dialog for the message in view, opened from the main window (`window`: `0`) or from the
+    /// message's own window. `Err` when nothing is selected, or nothing can be printed here.
+    pub fn open(app: &MailApp, window: u64) -> Result<Ask, String> {
         let Some(id) = app.session.sel.focus() else {
             return Err("select a message to print first".to_owned());
         };
@@ -194,7 +197,7 @@ impl Ask {
         let printers = printers(app);
         let subject = app.session.mailbox.message(id).map(|m| m.subject.clone()).unwrap_or_default();
         let chosen = printers.iter().find(|p| p.default).map(|p| p.name.clone());
-        Ok(Ask { message: id, subject, printers, printer: chosen, choices: Choices::default(), error: String::new() })
+        Ok(Ask { message: id, window, subject, printers, printer: chosen, choices: Choices::default(), error: String::new() })
     }
 
     /// A printer's name as the dialog shows it: the system's default marked.

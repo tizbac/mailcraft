@@ -92,3 +92,50 @@ fn a_message_that_is_not_there_is_said_so() {
     let id = app.session.mailbox.messages.keys().next().copied().unwrap_or(0);
     assert!(app.execute("file.print", json!({"id": id + 9999})).is_err(), "no message with that id");
 }
+
+/// The whole window laid out as on a screen. (In the headless window a message window sits inside
+/// the main one, as in a browser; a window of the system draws its own dialog inside itself.)
+fn screen(app: MailApp) -> egui_kittest::Harness<'static, MailApp> {
+    let mut harness = egui_kittest::Harness::builder()
+        .with_accessibility_check(false)
+        .allow_missing_glyphs()
+        .with_size(egui::vec2(1280.0, 800.0))
+        .with_step_dt(1.0 / 60.0)
+        .build_ui_state(
+            |ui, app: &mut MailApp| {
+                let ctx = ui.ctx().clone();
+                app.logic(&ctx);
+                app.ui(ui);
+            },
+            app,
+        );
+    harness.run_steps(3);
+    harness
+}
+
+#[test]
+fn the_print_dialog_of_a_window_stands_over_that_window() {
+    let mut app = app();
+    spooler(&mut app);
+    app.services.printers = Some(Box::new(|| vec![Printer { name: "Office laser".into(), default: true, two_sided: Some(true) }]));
+    let mut harness = screen(app);
+    let id = harness.state_mut().session.rows()[1].id;
+    harness.state_mut().execute("mail.select", json!({"id": id})).unwrap_or_else(|e| panic!("mail.select: {e}"));
+    let opened = harness.state_mut().execute("ui.openWindow", json!({"message": id})).unwrap_or_else(|e| panic!("ui.openWindow: {e}"));
+    let window = opened["window"].as_u64().unwrap_or(0);
+    harness.run_steps(3);
+    let here = harness.state().hit.rect("window", window).unwrap_or(egui::Rect::NOTHING);
+    harness.state_mut().execute("ui.printDialog", json!({"window": window})).unwrap_or_else(|e| panic!("ui.printDialog: {e}"));
+    harness.run_steps(3);
+    let dialog = harness.state().hit.rect("printDialog", window).unwrap_or(egui::Rect::NOTHING);
+    assert!(dialog.width() > 0.0, "the dialog is drawn");
+    assert!(here.contains(dialog.center()), "the Print dialog stands over the window it was asked from, not the main window: {here} vs {dialog}");
+    // Closing the window takes the dialog's home with it: the next one is centred on the main
+    // window, where the reading pane is.
+    harness.state_mut().execute("ui.closeWindow", json!({"window": window})).unwrap_or_else(|e| panic!("ui.closeWindow: {e}"));
+    harness.run_steps(3);
+    harness.state_mut().execute("ui.printDialog", json!({})).unwrap_or_else(|e| panic!("ui.printDialog: {e}"));
+    harness.run_steps(3);
+    let main = harness.state().hit.rect("printDialog", 0).unwrap_or(egui::Rect::NOTHING);
+    assert!(main.width() > 0.0 && main.height() > 0.0, "the main window's Print dialog is drawn: {main}");
+}
