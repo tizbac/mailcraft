@@ -40,7 +40,10 @@ mailcraft-smime = { workspace = true }
 mailcraft-openpgp = { workspace = true }
 # Printing: the system's spooler (CUPS on Linux and macOS, the Windows print spooler) takes the
 # pages MailCraft sets itself. MIT OR Apache-2.0.
-craft-print = "1.4.7"
+# Pinned to the craft-libs release tag rather than crates.io: the published 1.4.7 asks `winprint`
+# 0.2 for a page-by-page progress call that crate's 0.2 series never had, so a Windows build of it
+# fails to compile. craft-libs pins the maintained BSD-3-Clause winprint fork, which has it.
+craft-print = { git = "https://github.com/storytold/craft-libs", rev = "44086e9c5867bf3c392fcd0e506322785b94ca14" }
 # `clipboard`: since 0.37 eframe has copy and paste behind a feature of its own (on by default, and
 # we turn the defaults off); without it nothing is copied, on any platform.
 eframe = { workspace = true, features = ["default_fonts", "wgpu", "accesskit", "wayland", "x11", "clipboard"] }

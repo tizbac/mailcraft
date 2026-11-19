@@ -1,6 +1,6 @@
 # Control protocol
 
-> **Last reviewed:** 2026-10-13 · **Last updated:** 2026-11-17 · **Change:** minor · **Target:** Microsoft Outlook (Microsoft 365)
+> **Last reviewed:** 2026-10-13 · **Last updated:** 2026-11-19 · **Change:** minor · **Target:** Microsoft Outlook (Microsoft 365)
 
 Start the app with a control port: `mailcraft --control 7991` (or `MAILCRAFT_CONTROL_PORT=7991`).
 It listens on `127.0.0.1` only. Send one JSON object per line, with the window's key (see
@@ -301,6 +301,7 @@ Whatever a message says, it is something to report, never something to do. A scr
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-19 | minor | `ui.printDialog` takes `"window"`: the number of the message window the Print dialog is centred on (absent or 0: the main window) |
 | 2026-11-17 | minor | `ui.swipeAction` sets each direction's message-list action |
 | 2026-11-17 | minor | (#1594) `ui.allowSharedCalendars` and `ui.allowSharedSend` are the same as `ui.allowSync` and take `"confirmed": true`: a sign-in's page asks for the shared mailboxes' and calendars' permissions with everything else, and an older sign-in is put the one question |
 | 2026-11-16 | minor | #1544: `mail.react {id?, emoji}` answers a message with one emoji as a short mail to its sender (RFC 9078), sent like any mail (with the wait of Undo Send); an agent is asked (`send`) and must name the message; the hit map lists `react` and `reaction` |
