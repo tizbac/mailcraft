@@ -160,6 +160,9 @@ pub enum Dialog {
     /// File › Info › Automatic Replies ([`crate::auto_replies`]): it only collects what the owner
     /// wants, then runs `account.setAutomaticReplies`.
     AutomaticReplies(Box<crate::auto_replies::Draft>),
+    /// Print a message ([`crate::print`]): the printer, the copies, the sheet; Print runs
+    /// `file.print` with what the owner chose (gap 15).
+    Print(Box<crate::print::Ask>),
     /// What is in a folder of mbox files, before it is imported ([`crate::import_tree`]).
     ImportTree(Box<crate::import_tree::ImportTree>),
     /// A .pst file, before and while its mail is imported ([`crate::import_pst`]).
@@ -292,6 +295,7 @@ impl Dialog {
             Dialog::Meeting(d) => d.name(),
             Dialog::FolderProperties(_) => "folderProperties",
             Dialog::AutomaticReplies(_) => "automaticReplies",
+            Dialog::Print(_) => "print",
             Dialog::ImportTree(_) => "importTree",
             Dialog::ImportPst(_) => "importPst",
             Dialog::MergeContacts(_) => "mergeContacts",
@@ -346,6 +350,7 @@ impl Dialog {
                 }
             }
             "goToDate" => Dialog::GoToDate { text: app.session.view.date.iso(), error: String::new() },
+            "printDialog" => Dialog::Print(Box::new(crate::print::Ask::open(app).ok()?)),
             "addReminder" => Dialog::AddReminder(crate::reminder_dialog::AddReminder::open(app, crate::reminder_dialog::Target::Messages)?),
             "followUpDate" => Dialog::AddReminder(crate::reminder_dialog::AddReminder::open(app, crate::reminder_dialog::Target::Composing)?),
             "moveItems" | "copyItems" => Dialog::MoveItems(crate::move_items::MoveItems::open(app, name == "copyItems")?),
@@ -2377,6 +2382,11 @@ pub fn show(app: &mut MailApp, ctx: &egui::Context) {
             let mut done = false;
             let title = dialog.title();
             let open = window(ctx, &title, crate::auto_replies::WIDTH, |ui| done = dialog.show(app, ui));
+            close |= !open || done;
+        }
+        Dialog::Print(dialog) => {
+            let mut done = false;
+            let open = window(ctx, tl!("Print"), crate::print::WIDTH, |ui| done = dialog.show(app, ui));
             close |= !open || done;
         }
         Dialog::Security(security) => {

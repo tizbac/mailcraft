@@ -32,7 +32,7 @@ pub fn specs() -> Vec<CommandSpec> {
         ),
         CommandSpec::new("file.exportMessage", "Save Message As", "File › Save As", export_message).pure().params(r#"{"id"?: number, "path"?: string, "format"?: "eml"|"msg"} — one message as an Internet message (.eml, as received when its bytes can be had) or an Outlook message (.msg); without `format`, the default chosen in File › Options"#),
         CommandSpec::new("file.print", "Print", "File › Print", print_message).pure().key("Mod+P").params(
-            r#"{"id"?: number} — one message as printable text: who sent it, to whom, when, and its text (the text of its HTML when it has no plain one), with its files by name; hidden sender text is never printed. The window hands it to the printer"#,
+            r#"{"id"?: number} — one message as printable text: who sent it, to whom, when, its text (the text of its HTML when it has no plain one), with its files by name; hidden sender text is never printed. The window prints it as pages on the paper and printer it was given (`printer`, `copies`, `collate`, `twoSided`, `grayscale`, `paper`: "a4"|"letter")"#,
         ),
         CommandSpec::new("file.exportFolder", "Export Folder", "File › Open & Export", export_folder).pure().params(r#"{"id"?: number, "path"?: string} — a folder's messages as .mbox"#),
         CommandSpec::new("file.exportCalendar", "Save Calendar", "File › Save Calendar", export_calendar).pure().params(r#"{"calendar"?: number, "id"?: number (one event), "path"?: string} — .ics"#),
@@ -460,7 +460,7 @@ fn print_message(s: &mut Session, v: &Value) -> CmdResult {
     if !text.ends_with('\n') {
         text.push('\n');
     }
-    Ok(json!({"name": export_name_or(&m.subject, "txt", "message"), "text": text}))
+    Ok(json!({"id": id, "name": export_name_or(&m.subject, "txt", "message"), "text": text}))
 }
 
 fn export_folder(s: &mut Session, v: &Value) -> CmdResult {
