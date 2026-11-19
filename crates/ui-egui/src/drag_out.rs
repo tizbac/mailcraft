@@ -13,6 +13,10 @@ use crate::mail_view::MessageDrag;
 /// The most messages one drag carries: a selection larger than this drags its first few.
 const MOST: usize = 20;
 
+/// The files of the last drag, taken away when the next one starts (the drop target may still be
+/// copying them when the drag itself is over), or when the program quits.
+static LAST: std::sync::Mutex<Option<std::path::PathBuf>> = std::sync::Mutex::new(None);
+
 /// Whether a message drag has just left the window, and if so, hands it to the system.
 pub(crate) fn escalate(app: &mut MailApp, ctx: &egui::Context) {
     let Some(drag) = egui::DragAndDrop::payload::<MessageDrag>(ctx) else { return };
@@ -25,6 +29,10 @@ pub(crate) fn escalate(app: &mut MailApp, ctx: &egui::Context) {
     egui::DragAndDrop::clear_payload(ctx);
     if ids.is_empty() {
         return;
+    }
+    // The files of the drag before this one have been copied by now.
+    if let Some(previous) = LAST.lock().ok().and_then(|mut last| last.take()) {
+        let _ = std::fs::remove_dir_all(previous);
     }
     let Some(folder) = scratch() else { return };
     let mut files = Vec::new();
@@ -40,14 +48,28 @@ pub(crate) fn escalate(app: &mut MailApp, ctx: &egui::Context) {
         let _ = std::fs::remove_dir_all(&folder);
         return;
     }
-    if let Some(start) = app.services.drag_out.as_ref() {
-        // The system's drag runs until the owner lets go or cancels; the window waits with it.
-        if start(&files).is_err() {
+    let started = app.services.drag_out.as_ref().is_some_and(|start| {
+        // X11 and Windows wait here until the drag is over; Wayland only starts it.
+        let served = start(&files).is_ok();
+        if !served {
             log::info!("dragging files out isn't served here");
         }
+        served
+    });
+    if started {
+        if let Ok(mut last) = LAST.lock() {
+            *last = Some(folder);
+        }
+    } else {
+        let _ = std::fs::remove_dir_all(&folder);
     }
-    // What the drop target copied is its own; this is only the original.
-    let _ = std::fs::remove_dir_all(&folder);
+}
+
+/// Takes away the files of the last drag, if any (at quit).
+pub fn clear_scratch() {
+    if let Some(last) = LAST.lock().ok().and_then(|mut last| last.take()) {
+        let _ = std::fs::remove_dir_all(last);
+    }
 }
 
 /// `dir/name`, or `dir/name (2)`, … when two messages of the drag share a subject.

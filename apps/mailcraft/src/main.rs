@@ -251,6 +251,7 @@ impl eframe::App for App {
         open_pages(ui.ctx(), frame);
     }
     fn on_exit(&mut self) {
+        self.0.clear_drag_scratch();
         // A window closed while its mailbox was still opening has nothing to save (#519).
         if !self.0.is_opening() {
             save_prefs(&self.0);
@@ -1104,11 +1105,59 @@ fn auto_replies_job(job: mailcraft_ui_egui::auto_replies::AutoRepliesJob) -> mai
 /// mail servers, checking an account, asking whether a new version is out), each on a background
 /// thread; and the credential store.
 /// `kept_pictures` is where downloaded pictures are kept between runs, when they are.
+#[cfg(target_os = "linux")]
 fn services(
     file_dialog: file_dialogs::Hook,
     ctx: egui::Context,
     kept_pictures: Option<std::sync::Arc<picture_cache::Cache>>,
     updates: Option<&HostUpdates>,
+    wayland_dnd: Option<limn_dnd::FileDnd>,
+) -> Services {
+    let (drag_out, drag_out_tick) = drag_out(wayland_dnd);
+    build_services(file_dialog, ctx, kept_pictures, updates, drag_out, drag_out_tick)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn services(
+    file_dialog: file_dialogs::Hook,
+    ctx: egui::Context,
+    kept_pictures: Option<std::sync::Arc<picture_cache::Cache>>,
+    updates: Option<&HostUpdates>,
+) -> Services {
+    let (drag_out, drag_out_tick) = drag_out(None);
+    build_services(file_dialog, ctx, kept_pictures, updates, drag_out, drag_out_tick)
+}
+
+/// Dragging files out of the window: the platform's own where it is X11 or Windows, and on
+/// Wayland the window's data source, whose news is taken in each frame ([`Services::drag_out_tick`]).
+fn drag_out(
+    #[cfg(target_os = "linux")] wayland_dnd: Option<limn_dnd::FileDnd>,
+    #[cfg(not(target_os = "linux"))] _no_wayland: Option<()>,
+) -> (Option<Box<dyn Fn(&[std::path::PathBuf]) -> Result<(), String>>>, Option<Box<dyn Fn()>>) {
+    #[cfg(target_os = "linux")]
+    if let Some(dnd) = wayland_dnd {
+        let dnd = std::rc::Rc::new(dnd);
+        let tick = dnd.clone();
+        let poll = Box::new(move || {
+            // Its news is not used here: the file list serves the drop itself.
+            drop(tick.poll());
+        });
+        let start: Box<dyn Fn(&[std::path::PathBuf]) -> Result<(), String>> = Box::new(move |paths| {
+            dnd.start_drag(paths.to_vec());
+            Ok(())
+        });
+        return (Some(start), Some(poll));
+    }
+    (Some(Box::new(mailcraft_drag_out::start_drag)), None)
+}
+
+fn build_services(
+    file_dialog: file_dialogs::Hook,
+    ctx: egui::Context,
+    kept_pictures: Option<std::sync::Arc<picture_cache::Cache>>,
+    updates: Option<&HostUpdates>,
+    drag_out: Option<Box<dyn Fn(&[std::path::PathBuf]) -> Result<(), String>>>,
+    drag_out_tick: Option<Box<dyn Fn()>>,
 ) -> Services {
     let pictures_ctx = ctx.clone();
     let unsubscribe_ctx = ctx.clone();
@@ -1160,7 +1209,8 @@ fn services(
         platform_calls,
         file_dialog: Some(file_dialog),
         // A message dragged out of the window goes to Explorer or a file manager as a real file.
-        drag_out: Some(Box::new(mailcraft_drag_out::start_drag)),
+        drag_out,
+        drag_out_tick,
         #[cfg(windows)]
         recent_attachments: Some(Box::new(|ctx| background(ctx, "recent attachments", recent_attachments::list))),
         // Mail arrives in pieces as the run goes (what was sent, then folder by folder), through a
@@ -1744,6 +1794,13 @@ fn main() -> eframe::Result {
             let ctx = cc.egui_ctx.clone();
             #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             let wayland_display = clipboard::wayland_display(cc);
+            // Wayland's drag-out works on the window's own connection: attached here, where the
+            // window is, and handed to the services (X11 and Windows use `mailcraft-drag-out`).
+            #[cfg(target_os = "linux")]
+            let wayland_dnd = cc.winit_window().and_then(|window| {
+                let wake = cc.egui_ctx.clone();
+                limn_dnd::FileDnd::attach(window.as_ref(), move || wake.request_repaint())
+            });
             let (first_prefs, host_updates) = (prefs.clone(), updates.clone());
             let build: mailcraft_ui_egui::opening::Build = Box::new(move |arrival| {
                 let (mailbox, path, unavailable, unchecked, damaged) =
@@ -1759,6 +1816,9 @@ fn main() -> eframe::Result {
                 session.dav_enabled = std::env::var("MAILCRAFT_DAV").is_ok_and(|v| v == "1");
                 // A run that keeps its mailbox and its settings keeps downloaded pictures too.
                 let kept_pictures = if kept && !sample && prefs_enabled() { keep_pictures() } else { None };
+                #[cfg(target_os = "linux")]
+                let mut services = services(file_dialog, ctx.clone(), kept_pictures, host_updates.as_ref(), wayland_dnd);
+                #[cfg(not(target_os = "linux"))]
                 let mut services = services(file_dialog, ctx.clone(), kept_pictures, host_updates.as_ref());
                 services.window_identity =
                     Some(mailcraft_ui_egui::windows::WindowIdentity { icon: app_icon().map(std::sync::Arc::new), app_id: Some(APP_ID.into()) });

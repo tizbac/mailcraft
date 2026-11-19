@@ -346,6 +346,9 @@ pub struct Services {
     /// file manager, and return when it ends (dropped or cancelled). Absent in the browser and
     /// the tests; the window writes the files and takes them away afterwards.
     pub drag_out: Option<Box<dyn Fn(&[std::path::PathBuf]) -> Result<(), String>>>,
+    /// Desktop: looked at once a frame while a drag is under way, for the systems whose drag runs
+    /// in the background (Wayland) and have news to take in.
+    pub drag_out_tick: Option<Box<dyn Fn()>>,
     /// Web: open a file picker; what is picked arrives later through `picked`, each file with
     /// what the picker was opened for (`mailbox`, `import`, `attach`, …) and the message being
     /// written that asked, as given here ([`Delivered::picked`]): the picker's answer is never
@@ -5684,6 +5687,9 @@ impl MailApp {
         agent_gate::show(self, &ctx);
         // While messages are dragged: the pointer for what is under it (#430).
         drag_pointer::apply(&ctx);
+        if let Some(tick) = self.services.drag_out_tick.as_ref() {
+            tick();
+        }
         // A message dragged past the window's edge is handed to the desktop.
         drag_out::escalate(self, &ctx);
         self.by_hand = false;
@@ -5698,6 +5704,11 @@ impl MailApp {
         self.frame_ms = now_ms() - t0;
         self.report_dirty();
         text_menu::finish(&ctx, menus);
+    }
+
+    /// Takes away the files the last message drag carried, if any.
+    pub fn clear_drag_scratch(&self) {
+        drag_out::clear_scratch();
     }
 
     /// The window's close button. MailCraft saves by itself, so closing only waits for a message
