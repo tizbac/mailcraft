@@ -26,6 +26,10 @@ in every folder request; it is listed under Shared Calendars or with the account
 lets the owner into the shared folder it is given but not list that mailbox's other folders, so a
 shared calendar or book is read as its default folder there.
 
+What is changed here goes up before the mail is read: plain marks a hundred to a request (a mark
+put on a large selection is not a request for each message), and Send/Receive Progress says how
+many of them the server has taken on.
+
 ## Grommunio
 
 **Seen:** Grommunio's own container deployment, Gromox 3.13.33 (October 2026), one domain, three

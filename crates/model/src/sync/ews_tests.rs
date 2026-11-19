@@ -162,6 +162,7 @@ fn a_result_beyond_the_caps_is_refused() {
         ("a long problem", Box::new(|r| r.errors[0] = "e".repeat(MAX_EWS_ERROR + 1))),
         ("a fingerprint that is none", Box::new(|r| r.untrusted = "nope".into())),
         ("a long url", Box::new(|r| r.url = "u".repeat(3000))),
+        ("more changes up than it had to send", Box::new(|r| r.up = Some(UpProgress { done: 3, total: 2 }))),
     ];
     for (what, change) in refused {
         let mut r = whole_result();

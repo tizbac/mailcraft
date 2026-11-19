@@ -487,6 +487,18 @@ pub struct EwsMessagePage {
     pub state: String,
 }
 
+/// How far the changes made here have gone up in a run (#252): how many of them the server has
+/// taken on, of how many the run had to send — the changes of folders and of messages, the
+/// drafts and the sends together. A piece of the run that carries changes carries its progress,
+/// so that a run pushing a large batch of marks (tens of thousands of messages marked read) is
+/// seen to move rather than a spinner saying only that it is at the folders.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpProgress {
+    pub done: u32,
+    pub total: u32,
+}
+
 /// What a run for an Exchange server account brought back, or a piece of it.
 ///
 /// A run arrives in pieces, in the order things were done (`partial` on all but the last), each
@@ -559,6 +571,9 @@ pub struct EwsMailResult {
     /// How far the run has got, for the status bar.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub progress: Option<GraphProgress>,
+    /// How far what was changed here has gone up, while the run pushes it: the panel's bar.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub up: Option<UpProgress>,
     /// The server turned the password down (a 401): the owner is asked for it again, and the run
     /// is not repeated by itself.
     #[serde(skip_serializing_if = "is_false")]
@@ -672,6 +687,11 @@ impl EwsMailResult {
         if self.pages.iter().any(|p| !state_ok(&p.state) || !state_ok(&p.from)) {
             return Err("has a sync state that can't be one");
         }
+        if let Some(up) = self.up
+            && up.done > up.total
+        {
+            return Err("has gone further up than it had to");
+        }
         if let Some(directory) = &self.directory {
             directory.check()?;
         }
@@ -747,6 +767,9 @@ impl EwsMailResult {
         (self.partial, self.whole, self.stopped) = (piece.partial, piece.whole, piece.stopped);
         if piece.progress.is_some() {
             self.progress = piece.progress;
+        }
+        if piece.up.is_some() {
+            self.up = piece.up;
         }
         self.auth_refused |= piece.auth_refused;
         if !piece.untrusted.is_empty() {

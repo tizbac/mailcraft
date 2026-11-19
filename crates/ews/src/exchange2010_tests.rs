@@ -236,7 +236,13 @@ fn a_flag_stays_here_and_the_read_mark_goes_up_on_exchange_2010() {
         assert!(matches!(message.outcome, MessageOutcome::Refused { .. }), "{:?}", message.outcome);
     }
     assert!(!standin.state().item(&one).unwrap().read);
-    assert_eq!(codes(&standin, "UpdateItem"), ["ErrorChangeKeyRequiredForWriteOperations", "ErrorSchemaValidation", "ErrorSchemaValidation"]);
+    // (The batch of two refused for the key, then the first asked again as it always was: without
+    // the key, with it, and refused for its flag; the second with the key, refused the same way.
+    // A schema fault with another cause is not read as a server without flags.)
+    assert_eq!(
+        codes(&standin, "UpdateItem"),
+        ["ErrorChangeKeyRequiredForWriteOperations", "ErrorChangeKeyRequiredForWriteOperations", "ErrorSchemaValidation", "ErrorSchemaValidation"]
+    );
     let state = standin.state();
     assert!(state.requests.iter().filter(|r| r.operation == "UpdateItem").skip(1).all(|r| r.body.contains("item:Flag")));
 }
