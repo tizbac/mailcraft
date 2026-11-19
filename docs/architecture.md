@@ -1,6 +1,6 @@
 # MailCraft architecture
 
-> **Last reviewed:** 2026-10-11 · **Last updated:** 2026-11-17 · **Change:** minor · **Target:** Microsoft Outlook (Microsoft 365)
+> **Last reviewed:** 2026-10-11 · **Last updated:** 2026-11-19 · **Change:** minor · **Target:** Microsoft Outlook (Microsoft 365)
 
 How MailCraft is built today. Rules for working in the code are in [`AGENTS.md`](../AGENTS.md). The
 shape — layers, "everything is a command", the swappable egui front end, the control channel, MCP,
@@ -313,9 +313,13 @@ a made-up mailbox of 64,000 messages (ignored by `cargo test`).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-19 | minor | `print` added to the layer table (L2): a crate that sets a message's pages from `html`'s display blocks — its heading, formatting, lists, tables and pictures — on A4 or Letter, with the caps on picture bytes, sides, pixels and sheets |
+| 2026-11-17 | patch | MB3.18: `host` holds the calendar's and the to-dos' jobs in flight (`calendar_job`, `tasks_job`), driven by the desktop and the phone alike |
+| 2026-11-17 | patch | MB3.15: the Android app row names its end-to-end run on an emulator against the Graph stand-in ([android.md](android.md)) |
 | 2026-11-17 | patch | MB3.18: `host` holds the calendar's and the to-dos' jobs in flight (`calendar_job`, `tasks_job`), driven by the desktop and the phone alike |
 | 2026-11-17 | patch | MB3.15: the Android app row names its end-to-end run on an emulator against the Graph stand-in ([android.md](android.md)) |
 | 2026-11-15 | patch | 29 crates and 4 apps; rows for `smime` and `mobile` |
+| 2026-11-15 | patch | 27 crates and 4 apps; rows for `smime` and `mobile` |
 | 2026-11-15 | patch | #209 D3: the `dav_discovery` fuzz target joins the list |
 | 2026-11-15 | patch | #209 D2: the `dav_answers` fuzz target joins the list |
 | 2026-11-14 | patch | #1376: header blocks packed in a few files in the content folder (`store_pack.rs`), not one file each; a block that can't be read fails the fresh pack, Undo-held blocks count as named, packs a kept-aside file names stay |

@@ -1,6 +1,6 @@
 # Exchange servers other than Microsoft's
 
-> **Last reviewed:** 2026-10-30 · **Last updated:** 2026-11-14 · **Change:** minor
+> **Last reviewed:** 2026-10-30 · **Last updated:** 2026-11-19 · **Change:** minor
 
 An Exchange server account (#252) reaches an organisation's own mail server through Exchange Web
 Services: its mail, and now its calendars, address books and to-do lists, including a person's
@@ -150,7 +150,12 @@ server, Kerberos and modern sign-in (not built), a shared mailbox, and Autodisco
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-19 | patch | Changes made here go up a hundred to a request, and Send/Receive Progress counts them |
+| 2026-11-18 | minor | Grommunio: `scripts/grommunio-e2e.sh` and `apps/mailcraft/src/grommunio_e2e_tests.rs` make a throwaway server and run contacts, events and to-dos through Exchange Web Services end to end; the facts are in `docs/grommunio-testing.md` |
+| 2026-11-14 | patch | #1274: the stretch of the calendar a Send/Receive reads, and the days read by themselves when the owner goes to them |
 | 2026-11-14 | minor | #1349: Exchange Server 2010: what the reporter's server refused and how MailCraft now asks it; not yet tried again against that server |
+| 2026-11-05 | minor | #70: a shared mailbox opens under an Exchange server account, read at its own address with the owner's sign-in; tried on Grommunio |
+| 2026-11-04 | minor | #252: calendars, contacts and to-dos kept in step both ways, and a person's calendar or address book opened by address; tried on a Grommunio container, including the shared folders and the limits there |
 | 2026-11-04 | patch | #746: Exchange Server 2019 seen working for mail (Basic over TLS, 24,574 messages, exact folder counts), and taken off the not yet tried list |
 | 2026-11-04 | minor | #252: calendars, contacts and to-dos kept in step both ways, and a person's calendar or address book opened by address; tried on a Grommunio container, including the shared folders and the limits there |
 | 2026-11-01 | minor | #252: Exchange server accounts are on for everyone, for mail; the testing switch is gone |

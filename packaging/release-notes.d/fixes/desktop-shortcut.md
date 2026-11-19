@@ -1,1 +1,0 @@
-- Windows: the `.msi` now puts a MailCraft icon on the desktop, beside the Start menu entry, for everyone who uses the computer (the installer is per-machine). The Windows script and the Docker build on Linux make the same MSI.
