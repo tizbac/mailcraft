@@ -24,13 +24,7 @@ pub(crate) fn escalate(app: &mut MailApp, ctx: &egui::Context) {
     // sending motion even outside the window (so no "pointer gone" arrives), and the frame that
     // sees the pointer outside must still come.
     ctx.request_repaint_after(std::time::Duration::from_millis(50));
-    // The pointer is outside the window with the button still held: the owner is dragging out.
-    // Once it is gone (X11), once its last position is past the window's edge (Wayland).
-    let left = ctx.input(|i| {
-        i.pointer.is_decidedly_dragging()
-            && (i.pointer.hover_pos().is_none() || i.pointer.latest_pos().is_some_and(|at| !i.viewport_rect().contains(at)))
-    });
-    if !left {
+    if !ctx.input(outside) {
         return;
     }
     let ids: Vec<u64> = drag.0.iter().copied().take(MOST).collect();
@@ -74,6 +68,13 @@ pub(crate) fn escalate(app: &mut MailApp, ctx: &egui::Context) {
     }
 }
 
+/// Whether a drag is under way with its pointer outside the window: gone (X11), or its last
+/// position past the window's edge (Wayland and Windows, where a grab keeps sending motion
+/// outside).
+fn outside(i: &egui::InputState) -> bool {
+    i.pointer.is_decidedly_dragging() && (i.pointer.hover_pos().is_none() || i.pointer.latest_pos().is_some_and(|at| !i.viewport_rect().contains(at)))
+}
+
 /// Takes away the files of the last drag, if any (at quit).
 pub fn clear_scratch() {
     if let Some(last) = LAST.lock().ok().and_then(|mut last| last.take()) {
@@ -104,3 +105,7 @@ fn scratch() -> Option<std::path::PathBuf> {
     let folder = std::env::temp_dir().join(format!("mailcraft-drag-{}-{nanos}", std::process::id()));
     std::fs::create_dir_all(&folder).ok().map(|()| folder)
 }
+
+#[cfg(test)]
+#[path = "drag_out_tests.rs"]
+mod drag_out_tests;

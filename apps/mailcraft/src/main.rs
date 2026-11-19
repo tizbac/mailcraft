@@ -1151,7 +1151,11 @@ fn drag_out(
         });
         return (Some(start), Some(poll));
     }
-    (Some(Box::new(mailcraft_drag_out::start_drag)), None)
+    let start: Box<dyn Fn(&[std::path::PathBuf]) -> Result<(), String>> = Box::new(|paths| {
+        log::info!("drag: handing {} file(s) to the platform", paths.len());
+        mailcraft_drag_out::start_drag(paths).inspect_err(|why| log::warn!("drag: {why}"))
+    });
+    (Some(start), None)
 }
 
 fn build_services(
