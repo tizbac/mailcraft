@@ -106,7 +106,15 @@ impl AccountRun {
                 None => 0.0,
                 Some(SyncPhase::Inbox) => 0.02,
                 Some(SyncPhase::Sending) => 0.1 * part(self.done, self.total),
-                Some(SyncPhase::Folders) => 0.1,
+                // (The changes going up: a bar that moves as the server takes them on, where the
+                // phase has a count; without one, the phase's own share.)
+                Some(SyncPhase::Folders) => {
+                    if self.total == 0 {
+                        0.1
+                    } else {
+                        0.02 + 0.13 * part(self.done, self.total)
+                    }
+                }
                 Some(SyncPhase::NewMail) => {
                     let within = part(self.done, self.total);
                     let folders = if self.folders == 0 {
