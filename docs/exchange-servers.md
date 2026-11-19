@@ -9,7 +9,9 @@ tried with made-up mail on a server running on the same computer; no real mailbo
 
 What is changed here goes up before the mail is read: plain marks a hundred to a request (a mark
 put on a large selection is not a request for each message), and Send/Receive Progress says how
-many of them the server has taken on.
+many of them the server has taken on. A change a folder's page holds that can't be taken in leaves
+that folder where it was and is tried again next time; the line names the message by its subject
+when the server sent one.
 
 ## Grommunio
 

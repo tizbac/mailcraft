@@ -424,6 +424,43 @@ fn the_progress_of_what_goes_up_is_a_moving_count_not_a_bare_phase() {
 }
 
 #[test]
+fn a_folder_that_cannot_take_in_a_change_says_which_item_it_was() {
+    use mailcraft_model::sync::UnreadableChange;
+    let (mut s, account) = session();
+    list(&mut s, account);
+    let said = apply_ews_mail(
+        &mut s,
+        EwsMailResult {
+            blocked: vec!["F1".into()],
+            unreadable: vec![UnreadableChange { folder: "F1".into(), kind: "Create".into(), subject: "Quarterly report".into() }],
+            ..piece(account)
+        },
+    )
+    .unwrap();
+    let errors: Vec<&str> = said["errors"].as_array().map(|a| a.iter().filter_map(|e| e.as_str()).collect()).unwrap_or_default();
+    assert!(errors.iter().any(|e| e.contains("Inbox") && e.contains("Quarterly report")), "{errors:?}");
+    assert_eq!(said["unreadableFolders"], json!(["Inbox"]));
+}
+
+#[test]
+fn a_change_with_no_subject_is_named_by_its_kind() {
+    use mailcraft_model::sync::UnreadableChange;
+    let (mut s, account) = session();
+    list(&mut s, account);
+    let said = apply_ews_mail(
+        &mut s,
+        EwsMailResult {
+            blocked: vec!["F1".into()],
+            unreadable: vec![UnreadableChange { folder: "F1".into(), kind: "Delete".into(), subject: String::new() }],
+            ..piece(account)
+        },
+    )
+    .unwrap();
+    let errors: Vec<&str> = said["errors"].as_array().map(|a| a.iter().filter_map(|e| e.as_str()).collect()).unwrap_or_default();
+    assert!(errors.iter().any(|e| e.contains("Inbox") && e.contains("Delete")), "{errors:?}");
+}
+
+#[test]
 fn a_refused_page_keeps_the_end_of_its_run_from_sweeping() {
     let (mut s, account) = session();
     list(&mut s, account);

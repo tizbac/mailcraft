@@ -168,6 +168,17 @@ impl PolicyReason {
     }
 }
 
+/// A change in a page that can't be taken in: the kind of change the answer named, and the subject
+/// of its item when the answer had one — for the owner to find the message. The log never takes
+/// the subject (and no id is kept at all).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Unreadable {
+    /// The kind of change the answer named (`Create`, `Update`, `Delete`, `ReadFlagChange`).
+    pub kind: String,
+    /// The subject of its item, when the answer had one; empty when it had none.
+    pub subject: String,
+}
+
 /// Why an operation did not succeed.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -196,7 +207,7 @@ pub enum Error {
     Unexpected,
     /// A change in the answer can't be taken in (it has no usable id, or no item): the page holding
     /// it is no page, since its state would say the change was taken in.
-    Unreadable,
+    Unreadable(Unreadable),
     /// The answer was longer than the limit.
     TooLarge,
     /// An HTTP status the service does not use.
@@ -216,7 +227,7 @@ impl fmt::Display for Error {
             Self::Server(code) => write!(f, "the server answered with {code}"),
             Self::Malformed => f.write_str("the server's answer could not be read"),
             Self::Unexpected => f.write_str("the server's answer is not the answer to the request"),
-            Self::Unreadable => f.write_str("a change in the server's answer could not be taken in"),
+            Self::Unreadable(_) => f.write_str("a change in the server's answer could not be taken in"),
             Self::TooLarge => f.write_str("the server's answer is larger than any this program reads"),
             Self::Status(code) => write!(f, "the server answered with HTTP status {code}"),
         }

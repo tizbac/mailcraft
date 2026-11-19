@@ -39,7 +39,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use mailcraft_model::FolderKind;
 use mailcraft_model::sync::{
     EwsFetchRequest, EwsFolderDeltas, EwsMailRequest, EwsMailResult, EwsMessagePage, EwsScope, FolderChange, GraphFetchResult, GraphFetched,
-    GraphFolder, GraphMessage, GraphProgress, MAX_THREAD_ASKS, ThreadOf,
+    GraphFolder, GraphMessage, GraphProgress, MAX_THREAD_ASKS, ThreadOf, UnreadableChange,
 };
 
 use crate::client::Client;
@@ -79,7 +79,8 @@ pub(crate) enum Asked {
     /// server's service would give): it may have happened, and it was not sent again.
     Lost,
     /// A page of a folder holds a change that can't be taken in: the folder stays where it was.
-    Unreadable,
+    /// What kind of change, and its item's subject when the answer named one.
+    Unreadable(crate::error::Unreadable),
 }
 
 /// What ends a run.
@@ -104,6 +105,8 @@ struct Outcome {
     incomplete: bool,
     /// The folders (their server ids) whose pages hold a change that can't be taken in.
     blocked: Vec<String>,
+    /// Those changes, each with its folder, kind and (when there was one) its item's subject.
+    unreadable: Vec<UnreadableChange>,
 }
 
 impl Outcome {
@@ -222,7 +225,7 @@ impl<E: HttpExchange> Run<'_, E> {
                 Error::Server(code) => return Err(Asked::Code(code)),
                 // (An answer that is none the service gives, to a request that may have been done.)
                 Error::Status(_) | Error::Malformed | Error::TooLarge | Error::Unexpected if once => return Err(Asked::Lost),
-                Error::Unreadable => return Err(Asked::Unreadable),
+                Error::Unreadable(why) => return Err(Asked::Unreadable(why)),
                 _ => return Err(Asked::Bad),
             }
         }
@@ -474,7 +477,7 @@ pub async fn sync_mail<E: HttpExchange>(
     if let Err(stop) = run.all(request, &mut out, emit).await {
         match stop {
             Asked::Stop(why) => out.stop(why),
-            Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable => {
+            Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable(_) => {
                 out.incomplete = true;
                 out.line("The server's answer couldn't be used");
             }
@@ -500,6 +503,7 @@ pub async fn sync_mail<E: HttpExchange>(
         stopped: out.stopped,
         auth_refused: out.auth_refused,
         blocked: out.blocked,
+        unreadable: out.unreadable,
         threads,
         ..base(request)
     });
@@ -611,10 +615,11 @@ impl<E: HttpExchange> Run<'_, E> {
                 Err(Asked::Stop(stop)) => return Err(Asked::Stop(stop)),
                 // A folder that is blocked is not a server that is failing: the other folders go on,
                 // and it doesn't count towards the folders in a row (the engine says which it was).
-                Err(Asked::Unreadable) => {
+                Err(Asked::Unreadable(why)) => {
                     out.incomplete = true;
                     if out.blocked.len() < MAX_FOLDERS {
                         out.blocked.push(folder.clone());
+                        out.unreadable.push(UnreadableChange { folder: folder.clone(), kind: why.kind, subject: why.subject });
                     }
                 }
                 Err(_) => {
@@ -776,7 +781,7 @@ pub async fn fetch_messages<E: HttpExchange>(
         match run.ask(&op.element(), &|reply| op.answer(reply)).await {
             Ok(mime) => out.fetched.push(GraphFetched { id: id.clone(), mime }),
             Err(Asked::Code(ResponseCode::ItemNotFound)) => out.missing.push(id.clone()),
-            Err(Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable) => out.failed.push(id.clone()),
+            Err(Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable(_)) => out.failed.push(id.clone()),
             Err(Asked::Stop(stop)) => {
                 if let Stop::Busy(seconds) = stop {
                     out.busy_for = Some(seconds.max(1));

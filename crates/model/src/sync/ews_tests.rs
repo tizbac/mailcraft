@@ -163,6 +163,14 @@ fn a_result_beyond_the_caps_is_refused() {
         ("a fingerprint that is none", Box::new(|r| r.untrusted = "nope".into())),
         ("a long url", Box::new(|r| r.url = "u".repeat(3000))),
         ("more changes up than it had to send", Box::new(|r| r.up = Some(UpProgress { done: 3, total: 2 }))),
+        (
+            "an unreadable change with a kind that is too long",
+            Box::new(|r| r.unreadable = vec![UnreadableChange { folder: "F1".into(), kind: "x".repeat(40), subject: String::new() }]),
+        ),
+        (
+            "an unreadable change with a subject that is too long",
+            Box::new(|r| r.unreadable = vec![UnreadableChange { folder: "F1".into(), kind: "Create".into(), subject: "s".repeat(20_000) }]),
+        ),
     ];
     for (what, change) in refused {
         let mut r = whole_result();

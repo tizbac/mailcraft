@@ -286,6 +286,18 @@ pub struct UpProgress {
     pub total: u32,
 }
 
+/// A change in a folder's page that couldn't be taken in (#252): the folder (a server id, which the
+/// engine names), the kind of change the server sent, and the subject of its item when the answer
+/// had one — for the owner to find the message. No id is kept, and the log never takes the
+/// subject.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct UnreadableChange {
+    pub folder: String,
+    pub kind: String,
+    pub subject: String,
+}
+
 /// What a run for an Exchange server account brought back, or a piece of it.
 ///
 /// A run arrives in pieces, in the order things were done (`partial` on all but the last), each
@@ -338,6 +350,10 @@ pub struct EwsMailResult {
     /// it was, is read again next time, and blocks the end of the run that would sweep.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub blocked: Vec<String>,
+    /// Those changes, each with its folder, the kind of change, and the subject of its item when
+    /// the answer had one: what the owner can find the message by.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub unreadable: Vec<UnreadableChange>,
     /// Problems worth telling the owner; empty when all went well.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub errors: Vec<String>,
@@ -447,6 +463,14 @@ impl EwsMailResult {
         if self.blocked.len() > MAX_LISTED_FOLDERS || !self.blocked.iter().all(|id| id_ok(id)) {
             return Err(ODD_ID);
         }
+        if self.unreadable.len() > MAX_LISTED_FOLDERS
+            || self
+                .unreadable
+                .iter()
+                .any(|u| !id_ok(&u.folder) || u.kind.len() > 32 || u.subject.chars().count() > MAX_TEXT || u.kind.chars().any(char::is_control))
+        {
+            return Err("has an unreadable change that can't be told");
+        }
         if self.threads.len() > MAX_THREAD_ASKS {
             return Err(TOO_MANY);
         }
@@ -541,7 +565,10 @@ impl EwsMailResult {
             self.hierarchy = piece.hierarchy;
         }
         self.pages.extend(piece.pages);
-        self.blocked.extend(piece.blocked);
+        if !piece.blocked.is_empty() {
+            self.blocked.extend(piece.blocked);
+        }
+        self.unreadable.extend(piece.unreadable);
         self.threads.extend(piece.threads);
         self.errors.extend(piece.errors);
         self.busy_for = piece.busy_for.or(self.busy_for);
