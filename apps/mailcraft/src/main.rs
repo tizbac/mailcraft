@@ -1143,6 +1143,7 @@ fn drag_out(
             drop(tick.poll());
         });
         let start: Box<dyn Fn(&[std::path::PathBuf]) -> Result<(), String>> = Box::new(move |paths| {
+            log::info!("drag: handing {} file(s) to the Wayland compositor", paths.len());
             dnd.start_drag(paths.to_vec());
             Ok(())
         });

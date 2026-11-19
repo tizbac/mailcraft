@@ -20,12 +20,21 @@ static LAST: std::sync::Mutex<Option<std::path::PathBuf>> = std::sync::Mutex::ne
 /// Whether a message drag has just left the window, and if so, hands it to the system.
 pub(crate) fn escalate(app: &mut MailApp, ctx: &egui::Context) {
     let Some(drag) = egui::DragAndDrop::payload::<MessageDrag>(ctx) else { return };
+    // A frame now and then while the messages are held: on Wayland an implicit grab keeps
+    // sending motion even outside the window (so no "pointer gone" arrives), and the frame that
+    // sees the pointer outside must still come.
+    ctx.request_repaint_after(std::time::Duration::from_millis(50));
     // The pointer is outside the window with the button still held: the owner is dragging out.
-    let left = ctx.input(|i| i.pointer.is_decidedly_dragging() && i.pointer.hover_pos().is_none());
+    // Once it is gone (X11), once its last position is past the window's edge (Wayland).
+    let left = ctx.input(|i| {
+        i.pointer.is_decidedly_dragging()
+            && (i.pointer.hover_pos().is_none() || i.pointer.latest_pos().is_some_and(|at| !i.viewport_rect().contains(at)))
+    });
     if !left {
         return;
     }
     let ids: Vec<u64> = drag.0.iter().copied().take(MOST).collect();
+    log::info!("drag: the pointer left the window; handing {} message(s) over", ids.len());
     egui::DragAndDrop::clear_payload(ctx);
     if ids.is_empty() {
         return;
