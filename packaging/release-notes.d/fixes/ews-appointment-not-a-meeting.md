@@ -1,1 +1,0 @@
-- An appointment made in MailCraft no longer disappears from its calendar on older Grommunio servers: a plain appointment now says it is not a meeting (its `PidLidAppointmentStateFlags`), a value those servers look up and fail on when it is absent, after which they leave the item out of the list.

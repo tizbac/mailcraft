@@ -1,1 +1,0 @@
-| 2026-11-19 | minor | Print: File › Print (Ctrl+P) and the reading pane's Print button open a Print dialog — the printer, the copies, collating, two sided, black and white, A4 or Letter — and print the message as pages MailCraft sets from the reading pane's display blocks, its pictures and tables on them; no print preview yet |

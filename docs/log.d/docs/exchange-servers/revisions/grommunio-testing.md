@@ -1,1 +1,0 @@
-| 2026-11-18 | minor | Grommunio: `scripts/grommunio-e2e.sh` and `apps/mailcraft/src/grommunio_e2e_tests.rs` make a throwaway server and run contacts, events and to-dos through Exchange Web Services end to end; the facts are in `docs/grommunio-testing.md` |

@@ -1,1 +1,0 @@
-| 2026-11-19 | minor | Gap 15: a message prints as pages MailCraft sets itself — its header, its formatting, its tables and its pictures — on the sheet the owner chooses, with the printer, the copies, collating, two sided and black and white in a Print dialog; the calendar, the contacts and tasks still print nothing |

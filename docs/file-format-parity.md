@@ -57,7 +57,11 @@ IMAP and SMTP servers, a Graph stand-in and a JMAP stand-in, not yet against oth
 | Date | Change | Summary |
 |---|---|---|
 | 2026-11-18 | patch | #1527: Save Mailbox As streams messages, preserves header compatibility and checks file and message sizes while preserving the destination on failure |
+| 2026-11-18 | minor | Save Message As writes Outlook `.msg` files ([MS-OXMSG] over [MS-CFB]): the note's properties, its recipients and its attachments; File › Options chooses whether `.eml` or `.msg` is the default. Reading a `.msg` is not built |
+| 2026-11-18 | patch | #1527: Save Mailbox As streams messages, preserves header compatibility and checks file and message sizes while preserving the destination on failure |
 | 2026-11-17 | minor | #1561 part 1: `.eml`: Save Message As writes a message as it was received (the bytes kept of a signed message, or a Microsoft, Exchange server or JMAP server's copy fetched for the save), else says it was written from what this computer keeps; a message only partly here is refused |
+| 2026-11-17 | minor | #1561 part 1: `.eml`: Save Message As writes a message as it was received (the bytes kept of a signed message, or a Microsoft, Exchange server or JMAP server's copy fetched for the save), else says it was written from what this computer keeps; a message only partly here is refused |
+| 2026-11-16 | minor | The mbox import limits are the owner's to set in File › Options, with what they cost in memory said |
 | 2026-11-15 | patch | Protocols: Exchange Web Services for an organisation's own server (mail only, #252); CalDAV, CardDAV and MAPI still no |
 | 2026-11-14 | patch | #1376: `.mailcraft`: header blocks packed in a few `headers-<n>.pack` files in the content folder, not one file each |
 | 2026-11-13 | minor | HS: `.mailcraft` in format 4, a message's header block beside it with its other content; format 3 still read |
