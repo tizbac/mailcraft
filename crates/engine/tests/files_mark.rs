@@ -44,6 +44,7 @@ const OTHER_WRITERS: &[(&str, &str)] = &[
     ("apps/mailcraft/src/install.rs", "a probe of where the program is installed"),
     ("apps/mailcraft/src/logging.rs", "the log"),
     ("apps/mailcraft/src/picture_cache.rs", "pictures kept for the window, never handed out"),
+    ("apps/mailcraft/src/print.rs", "the printable text, handed to the printer and deleted"),
     ("apps/mailcraft/src/self_update.rs", "the program's own update"),
     ("apps/mailcraft/src/single_instance.rs", "a lock"),
     ("apps/mailcraft-cli/src/main.rs", "its tests"),

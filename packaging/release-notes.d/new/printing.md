@@ -1,0 +1,1 @@
+- File › Print (Ctrl+P) prints the selected message on the system's default printer: its subject, sender, recipients and date, its files by name, and its text (the text of its HTML body when it has no plain one). Hidden sender text is never printed. Windows prints through Notepad's `/p`; Linux and the BSDs through CUPS (`lp`, or `lpr`).
