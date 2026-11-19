@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! A `.msg` file as it is written: the properties in the top-level stream, a recipient storage
 //! and an attachment storage, each with its own values.
+#![allow(clippy::chunks_exact_to_as_chunks)]
 
 use std::io::Read as _;
 use std::sync::Arc;
@@ -9,7 +10,7 @@ use std::sync::Arc;
 use cfb::CompoundFile;
 use mailcraft_model::{Address, Attachment, Body, Message};
 
-use super::write;
+use super::{MSG_CLSID, write};
 
 fn message() -> Message {
     Message {
@@ -39,7 +40,9 @@ fn stream(file: &mut CompoundFile<std::io::Cursor<Vec<u8>>>, path: &str) -> Vec<
 
 fn utf16(bytes: &[u8]) -> String {
     let units: Vec<u16> = bytes.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
-    String::from_utf16(&units).unwrap()
+    // A string in a property stream ends with a null ([MS-OXMSG] §2.4.2.1).
+    let text = String::from_utf16(&units).unwrap();
+    text.strip_suffix('\0').unwrap_or(&text).to_string()
 }
 
 #[test]
@@ -71,6 +74,29 @@ fn a_message_is_a_compound_file_with_its_properties_recipients_and_attachments()
     let attach = "/__attach_version1.0_#00000000";
     assert_eq!(utf16(&stream(&mut file, &format!("{attach}/__substg1.0_3707001F"))), "notes.txt");
     assert_eq!(stream(&mut file, &format!("{attach}/__substg1.0_37010102")), b"the notes");
+}
+
+/// The compound file says at its root that it is a message, keeps the (empty) name id streams a
+/// client looks for, and writes its flags as the long they are — the things Outlook refused when
+/// they were missing.
+#[test]
+fn a_message_is_marked_as_one_at_its_root() {
+    let bytes = write(&message()).unwrap();
+    let mut file = CompoundFile::open(std::io::Cursor::new(bytes)).unwrap();
+    assert_eq!(*file.root_entry().clsid(), uuid::Uuid::from_bytes(MSG_CLSID), "the message class");
+    assert!(file.exists("/__nameid_version1.0"));
+    for name in ["00020102", "00030102", "00040102"] {
+        assert!(file.exists(format!("/__nameid_version1.0/__substg1.0_{name}")));
+    }
+    let top = stream(&mut file, "/__properties_version1.0");
+    let flags = top[32..]
+        .chunks_exact(16)
+        .find(|e| u32::from_le_bytes([e[0], e[1], e[2], e[3]]) == 0x0E07_0003)
+        .map(|e| u32::from_le_bytes([e[8], e[9], e[10], e[11]]));
+    assert!(flags.is_some_and(|flags| flags & 0x12 == 0x12), "PR_MESSAGE_FLAGS as a long, read: {flags:?}");
+    // A string is null-terminated, and the length the entry gives includes the null.
+    let subject = stream(&mut file, "/__substg1.0_0037001F");
+    assert!(subject.len() >= 2 && subject.ends_with(&[0, 0]), "the subject ends with a null: {subject:?}");
 }
 
 #[test]

@@ -3385,6 +3385,7 @@ dependencies = [
  "mailcraft-time",
  "proptest",
  "serde_json",
+ "uuid",
 ]
 
 [[package]]
