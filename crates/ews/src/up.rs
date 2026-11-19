@@ -33,11 +33,13 @@ use std::collections::HashMap;
 use mailcraft_model::sync::{
     ChangeOutcome, DraftDone, DraftUp, EwsMailRequest, EwsMailResult, FlagUp, FolderChange, FolderChangeDone, GraphFolder, MAX_DRAFTS,
     MAX_FOLDER_CHANGES, MAX_MESSAGE_CHANGES, MAX_SENDS, MessageChange, MessageChangeDone, MessageOutcome, SendDone, SendOutcome, SendUp,
-    SyncedAttachment, marker_id, marker_of, merge_categories,
+    SyncedAttachment, UpProgress, marker_id, marker_of, merge_categories,
 };
 use mailcraft_model::{FolderKind, Id, Importance};
 
-use crate::changes::{CreateFolder, DeleteFolder, DeleteItem, DeleteMode, GetItemNow, ItemUpdate, MoveFolder, MoveItem, RenameFolder, UpdateItem};
+use crate::changes::{
+    CreateFolder, DeleteFolder, DeleteItem, DeleteMode, GetItemNow, ItemUpdate, MoveFolder, MoveItem, RenameFolder, UpdateItem, UpdateItems,
+};
 use crate::compose::{AddAttachments, CreateDraft, DraftContent, FindDraft, RemoveAttachments, SendMessage};
 use crate::delete_check::Found;
 use crate::error::ResponseCode;
@@ -46,6 +48,14 @@ use crate::run::{Asked, Run, base};
 
 /// Codes a server gives when it doesn't have a property (the flag, here).
 const LACKS_PROPERTY: [&str; 3] = ["ErrorInvalidPropertyRequest", "ErrorInvalidPropertyForOperation", "ErrorInvalidPropertySet"];
+
+/// How many changes one `UpdateItem` carries: the service's own most, which is what makes tens of
+/// thousands of marks go up in hundreds of requests instead of thousands.
+const UPDATE_BATCH: usize = crate::changes::MAX_UPDATE_BATCH;
+
+/// How many changes go up between two pieces that say how far they have got: one batch, so that a
+/// long push is seen to move and the window is told of each batch as it is taken on.
+const PROGRESS_EVERY: u32 = UPDATE_BATCH as u32;
 
 fn refused_status(code: &ResponseCode) -> u16 {
     if *code == ResponseCode::AccessDenied { 403 } else { 400 }
@@ -75,14 +85,36 @@ fn plain(code: &ResponseCode) -> String {
     }
 }
 
+/// How many changes from the start of `changes` can go up in one `UpdateItem`: plain marks (read,
+/// a flag, importance) that need nothing read from the server first, up to [`UPDATE_BATCH`]. A
+/// change of categories is not one (the server's list is read first), nor a move nor a copy.
+fn batch_len(changes: &[MessageChange]) -> usize {
+    changes.iter().take(UPDATE_BATCH).take_while(|change| matches!(change, MessageChange::Update { categories: None, .. })).count()
+}
+
+/// Hands on the changes gathered so far as a piece, once `done` has come to another
+/// [`PROGRESS_EVERY`] and there are more to send: how far up they are, and what the server took
+/// on. Nothing otherwise, so that an ordinary run is one piece as it always was.
+fn emit_up(request: &EwsMailRequest, piece: &mut EwsMailResult, done: u32, total: u32, emit: &mut dyn FnMut(EwsMailResult)) {
+    if done == 0 || done >= total || !done.is_multiple_of(PROGRESS_EVERY) {
+        return;
+    }
+    let mut now = EwsMailResult { partial: true, ..base(request) };
+    std::mem::swap(&mut now, piece);
+    now.up = Some(UpProgress { done, total });
+    emit(now);
+}
+
 impl<E: HttpExchange> Run<'_, E> {
-    /// Everything of `request` that goes up, emitted as one piece (before it is read from).
+    /// Everything of `request` that goes up, emitted as pieces: one every [`PROGRESS_EVERY`]
+    /// changes while a long push goes on (it says how far up it is), and the last with what is
+    /// left. The answer is how the push ended.
     pub(crate) async fn push(&mut self, request: &EwsMailRequest, emit: &mut dyn FnMut(EwsMailResult)) -> Result<(), Asked> {
         if request.changes.is_empty() && request.messages.is_empty() && request.drafts.is_empty() && request.sends.is_empty() {
             return Ok(());
         }
         let mut piece = EwsMailResult { partial: true, ..base(request) };
-        let outcome = self.push_into(request, &mut piece).await;
+        let outcome = self.push_into(request, &mut piece, emit).await;
         log::info!(
             "ews up: {} folder changes, {} message changes, {} drafts, {} messages sent of those asked",
             piece.changes.len(),
@@ -94,9 +126,19 @@ impl<E: HttpExchange> Run<'_, E> {
         outcome
     }
 
-    async fn push_into(&mut self, request: &EwsMailRequest, piece: &mut EwsMailResult) -> Result<(), Asked> {
+    async fn push_into(&mut self, request: &EwsMailRequest, piece: &mut EwsMailResult, emit: &mut dyn FnMut(EwsMailResult)) -> Result<(), Asked> {
         // The folders made in this run, by the id they have here.
         let mut made: HashMap<Id, String> = HashMap::new();
+        let total = u32::try_from(
+            request
+                .changes
+                .len()
+                .min(MAX_FOLDER_CHANGES)
+                .saturating_add(request.messages.len().min(MAX_MESSAGE_CHANGES))
+                .saturating_add(request.drafts.len().min(MAX_DRAFTS).saturating_add(request.sends.len().min(MAX_SENDS))),
+        )
+        .unwrap_or(u32::MAX);
+        let mut done = 0u32;
         for change in request.changes.iter().take(MAX_FOLDER_CHANGES) {
             // One of the server's own folders (#779) is never renamed, moved or deleted: it is
             // refused here without asking, and put back as any refusal is.
@@ -107,31 +149,79 @@ impl<E: HttpExchange> Run<'_, E> {
                 self.reread_folders |= matches!(change, FolderChange::Delete { .. });
                 let why = "it is one of the server's own folders, which may not be renamed, moved or deleted".to_owned();
                 piece.changes.push(FolderChangeDone { change: change.clone(), outcome: ChangeOutcome::Refused { why } });
+                done = done.saturating_add(1);
+                emit_up(request, piece, done, total, emit);
                 continue;
             }
             if let Some(outcome) = self.folder_change(change, &mut made).await? {
                 piece.changes.push(FolderChangeDone { change: change.clone(), outcome });
             }
+            done = done.saturating_add(1);
+            emit_up(request, piece, done, total, emit);
         }
-        for change in request.messages.iter().take(MAX_MESSAGE_CHANGES) {
+        // Plain marks go up a hundred at a time (the Inbox's 30,000 messages marked read are 300
+        // requests, not 30,000); anything that needs the item read first, a move, a copy or a
+        // draft goes one by one, as it always has.
+        let asked = request.messages.len().min(MAX_MESSAGE_CHANGES);
+        let mut at = 0usize;
+        while at < asked {
+            // (A server older than Exchange 2013 names an item only with its change key, so it is
+            // asked one by one as it always was; so is every change after one that wanted a key.)
+            let batch = if self.needs_change_key || !self.client.version().has_preview() { 1 } else { batch_len(&request.messages[at..asked]) };
+            if batch > 1 {
+                let changes = &request.messages[at..at + batch];
+                let answered = match self.update_marks(changes).await {
+                    Ok(answered) => answered,
+                    // (The batch as a whole didn't go: each change is asked by itself, which is
+                    // what knows a change key and a server without flags.)
+                    Err(Asked::Stop(stop)) => return Err(Asked::Stop(stop)),
+                    Err(_) => vec![false; batch],
+                };
+                for (change, went) in changes.iter().zip(answered) {
+                    let outcome = if went {
+                        let MessageChange::Update { flag, .. } = change else { return Err(Asked::Bad) };
+                        Some(MessageOutcome::Done { categories: None, flag: flag.clone(), folder: String::new(), id: String::new() })
+                    } else {
+                        self.message_change(change, &made).await?
+                    };
+                    if let Some(outcome) = outcome {
+                        piece.messages.push(MessageChangeDone { change: (*change).clone(), outcome, there: None });
+                    }
+                    done = done.saturating_add(1);
+                    emit_up(request, piece, done, total, emit);
+                }
+                at += batch;
+                continue;
+            }
+            let change = &request.messages[at];
             if let Some(outcome) = self.message_change(change, &made).await? {
                 piece.messages.push(MessageChangeDone { change: change.clone(), outcome, there: None });
             }
+            done = done.saturating_add(1);
+            emit_up(request, piece, done, total, emit);
+            at += 1;
         }
         for draft in request.drafts.iter().take(MAX_DRAFTS) {
-            let (done, ended) = self.draft(draft).await;
-            if !done.id.is_empty() || done.refused.is_some() || done.conflict {
-                piece.drafts.push(done);
+            let (done_draft, ended) = self.draft(draft).await;
+            if !done_draft.id.is_empty() || done_draft.refused.is_some() || done_draft.conflict {
+                piece.drafts.push(done_draft);
             }
+            done = done.saturating_add(1);
+            emit_up(request, piece, done, total, emit);
             ended?;
         }
         for send in request.sends.iter().take(MAX_SENDS) {
-            let (done, ended) = self.send(send).await;
-            if done.draft.is_some() || done.outcome != SendOutcome::Waits {
-                piece.sent.push(done);
+            let (done_send, ended) = self.send(send).await;
+            if done_send.draft.is_some() || done_send.outcome != SendOutcome::Waits {
+                piece.sent.push(done_send);
             }
+            done = done.saturating_add(1);
+            emit_up(request, piece, done, total, emit);
             ended?;
         }
+        // The last piece says the changes are all up (a piece of a push that stops early says
+        // how far it got).
+        piece.up = Some(UpProgress { done: done.min(total), total });
         Ok(())
     }
 
@@ -224,6 +314,35 @@ impl<E: HttpExchange> Run<'_, E> {
     }
 
     // ---- messages ----
+
+    /// Sets the plain marks of `changes` (read, a flag, importance — no categories, which are
+    /// read first) in one `UpdateItem`, up to [`UPDATE_BATCH`] of them. What became of each, in
+    /// order: `true` when the server took it on, or there was nothing to ask (a flag a server
+    /// without one keeps here). One the server refuses is asked again by itself by the caller,
+    /// which is the path that reads a change key and a server without flags.
+    async fn update_marks(&mut self, changes: &[MessageChange]) -> Result<Vec<bool>, Asked> {
+        let mut items = Vec::with_capacity(changes.len());
+        let mut nothing_to_ask = Vec::with_capacity(changes.len());
+        for change in changes {
+            let MessageChange::Update { id, read, flag, importance, .. } = change else { return Err(Asked::Bad) };
+            // (A server older than Exchange 2013's has no place for a follow-up flag: the item
+            // goes up without it, as it does one by one.)
+            let flag = flag.clone().filter(|_| !self.flag_lacking);
+            let update = ItemUpdate { read: *read, flag, importance: *importance, ..ItemUpdate::default() };
+            let empty = update.is_empty();
+            nothing_to_ask.push(empty);
+            if !empty {
+                items.push((id.clone(), update));
+            }
+        }
+        if items.is_empty() {
+            return Ok(nothing_to_ask);
+        }
+        let op = UpdateItems::marks(items);
+        let answered = self.ask(&op.element(), &|reply| op.answer(reply)).await?;
+        let mut answers = answered.into_iter();
+        Ok(nothing_to_ask.into_iter().map(|empty| if empty { true } else { answers.next().is_some_and(|saved| saved.is_ok()) }).collect())
+    }
 
     async fn message_change(&mut self, change: &MessageChange, made: &HashMap<Id, String>) -> Result<Option<MessageOutcome>, Asked> {
         let done = |folder: &str, id: &str| MessageOutcome::Done { categories: None, flag: None, folder: folder.to_owned(), id: id.to_owned() };

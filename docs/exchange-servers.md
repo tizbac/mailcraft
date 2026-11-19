@@ -7,6 +7,10 @@ Services, for mail (its calendar and contacts are not kept in step yet). This pa
 working on servers other than Microsoft's, one at a time, and what has not. Everything here was
 tried with made-up mail on a server running on the same computer; no real mailbox was used.
 
+What is changed here goes up before the mail is read: plain marks a hundred to a request (a mark
+put on a large selection is not a request for each message), and Send/Receive Progress says how
+many of them the server has taken on.
+
 ## Grommunio
 
 **Seen:** Grommunio's own container deployment, Gromox 3.13.33 (October 2026), one domain, three
