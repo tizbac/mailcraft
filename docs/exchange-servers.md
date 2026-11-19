@@ -18,7 +18,9 @@ Items; without it the message is held with the reason, never sent from another a
 The directory is read after the mail of a Send/Receive: the account's calendars, books and lists
 (the folders the server gives that kind), the events of a month back and a year ahead (with the
 days on screen when they are within two years of it), and every contact and to-do. What is made,
-changed or deleted here goes up before it is read. While the calendar is in front, days the owner
+changed or deleted here goes up before it is read, a hundred changes to a request (a mark put on
+a large selection is not a request for each message), and Send/Receive Progress says how many of
+them the server has taken on. While the calendar is in front, days the owner
 goes to that weren't read in the last five minutes are read by themselves, the calendars alone and
 nothing sent, with the password the Send/Receive was given (#1274).
 Another mailbox's calendar or address book is read with the owner's sign-in by putting its address

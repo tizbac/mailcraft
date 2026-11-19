@@ -447,6 +447,19 @@ fn the_commands_take_a_result_by_json_and_leave_no_server_id_in_their_errors() {
 }
 
 #[test]
+fn the_progress_of_what_goes_up_is_a_moving_count_not_a_bare_phase() {
+    use mailcraft_model::sync::{SyncPhase, UpProgress};
+    let (mut s, account) = session();
+    apply_ews_mail(&mut s, EwsMailResult { up: Some(UpProgress { done: 300, total: 10_000 }), ..piece(account) }).unwrap();
+    let row = s.sync_progress.accounts.iter().find(|r| r.account == account).expect("a row for the account");
+    assert_eq!(row.phase, Some(SyncPhase::Folders));
+    assert_eq!((row.done, row.total), (300, 10_000));
+    // (The status bar's bar moves with it, instead of standing still for the phase.)
+    let part = row.fraction();
+    assert!(part > 0.0 && part < 0.15, "{part}");
+}
+
+#[test]
 fn a_refused_page_keeps_the_end_of_its_run_from_sweeping() {
     let (mut s, account) = session();
     list(&mut s, account);
