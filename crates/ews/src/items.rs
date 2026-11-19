@@ -23,8 +23,14 @@ use crate::xml::{MAX_MIME_TEXT, Node};
 
 /// Most changes one page asks for (the schema's own limit is 512).
 pub const MAX_CHANGES: u32 = 512;
-/// The most changes one page holds that are taken in: what the model takes in of a page.
+/// The most changes of an item one page holds that are taken in: what the model takes in of a page.
 const MAX_PAGE: usize = mailcraft_model::sync::MAX_EWS_PAGE_MESSAGES;
+/// Most changes of read state one page holds that are taken in. A `ReadFlagChange` is an id and a
+/// flag and nothing else, and a server keeping a long list of them hands over more of those than
+/// of items (Grommunio sends the read states it already sent along with each new page, so a folder
+/// whose mail was read in bulk has thousands of them in one page while its items stay within the
+/// page asked for).
+const MAX_PAGE_FLAGS: usize = mailcraft_model::sync::MAX_EWS_PAGE_READ;
 /// Longest subject, `Message-ID`, preview and name kept, in characters; the most people a
 /// message names in one list.
 const MAX_SUBJECT: usize = 998;
@@ -156,14 +162,20 @@ impl SyncFolderItems {
         let last = node.child_in(MESSAGES, "IncludesLastItemInRange").is_none_or(|n| n.text.trim() != "false");
         let mut page = ItemsPage { state, last, ..ItemsPage::default() };
         let Some(changes) = node.child_in(MESSAGES, "Changes") else { return Ok(page) };
-        // (What the model takes in of one page: more than that is a page that can't be taken in.)
-        if changes.children.len() > MAX_PAGE {
-            return Err(unreadable("a page", "more changes in it than are taken in", ""));
-        }
+        // (What the model takes in of one page, counted by kind: an item is a message with its text,
+        // a read-state change is an id and a flag. A server that is working through a long list of
+        // read states gives more of those than were asked for; they are still taken in, since the
+        // state it hands back says everything up to here has been given.)
+        let mut items = 0usize;
+        let mut flags = 0usize;
         for change in changes.children.iter().filter(|c| *c.namespace == *TYPES) {
             let id = || change.child_in(TYPES, "ItemId").and_then(|id| id.attribute("Id")).filter(|id| valid_id(id));
             match change.name.as_str() {
                 "Create" | "Update" => {
+                    items = items.saturating_add(1);
+                    if items > MAX_PAGE {
+                        return Err(unreadable("a page", "more items in it than are taken in", ""));
+                    }
                     let item = change.children.iter().find(|c| *c.namespace == *TYPES);
                     // (The subject, when the answer has one, is what the owner can find it by: an
                     // item with no usable id is named by it in Send/Receive Progress, never in the
@@ -172,8 +184,18 @@ impl SyncFolderItems {
                     let read = item.and_then(read_item);
                     page.messages.push(read.ok_or_else(|| unreadable(&change.name, "an item with no usable id", &subject))?);
                 }
-                "Delete" => page.removed.push(id().ok_or_else(|| unreadable("Delete", "no usable item id", ""))?.to_owned()),
+                "Delete" => {
+                    items = items.saturating_add(1);
+                    if items > MAX_PAGE {
+                        return Err(unreadable("a page", "more items in it than are taken in", ""));
+                    }
+                    page.removed.push(id().ok_or_else(|| unreadable("Delete", "no usable item id", ""))?.to_owned());
+                }
                 "ReadFlagChange" => {
+                    flags = flags.saturating_add(1);
+                    if flags > MAX_PAGE_FLAGS {
+                        return Err(unreadable("a page", "more read-state changes in it than are taken in", ""));
+                    }
                     let id = id().ok_or_else(|| unreadable("ReadFlagChange", "no usable item id", ""))?;
                     match change.child_in(TYPES, "IsRead").map(|n| n.text.trim().eq_ignore_ascii_case("true")) {
                         Some(read) => page.read.push(ReadState { id: id.to_owned(), read }),

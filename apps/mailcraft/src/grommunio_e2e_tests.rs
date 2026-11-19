@@ -531,5 +531,5 @@ fn a_series_made_here_comes_back_and_changes() {
     assert_eq!(seen.recurrence.as_ref().and_then(|r| r.count), Some(8), "the new rule reached the server");
     // Take it away again through the same path.
     let _ = session.run("calendar.delete", &serde_json::json!({"id": id}));
-    let _ = sync(&mut session, "taken away");
+    sync(&mut session, "taken away");
 }
