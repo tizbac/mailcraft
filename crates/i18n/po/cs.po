@@ -12177,6 +12177,11 @@ msgstr "Jen primární pošta"
 msgid "Primary, Social, Promotions, Updates and Forums, as Gmail sorts your Inbox. Your mail stays in the Inbox."
 msgstr "Primární, Sociální sítě, Reklamy, Aktualizace a Fóra, jak Gmail třídí vaši Doručenou poštu. Pošta zůstává v Doručené poště."
 
+#. command label, ribbon, ribbon location
+#: crates/engine/src/cmd/file.rs crates/ui-egui/src/ribbon.rs
+msgid "Print"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AboutPages.kt
 #, fuzzy

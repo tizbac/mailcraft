@@ -92,6 +92,7 @@ mod opened_files;
 mod opened_flow;
 mod own_keys;
 mod picture_cache;
+mod print;
 mod quit;
 #[cfg(target_os = "macos")]
 mod quit_macos;
@@ -1439,6 +1440,8 @@ fn build_services(
         // folder and opened with the system's program for its kind (#126).
         open_file: opened_files()
             .map(|opened| Box::new(move |name: &str, bytes: &[u8]| opened.open(name, bytes)) as Box<dyn Fn(&str, &[u8]) -> Result<(), String>>),
+        // File › Print: the message as text, to the system's default printer.
+        print: Some(Box::new(print::print)),
         attachment_preview,
         secrets: secrets::store(),
         // File › Options › Security (#30 R13): the owner's own certificates and keys listed,

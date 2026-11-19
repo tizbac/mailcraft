@@ -377,6 +377,10 @@ pub struct Services {
     pub attachment_preview: Option<attachment_preview::Host>,
     /// Web: hand bytes to the browser as a download. An error means no download started.
     pub download: Option<Box<dyn Fn(&str, &[u8]) -> Result<(), String>>>,
+    /// Desktop: print `text` under `name` on the system's default printer, returning when the
+    /// job is handed over (or refused: no printer, no print command). Absent in the browser and
+    /// in tests, where `file.print` then says printing isn't available.
+    pub print: Option<Box<dyn Fn(&str, &str) -> Result<(), String>>>,
     /// Web: told whether there are unsaved changes after each pass, for the leave-page guard.
     pub on_dirty: Option<Box<dyn Fn(bool)>>,
     /// Desktop: synchronise with a mail server on a background thread. What it brings arrives
@@ -2683,6 +2687,19 @@ impl MailApp {
             return Some(r);
         }
         Some(match id {
+            // Printing is the window's: the message is turned into printable text here in the
+            // engine (as the command line and an agent get it too), and the system prints it.
+            "file.print" => match self.session.run("file.print", p) {
+                Err(e) => Err(e.to_string()),
+                Ok(done) => {
+                    let name = done.get("name").and_then(Value::as_str).unwrap_or("message");
+                    let text = done.get("text").and_then(Value::as_str).unwrap_or("");
+                    match self.services.print.as_ref() {
+                        Some(print) => print(name, text).map(|()| json!({"printed": name})),
+                        None => Err("printing isn't available here".into()),
+                    }
+                }
+            },
             "ui.removeAllData" => self.remove_all_data(),
             "ui.openDataFolder" => self.open_data_folder(),
             "ui.confirmServers" => self.confirm_servers(),
@@ -6188,6 +6205,8 @@ mod privacy_tests;
 mod problem_log_tests;
 #[cfg(test)]
 mod product_names_tests;
+#[cfg(test)]
+mod print_tests;
 #[cfg(test)]
 mod shift_delete_tests;
 #[cfg(test)]

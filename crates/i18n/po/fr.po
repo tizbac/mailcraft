@@ -12111,6 +12111,11 @@ msgstr "Courrier principal seulement"
 msgid "Primary, Social, Promotions, Updates and Forums, as Gmail sorts your Inbox. Your mail stays in the Inbox."
 msgstr "Principale, Réseaux sociaux, Promotions, Notifications et Forums, comme Gmail trie votre boîte de réception. Votre courrier reste dans la boîte de réception."
 
+#. command label, ribbon, ribbon location
+#: crates/engine/src/cmd/file.rs crates/ui-egui/src/ribbon.rs
+msgid "Print"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AboutPages.kt
 #, fuzzy
