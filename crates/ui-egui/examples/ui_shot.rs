@@ -735,6 +735,15 @@ fn main() {
     services.alert = Some(Box::new(StandInAlerts(host.clone())));
     // Remove MailCraft's data (#177): offered, and removes nothing here.
     services.data_wipe = Some(Box::new(StandInWipe));
+    // A made-up spooler, so File › Print can be looked at with nothing attached to a printer: the
+    // pages it is handed are counted and dropped; nothing is sent anywhere and no program is run.
+    services.printers = Some(Box::new(|| {
+        vec![
+            mailcraft_ui_egui::print::Printer { name: "Sample laser".into(), default: true, two_sided: Some(true) },
+            mailcraft_ui_egui::print::Printer { name: "Desk inkjet".into(), default: false, two_sided: Some(false) },
+        ]
+    }));
+    services.print = Some(Box::new(|job| Ok(format!("job 1 on Sample laser: {} sheet(s)", mailcraft_ui_egui::print::page_count(&job.pdf)))));
     // The owner's keys for Digital signatures (#30), none of them real.
     let pin = lines.iter().any(|l| l.pointer("/host/signing").and_then(|v| v.as_str()) == Some("pin"));
     services.signing = Some(Arc::new(StandInSigning(pin)));

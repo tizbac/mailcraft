@@ -7,7 +7,8 @@
 #   CLAUDE.md): a crate offered under "X OR GPL" is taken under X. The two non-OSI licences the
 #   tree needs are allowed for exactly the crate that needs them.
 # - bans: two versions of one crate warn (the GUI stack brings some).
-# - sources: crates.io, and our fork of winit from its git repository alone.
+# - sources: crates.io, our fork of winit, and the craft-libs print stack (with the winprint
+#   fork it pins) from their git repositories.
 
 [graph]
 all-features = true
@@ -38,6 +39,25 @@ ignore = [
     # rPGP moves to rsa 0.10 / crypto-bigint 0.7.
     { id = "RUSTSEC-2023-0071", reason = "rsa Marvin attack: private-key timing; mailcraft-openpgp only verifies with public keys; remove or justify again before MailCraft signs or decrypts with a key it holds (#30 parts 5 and 6)" },
     { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5 timing on secret integers; mailcraft-openpgp only verifies with public keys; remove or justify again before MailCraft signs or decrypts with a key it holds (#30 parts 5 and 6)" },
+    # 2026-11-19: the Windows spooler crate `winprint` (pinned by craft-print) uses `fmt-derive`
+    # 0.1.2, whose proc macro pulls in proc-macro-error 1.0.4, whose maintainer is gone. A proc
+    # macro run while building, not a library that ships or handles mail. Look again when
+    # winprint moves past fmt-derive 0.1.
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error (build-time macro of fmt-derive, through the Windows spooler crate winprint) is unmaintained, not a vulnerability; nothing of it runs in MailCraft" },
+    # 2026-11-19: printing's PDF writer (krilla, through `mailcraft-print`) reads the fonts it
+    # sets a page with: `ttf-parser` for the TrueType tables and `rustybuzz` for shaping. Both
+    # authors say the crates are finished rather than broken, with no known faults. The fonts
+    # they read are the system's own, never a font out of a message. Look again before a page is
+    # ever built from a font the owner hands MailCraft, and when krilla moves to a maintained
+    # reader (skrifa and harfrust are the alternatives named).
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser (krilla's font reader) is unmaintained, not vulnerable; MailCraft only feeds it the system's own fonts" },
+    { id = "RUSTSEC-2026-0206", reason = "rustybuzz (krilla's shaping) is unmaintained, not vulnerable; the same as ttf-parser" },
+    # 2026-11-19: the Windows spooler crate `winprint` (pinned by craft-print) checks the print
+    # driver's signature with sigstore, which uses chrono. chrono never touches mail: it is a
+    # Windows-only dependency of the spooler, and MailCraft's own dates and calendar maths are in
+    # `mailcraft-time`. Look again when winprint drops the signature check or sigstore moves off
+    # chrono.
+    { id = "RUSTSEC-2026-0543", reason = "chrono (through sigstore, which winprint uses on Windows) is unmaintained, not vulnerable; MailCraft's dates come from its own crate" },
 ]
 
 [licenses]
@@ -114,4 +134,4 @@ deny = [
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = ["https://github.com/UCSLabs/winit"]
+allow-git = ["https://github.com/UCSLabs/winit", "https://github.com/storytold/craft-libs", "https://github.com/storytold/winprint.rs"]
