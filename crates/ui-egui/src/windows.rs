@@ -1283,10 +1283,11 @@ fn show_native(app: &mut MailApp, ctx: &egui::Context, window: &mut Open, last: 
             let waits = !app.asking.is_empty() || window.what.form().is_some_and(Form::waiting);
             crate::keys::gate(&ctx, waits);
         }
-        // A dialog about the message written here (Check Names' choice) comes up over this
-        // window, not over the main one behind it, and has its keys.
-        let dialog_here =
-            !inside && window.what.compose().is_some() && app.dialog.as_ref().and_then(crate::dialogs::Dialog::compose) == window.what.compose();
+        // A dialog about what is written or read here (Check Names' choice, printing this message)
+        // comes up over this window, not over the main one behind it, and has its keys.
+        let dialog_here = !inside
+            && ((window.what.compose().is_some() && app.dialog.as_ref().and_then(crate::dialogs::Dialog::compose) == window.what.compose())
+                || app.dialog.as_ref().and_then(crate::dialogs::Dialog::window) == Some(window.id));
         let wish = if dialog_here { Keys::default() } else { keys_of(&ctx, window, ui.layer_id()) };
         if !inside {
             place_native(app, &ctx, window, kind);
@@ -1387,12 +1388,12 @@ fn contents(app: &mut MailApp, ui: &mut Ui, id: u64, what: &mut What, own_keys: 
             let scope = app.hit.scope(id);
             crate::attachment_preview::follow_message(app, id, Some(m.id));
             if crate::ribbon::show_attachment_window(app, ui, id, m.id) {
-                close = actions(app, ui, &m, own_keys, false);
+                close = actions(app, ui, &m, own_keys, false, id);
             } else {
                 egui::Panel::top(egui::Id::unique(("mailcraft-window-actions", id)))
                     .resizable(false)
                     .frame(egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin::symmetric(10, 5)))
-                    .show(ui, |ui| close = actions(app, ui, &m, own_keys, true));
+                    .show(ui, |ui| close = actions(app, ui, &m, own_keys, true, id));
             }
             egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.surface)).show(ui, |ui| {
                 crate::reading::show_message(app, ui, &m, Place::Window(id));
@@ -1448,12 +1449,17 @@ enum Action {
     Read,
 }
 
-/// A message window's action keys and, when visible, its toolbar. Returns `true` if the action
-/// deleted the message and the window should close.
-fn actions(app: &mut MailApp, ui: &mut Ui, m: &Arc<Message>, own_keys: bool, toolbar: bool) -> bool {
+/// A message window's action keys and, when visible, its toolbar. `window`: the number of this
+/// window, so a dialog the action opens (printing, for one) comes up over it. Returns `true` if the
+/// action deleted the message and the window should close.
+fn actions(app: &mut MailApp, ui: &mut Ui, m: &Arc<Message>, own_keys: bool, toolbar: bool, window: u64) -> bool {
     let flagged = m.flag == FlagStatus::Flagged;
-    let mut row: Vec<(&str, &str, &'static str, Action, &'static str)> =
-        crate::reading::ACTIONS.iter().map(|(icon, label, command)| (*icon, *label, *command, Action::Run(command), hit_kind(command))).collect();
+    let mut row: Vec<(&str, &str, &'static str, Action, &'static str)> = crate::reading::ACTIONS
+        .iter()
+        // (Print is here only where the window has a spooler to hand pages to.)
+        .filter(|(.., command)| *command != "ui.printDialog" || app.services.print.is_some())
+        .map(|(icon, label, command)| (*icon, *label, *command, Action::Run(command), hit_kind(command)))
+        .collect();
     row.push(("flag", if flagged { "Clear Flag" } else { "Flag" }, "mail.toggleFlag", Action::Flag, "windowFlag"));
     let (icon, label, command) =
         if m.read { ("markUnread", "Mark as unread", "mail.markUnread") } else { ("markRead", "Mark as read", "mail.markRead") };
@@ -1478,8 +1484,9 @@ fn actions(app: &mut MailApp, ui: &mut Ui, m: &Arc<Message>, own_keys: bool, too
     if toolbar {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
-            for (n, (icon, label, command, action, kind)) in row.iter().enumerate() {
-                if n == 3 || n == 4 {
+            for (icon, label, command, action, kind) in &row {
+                // (A little room between the respond group, Delete, and the marks.)
+                if matches!(*command, "mail.delete" | "mail.toggleFlag") {
                     ui.add_space(8.0);
                 }
                 let key = crate::widgets::shortcut_text(app, command);
@@ -1522,9 +1529,11 @@ fn actions(app: &mut MailApp, ui: &mut Ui, m: &Arc<Message>, own_keys: bool, too
         },
         Action::Run(command) => {
             // Replying and forwarding are written in a window of their own (#286); at the bound
-            // of windows, in the main window's reading pane.
+            // of windows, in the main window's reading pane. Printing asks for the window it was
+            // opened from, so its dialog comes up over that window.
             app.windows.place = Some(Opens::Window { behind: false });
-            let r = app.run(command, json!({"id": m.id}));
+            let params = if command == "ui.printDialog" { json!({"id": m.id, "window": window}) } else { json!({"id": m.id}) };
+            let r = app.run(command, params);
             app.windows.place = None;
             if let Ok(answer) = r {
                 let windowed = answer.get("compose").and_then(Value::as_u64).is_some_and(|c| app.windows.of_compose(c).is_some());
@@ -1546,6 +1555,7 @@ fn hit_kind(command: &str) -> &'static str {
         "mail.reply" => "windowReply",
         "mail.replyAll" => "windowReplyAll",
         "mail.forward" => "windowForward",
+        "ui.printDialog" => "windowPrint",
         _ => "windowDelete",
     }
 }
