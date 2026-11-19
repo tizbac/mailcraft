@@ -167,6 +167,11 @@ impl ItemUpdate {
         Element::new("t:DeleteItemField").child(Element::new("t:FieldURI").attr("FieldURI", uri))
     }
 
+    /// Whether it sets nothing at all (a flag a server has no place for, and nothing else).
+    pub fn is_empty(&self) -> bool {
+        self.element().is_none()
+    }
+
     /// The `t:Updates` element, or none when nothing is set.
     fn element(&self) -> Option<Element> {
         let mut updates = Element::new("t:Updates");
@@ -285,6 +290,74 @@ impl UpdateItem {
         let messages = reply.messages("UpdateItem")?;
         let [message] = messages.as_slice() else { return Err(Error::Unexpected) };
         first_item(message.ok()?).ok_or(Error::Unexpected)
+    }
+}
+
+/// Most items one `UpdateItem` may name: what the service takes in a single request.
+pub const MAX_UPDATE_BATCH: usize = 100;
+
+/// `UpdateItem` of several messages in one request, each with its own properties: the shape a
+/// large batch of marks goes up in (tens of thousands of messages marked read, one request for
+/// every hundred rather than one for each).
+#[derive(Clone, PartialEq, Eq)]
+pub struct UpdateItems {
+    /// (id, updates) in the order asked.
+    items: Vec<(String, ItemUpdate)>,
+}
+
+impl std::fmt::Debug for UpdateItems {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UpdateItems").field("items", &self.items.len()).finish()
+    }
+}
+
+impl UpdateItems {
+    /// Sets each item's properties over whatever the server has now, as [`UpdateItem::marks`]
+    /// does; nothing is asked of a change key.
+    pub fn marks(items: Vec<(String, ItemUpdate)>) -> Self {
+        Self { items }
+    }
+
+    /// Whether there is nothing to ask.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// How many items it names.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// The operation as the schema has it: one `t:ItemChange` per item.
+    pub fn element(&self) -> Element {
+        let changes = self.items.iter().fold(Element::new("m:ItemChanges"), |changes, (id, updates)| {
+            let change = Element::new("t:ItemChange").child(id_element("t:ItemId", id, None));
+            match updates.element() {
+                Some(updates) => changes.child(change.child(updates)),
+                None => changes.child(change),
+            }
+        });
+        Element::new("m:UpdateItem").attr("MessageDisposition", "SaveOnly").attr("ConflictResolution", "AlwaysOverwrite").child(changes)
+    }
+
+    /// What became of each item, in the order asked: the item as the server has it, or the error
+    /// it gave for that item alone. A busy server is the whole request's error (the caller waits
+    /// and asks again); an answer with a message for each item it wasn't asked about is no answer.
+    pub fn answer(&self, reply: &Reply) -> Result<Vec<Result<Saved, Error>>, Error> {
+        if let Some(busy) = reply.busy() {
+            return Err(busy);
+        }
+        let messages = reply.messages("UpdateItem")?;
+        if messages.len() != self.items.len() {
+            return Err(Error::Unexpected);
+        }
+        Ok(messages
+            .into_iter()
+            .map(|message| match message.ok() {
+                Ok(node) => first_item(node).ok_or(Error::Unexpected),
+                Err(error) => Err(error),
+            })
+            .collect())
     }
 }
 

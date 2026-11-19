@@ -44,7 +44,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use mailcraft_model::FolderKind;
 use mailcraft_model::sync::{
     EwsFetchRequest, EwsFolderDeltas, EwsMailRequest, EwsMailResult, EwsMessagePage, EwsScope, FolderChange, GraphFetchResult, GraphFetched,
-    GraphFolder, GraphMessage, GraphProgress, MAX_THREAD_ASKS, ThreadOf,
+    GraphFolder, GraphMessage, GraphProgress, MAX_THREAD_ASKS, ThreadOf, UnreadableChange,
 };
 
 use crate::client::Client;
@@ -56,9 +56,11 @@ use crate::items::{GetItemConversations, GetItemMime, GetItemRecipients, MAX_CON
 use crate::reply::Reply;
 use crate::soap::Element;
 
-/// How many changes one page of a folder asks for: enough that a large folder is a few hundred
-/// requests, few enough that a page is quick to take in.
-pub const PAGE: u32 = 200;
+/// How many changes one page of a folder asks for: the most the schema allows, so a large folder is
+/// as few requests as it can be. A server that works through a long list of read states sends the
+/// ones it already sent along with each new page (#252), so the traffic of a folder grows with the
+/// square of its pages: asking for the biggest page cuts it to a quarter of what 200 would.
+pub const PAGE: u32 = 512;
 /// How many times one request is made again for a busy server.
 const BUSY_TRIES: u32 = 3;
 /// The most folders one run reads, and the most pages of one folder.
@@ -84,7 +86,8 @@ pub(crate) enum Asked {
     /// server's service would give): it may have happened, and it was not sent again.
     Lost,
     /// A page of a folder holds a change that can't be taken in: the folder stays where it was.
-    Unreadable,
+    /// What kind of change, and its item's subject when the answer named one.
+    Unreadable(crate::error::Unreadable),
 }
 
 /// What ends a run.
@@ -109,6 +112,8 @@ struct Outcome {
     incomplete: bool,
     /// The folders (their server ids) whose pages hold a change that can't be taken in.
     blocked: Vec<String>,
+    /// Those changes, each with its folder, kind and (when there was one) its item's subject.
+    unreadable: Vec<UnreadableChange>,
 }
 
 impl Outcome {
@@ -146,6 +151,8 @@ pub(crate) struct Run<'a, E: HttpExchange> {
     pub(crate) flag_lacking: bool,
     /// A read-state change that said no state was passed over: said once a run, with no id.
     pub(crate) read_unsaid: bool,
+    /// A page carried more read states than a page takes in: said once a run, with how many.
+    pub(crate) read_overflow: bool,
     /// The ids of the server's other own folders ([`OWN`]) it has, as far as it said (#779): a
     /// change of one is never sent.
     pub(crate) own: HashSet<String>,
@@ -172,6 +179,7 @@ impl<'a, E: HttpExchange> Run<'a, E> {
             shape: Shape::Full,
             flag_lacking: false,
             read_unsaid: false,
+            read_overflow: false,
             own: HashSet::new(),
             reread_folders: false,
             needs_change_key: false,
@@ -231,7 +239,7 @@ impl<E: HttpExchange> Run<'_, E> {
                 Error::Server(code) => return Err(Asked::Code(code)),
                 // (An answer that is none the service gives, to a request that may have been done.)
                 Error::Status(_) | Error::Malformed | Error::TooLarge | Error::Unexpected if once => return Err(Asked::Lost),
-                Error::Unreadable => return Err(Asked::Unreadable),
+                Error::Unreadable(why) => return Err(Asked::Unreadable(why)),
                 _ => return Err(Asked::Bad),
             }
         }
@@ -485,7 +493,7 @@ pub async fn sync_mail<E: HttpExchange>(
     if let Err(stop) = run.all(request, &mut out, emit).await {
         match stop {
             Asked::Stop(why) => out.stop(why),
-            Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable => {
+            Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable(_) => {
                 out.incomplete = true;
                 out.line("The server's answer couldn't be used");
             }
@@ -537,6 +545,7 @@ pub async fn sync_mail<E: HttpExchange>(
         stopped: out.stopped,
         auth_refused: out.auth_refused,
         blocked: out.blocked,
+        unreadable: out.unreadable,
         threads,
         ..base(request)
     });
@@ -648,10 +657,11 @@ impl<E: HttpExchange> Run<'_, E> {
                 Err(Asked::Stop(stop)) => return Err(Asked::Stop(stop)),
                 // A folder that is blocked is not a server that is failing: the other folders go on,
                 // and it doesn't count towards the folders in a row (the engine says which it was).
-                Err(Asked::Unreadable) => {
+                Err(Asked::Unreadable(why)) => {
                     out.incomplete = true;
                     if out.blocked.len() < MAX_FOLDERS {
                         out.blocked.push(folder.clone());
+                        out.unreadable.push(UnreadableChange { folder: folder.clone(), kind: why.kind, subject: why.subject });
                     }
                 }
                 Err(_) => {
@@ -691,6 +701,13 @@ impl<E: HttpExchange> Run<'_, E> {
                     if page.read_unsaid > 0 && !self.read_unsaid {
                         self.read_unsaid = true;
                         log::info!("ews mail: the server gave a read-state change that says no state; it is passed over");
+                    }
+                    if page.read_left_out > 0 && !self.read_overflow {
+                        self.read_overflow = true;
+                        log::warn!(
+                            "ews mail: a page carried {} read-state changes more than a page takes in; the newest are kept, the rest are left out, and the folder goes on from the state the server gave",
+                            page.read_left_out
+                        );
                     }
                     page
                 }
@@ -816,7 +833,7 @@ pub async fn fetch_messages<E: HttpExchange>(
         match run.ask(&op.element(), &|reply| op.answer(reply)).await {
             Ok(mime) => out.fetched.push(GraphFetched { id: id.clone(), mime }),
             Err(Asked::Code(ResponseCode::ItemNotFound)) => out.missing.push(id.clone()),
-            Err(Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable) => out.failed.push(id.clone()),
+            Err(Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable(_)) => out.failed.push(id.clone()),
             Err(Asked::Stop(stop)) => {
                 if let Stop::Busy(seconds) = stop {
                     out.busy_for = Some(seconds.max(1));
