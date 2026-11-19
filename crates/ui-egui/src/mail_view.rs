@@ -23,6 +23,14 @@ mod server_rows;
 /// let go over (`nav::folder_row` takes them).
 pub(crate) struct MessageDrag(pub Vec<Id>);
 
+/// What dragging an attachment's chip carries: the message it belongs to and which of its files.
+/// Let go over a file manager, it is written there as a file of its own (Save As's name).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct AttachmentDrag {
+    pub id: Id,
+    pub index: usize,
+}
+
 /// A group heading in the list (Today, Yesterday…): a box with a line round it.
 const GROUP_H: f32 = 25.0;
 /// A group heading's text: 9 pt.

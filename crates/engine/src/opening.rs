@@ -743,6 +743,17 @@ pub fn export_name_or(stem: &str, ext: &str, fallback: &str) -> String {
     if ext.is_empty() { clean(stem) } else { clean(&format!("{stem}.{ext}")) }
 }
 
+/// The name a message takes when it is dragged to a folder of the owner's: the subject as a slug,
+/// every character that is not a letter or a digit turned into `_`, at most 64 of them, and the
+/// format's extension; `message.<extension>` when the subject leaves nothing. A name the system
+/// would not take (a reserved one, say) is made safe as [`export_name`] makes it.
+pub fn drag_name(subject: &str, format: crate::SaveMessageFormat) -> String {
+    let slug: String = subject.chars().map(|c| if c.is_alphanumeric() { c } else { '_' }).collect();
+    let slug: String = clean(slug.trim_matches('_')).chars().take(64).collect();
+    let slug = if slug.is_empty() { "message".to_string() } else { slug };
+    format!("{slug}.{}", format.extension())
+}
+
 /// [`file_name`] of a name with no folders in it, which may come out empty.
 fn clean(leaf: &str) -> String {
     let cleaned: String = leaf.chars().map(|c| if c.is_control() || "\\/:*?\"<>|".contains(c) || is_invisible(c) { '_' } else { c }).collect();
