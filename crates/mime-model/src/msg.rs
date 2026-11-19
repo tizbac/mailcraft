@@ -21,6 +21,9 @@ use std::io::Write as _;
 use cfb::CompoundFile;
 use mailcraft_model::{Address, Attachment, Importance, Message};
 
+/// The class of a message's compound file ([MS-OXMSG] §2.2), `{00020D0B-0000-0000-C000-000000000046}`.
+const MSG_CLSID: [u8; 16] = [0x00, 0x02, 0x0d, 0x0b, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46];
+
 /// Property types ([MS-OXCDATA] §2.11.1): what the entries and stream names carry.
 const PT_LONG: u16 = 0x0003;
 const PT_BOOLEAN: u16 = 0x000B;
@@ -58,6 +61,15 @@ impl From<std::io::Error> for MsgError {
 /// The message as the bytes of a `.msg` file.
 pub fn write(message: &Message) -> Result<Vec<u8>, MsgError> {
     let mut file = CompoundFile::create(std::io::Cursor::new(Vec::new()))?;
+    // A message's compound file is marked as one at its root ([MS-OXMSG] §2.2): Outlook refuses
+    // one whose root has no class.
+    file.set_storage_clsid("/", uuid::Uuid::from_bytes(MSG_CLSID))?;
+    // The name id streams, empty: this writer has no named properties, but a client that looks
+    // for the storage must find it.
+    file.create_storage("/__nameid_version1.0")?;
+    for name in ["00020102", "00030102", "00040102"] {
+        file.create_stream(format!("/__nameid_version1.0/__substg1.0_{name}"))?;
+    }
     // The folders in the order Microsoft writes them: a client that walks them sees the message's
     // own header first.
     let mut top = Properties::new();
@@ -79,6 +91,7 @@ pub fn write(message: &Message) -> Result<Vec<u8>, MsgError> {
         top.unicode(0x007D, &block);
     }
     top.unicode(0x0C1A, message.from.display());
+    top.unicode(0x0C1E, "SMTP");
     top.unicode(0x0C1F, &message.from.email);
     top.unicode(0x5D01, &message.from.email);
     if !message.to.is_empty() {
@@ -91,6 +104,18 @@ pub fn write(message: &Message) -> Result<Vec<u8>, MsgError> {
         top.unicode(0x0E02, &display_line(&message.bcc));
     }
     top.time(0x0E06, message.date);
+    // The rest of what Outlook writes for a note: when it was made and changed, what it is, how
+    // its text is encoded, and whether it carries files.
+    top.time(0x3007, message.date);
+    top.time(0x3008, message.date);
+    top.long(0x0FF4, 2);
+    top.long(0x0FF7, 0);
+    top.long(0x340D, 0x0004_0E79);
+    top.long(0x3FDE, 65001);
+    top.long(0x3FFD, 65001);
+    top.long(0x0036, 0);
+    top.unicode(0x0E1D, &message.subject);
+    top.unicode(0x0070, &message.subject);
     if !message.message_id.is_empty() {
         top.unicode(0x1035, &message.message_id);
     }
@@ -104,7 +129,11 @@ pub fn write(message: &Message) -> Result<Vec<u8>, MsgError> {
     );
     // A message that was read here is not marked unread there: both the read flag and the
     // message's own flags are left as Outlook would write them for a note.
-    top.boolean(0x0E07, message.read);
+    // PR_MESSAGE_FLAGS is a long, not a boolean: read, unchanged, and with files.
+    let files = attachments(message);
+    let flags = (if message.read { 1 } else { 0 }) | 0x02 | (if files.is_empty() { 0 } else { 0x10 });
+    top.long(0x0E07, flags);
+    top.boolean(0x0E1B, !files.is_empty());
     write_properties(&mut file, "/__properties_version1.0", &top, header(recipients(message), attachments(message)))?;
 
     for (index, (kind, address)) in recipients(message).into_iter().enumerate() {
@@ -112,10 +141,12 @@ pub fn write(message: &Message) -> Result<Vec<u8>, MsgError> {
         file.create_storage(&storage)?;
         let mut props = Properties::new();
         props.long(0x0C15, i32::try_from(kind).unwrap_or(i32::MAX));
+        props.long(0x0FFE, 6);
+        props.long(0x3000, i32::try_from(index).unwrap_or(i32::MAX));
         props.unicode(0x3001, address.display());
+        props.unicode(0x3002, "SMTP");
         props.unicode(0x3003, &address.email);
         props.unicode(0x39FE, &address.email);
-        props.unicode(0x39FF, "SMTP");
         write_properties(&mut file, &format!("{storage}/__properties_version1.0"), &props, vec![0; 8])?;
     }
 
@@ -130,6 +161,11 @@ pub fn write(message: &Message) -> Result<Vec<u8>, MsgError> {
         }
         props.unicode(0x3707, name);
         props.unicode(0x370E, &attachment.mime);
+        props.long(0x0E21, i32::try_from(index).unwrap_or(i32::MAX));
+        props.long(0x0FFE, 7);
+        props.long(0x0FF4, 2);
+        props.long(0x0FF7, 0);
+        props.long(0x370B, -1);
         props.long(0x3705, 1);
         props.long(0x0E20, i32::try_from(attachment.data.len()).map_err(|_| MsgError::TooLarge)?);
         if !attachment.content_id.is_empty() {
@@ -203,10 +239,13 @@ impl Properties {
     }
 
     fn unicode(&mut self, id: u16, text: &str) {
+        // A string in a property stream ends with a null ([MS-OXMSG] §2.4.2.1): the length the
+        // entry gives includes it.
         let mut bytes = Vec::with_capacity(text.len().saturating_mul(2).saturating_add(2));
         for unit in text.encode_utf16() {
             bytes.extend_from_slice(&unit.to_le_bytes());
         }
+        bytes.extend_from_slice(&[0, 0]);
         self.push(id, PT_UNICODE, Value::Variable(bytes));
     }
 
