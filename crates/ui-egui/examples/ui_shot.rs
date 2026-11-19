@@ -702,6 +702,15 @@ fn main() {
     services.alert = Some(Box::new(StandInAlerts(host.clone())));
     // Remove MailCraft's data (#177): offered, and removes nothing here.
     services.data_wipe = Some(Box::new(StandInWipe));
+    // A made-up spooler, so File › Print can be looked at with nothing attached to a printer: the
+    // pages it is handed are counted and dropped; nothing is sent anywhere and no program is run.
+    services.printers = Some(Box::new(|| {
+        vec![
+            mailcraft_ui_egui::print::Printer { name: "Sample laser".into(), default: true, two_sided: Some(true) },
+            mailcraft_ui_egui::print::Printer { name: "Desk inkjet".into(), default: false, two_sided: Some(false) },
+        ]
+    }));
+    services.print = Some(Box::new(|job| Ok(format!("job 1 on Sample laser: {} sheet(s)", mailcraft_ui_egui::print::page_count(&job.pdf)))));
     // Open MailCraft's data folder (#460): offered, and opens nothing here.
     services.data_folder = Some(mailcraft_ui_egui::data_removal::DataFolder {
         path: std::path::PathBuf::from("/home/you/.config/mailcraft"),

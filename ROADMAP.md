@@ -87,7 +87,7 @@ The themes that close the gap to Outlook's own features, taken in this order, ea
 against a pass/fail checklist, several at once. The shortfalls behind them are in
 [`docs/gaps.md`](docs/gaps.md).
 
-1. Printing
+1. Printing (a message, as text, in 0.13.0; calendars and contacts remain)
 2. Paragraph alignment
 3. Message list columns
 4. The To-Do Bar
@@ -186,7 +186,7 @@ the first people MailCraft is for. Each is a shortfall in [`docs/gaps.md`](docs/
    screen. Under way (`apps/mailcraft-android`, MB3: accounts and sign-in, the mail list, background
    Send/Receive with new-mail notifications); not in a release yet.
 3. Bringing an Outlook archive across: `.pst` files come in (#815); `.msg` files remain (gap 12).
-4. Printing messages, calendars and contacts (gap 15).
+4. Printing calendars and contacts (gap 15); printing a message came in 0.13.0.
 5. Warnings before sending (a recipient who looks like someone the owner writes to but isn't, many
    people outside the organisation who would see each other's addresses) and Report Phishing;
    the warnings about a sender when reading came with #508 (gap 17).

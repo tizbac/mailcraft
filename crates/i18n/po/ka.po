@@ -166,7 +166,7 @@ msgid "(no recipients)"
 msgstr "(მიმღების გარეშე)"
 
 #. android, interface, what a command says, why a mail server couldn't be used
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/MessageHeader.kt crates/engine/src/cmd/compose.rs crates/engine/src/cmd/graph_drafts.rs crates/engine/src/cmd/graph_send.rs crates/engine/src/cmd/snooze.rs crates/mobile/src/sync.rs crates/net/src/sync.rs crates/ui-egui/src/alerts.rs crates/ui-egui/src/mail_view.rs crates/ui-egui/src/mail_view/server_rows.rs crates/ui-egui/src/people_view.rs crates/ui-egui/src/pick_item.rs crates/ui-egui/src/reading.rs crates/ui-egui/src/reminders.rs crates/ui-egui/src/tasks_view.rs crates/ui-egui/src/windows.rs
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/MessageHeader.kt crates/engine/src/cmd/compose.rs crates/engine/src/cmd/graph_drafts.rs crates/engine/src/cmd/graph_send.rs crates/engine/src/cmd/snooze.rs crates/mobile/src/sync.rs crates/net/src/sync.rs crates/ui-egui/src/alerts.rs crates/ui-egui/src/mail_view.rs crates/ui-egui/src/mail_view/server_rows.rs crates/ui-egui/src/people_view.rs crates/ui-egui/src/pick_item.rs crates/ui-egui/src/print.rs crates/ui-egui/src/reading.rs crates/ui-egui/src/reminders.rs crates/ui-egui/src/tasks_view.rs crates/ui-egui/src/windows.rs
 #, fuzzy
 msgid "(no subject)"
 msgstr "(უთემო)"
@@ -664,6 +664,11 @@ msgstr ""
 #, fuzzy
 msgid "A web address, an email address, a phone number (tel:) or another address such as ms-settings:network-vpn. With nothing selected, the address is put in as it is."
 msgstr "ვებმისამართი, ელფოსტის მისამართი, ტელეფონის ნომერი (tel:) ან სხვა მისამართი, მაგალითად ms-settings:network-vpn. თუ არაფერია მონიშნული, მისამართი ისე ჩაისმება, როგორც არის."
+
+#. interface
+#: crates/ui-egui/src/print.rs
+msgid "A4"
+msgstr ""
 
 #. date and time, interface
 #: crates/i18n/src/date.rs crates/ui-egui/src/calendar_view.rs
@@ -2406,6 +2411,11 @@ msgstr "დაბადების დღე"
 msgid "Black"
 msgstr ""
 
+#. interface
+#: crates/ui-egui/src/print.rs
+msgid "Black and white"
+msgstr ""
+
 #. command label, interface
 #: crates/engine/src/cmd/junk.rs crates/ui-egui/src/ribbon.rs
 #, fuzzy
@@ -2676,7 +2686,7 @@ msgid "Can't sign"
 msgstr "ხელმოწერა შეუძლებელია"
 
 #. android, interface
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountDialogs.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AttachmentsView.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/CalendarEditor.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ComposerScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ReadingScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/TaskEditorScreen.kt crates/ui-egui/src/account_setup.rs crates/ui-egui/src/account_setup/help.rs crates/ui-egui/src/chrome.rs crates/ui-egui/src/close_to_tray.rs crates/ui-egui/src/dialogs.rs crates/ui-egui/src/forms.rs crates/ui-egui/src/import_pst.rs crates/ui-egui/src/import_tree.rs crates/ui-egui/src/meeting_dialogs.rs crates/ui-egui/src/report_problem.rs crates/ui-egui/src/security.rs
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountDialogs.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AttachmentsView.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/CalendarEditor.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ComposerScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ReadingScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/TaskEditorScreen.kt crates/ui-egui/src/account_setup.rs crates/ui-egui/src/account_setup/help.rs crates/ui-egui/src/chrome.rs crates/ui-egui/src/close_to_tray.rs crates/ui-egui/src/dialogs.rs crates/ui-egui/src/forms.rs crates/ui-egui/src/import_pst.rs crates/ui-egui/src/import_tree.rs crates/ui-egui/src/meeting_dialogs.rs crates/ui-egui/src/print.rs crates/ui-egui/src/report_problem.rs crates/ui-egui/src/security.rs
 #, fuzzy
 msgid "Cancel"
 msgstr "გაუქმება"
@@ -3436,6 +3446,11 @@ msgid "Collapse the Ribbon"
 msgstr "ლენტის აკეცვა"
 
 #. interface
+#: crates/ui-egui/src/print.rs
+msgid "Collate"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/account_setup.rs crates/ui-egui/src/calendar_view.rs crates/ui-egui/src/signatures.rs
 #, fuzzy
 msgid "Colour"
@@ -3647,6 +3662,11 @@ msgstr "მიმოწერები"
 #, fuzzy
 msgid "Copied. Paste it into mail or chat for your administrator."
 msgstr "დაკოპირდა. ჩასვით ის წერილში ან ჩატში თქვენი ადმინისტრატორისთვის."
+
+#. interface
+#: crates/ui-egui/src/print.rs
+msgid "Copies"
+msgstr ""
 
 #. name
 #: crates/engine/src/sync_driver/favorites.rs
@@ -8003,6 +8023,11 @@ msgstr "ჩემი ანგარიშის ხელით დაყენ
 msgid "Let people know you're away or can't answer for a while: your mailbox replies by itself"
 msgstr "აცნობეთ ხალხს, რომ არ ხართ ან გარკვეული დრო ვერ უპასუხებთ: თქვენი საფოსტო ყუთი თავად უპასუხებს"
 
+#. interface
+#: crates/ui-egui/src/print.rs
+msgid "Letter"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AboutPages.kt
 #, fuzzy
@@ -10237,6 +10262,11 @@ msgstr "ამ დანართის წინასწარი ნახვ
 msgid "No preview is available for this attachment."
 msgstr ""
 
+#. interface
+#: crates/ui-egui/src/print.rs
+msgid "No printer was found on this computer. Add one to the system, then print again."
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Hosted.kt
 #, fuzzy
@@ -11705,6 +11735,11 @@ msgstr "გვერდი {page} / {pages}"
 msgid "Pages like this open in the browser, where scripts in them run. Open it only if you know who sent it and expect it."
 msgstr "ასეთი გვერდები ბრაუზერში იხსნება, სადაც მათში არსებული სკრიპტები ეშვება. გახსენით მხოლოდ მაშინ, თუ იცით, ვინ გამოგზავნა, და ელოდებით."
 
+#. interface
+#: crates/ui-egui/src/print.rs
+msgid "Paper"
+msgstr ""
+
 #. ribbon
 #: crates/ui-egui/src/ribbon.rs
 #, fuzzy
@@ -12110,6 +12145,16 @@ msgstr "მხოლოდ „მთავარში“ მოსული ფ
 #, fuzzy
 msgid "Primary, Social, Promotions, Updates and Forums, as Gmail sorts your Inbox. Your mail stays in the Inbox."
 msgstr "„მთავარი“, „სოციალური“, „აქციები“, „განახლებები“ და „ფორუმები“, როგორც Gmail ახარისხებს თქვენს „შემოსულებს“. თქვენი ფოსტა „შემოსულებში“ რჩება."
+
+#. command label, interface, ribbon, ribbon location
+#: crates/engine/src/cmd/file.rs crates/ui-egui/src/dialogs.rs crates/ui-egui/src/lib.rs crates/ui-egui/src/print.rs crates/ui-egui/src/ribbon.rs
+msgid "Print"
+msgstr ""
+
+#. command label
+#: crates/ui-egui/src/lib.rs
+msgid "Print…"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AboutPages.kt
@@ -15781,8 +15826,8 @@ msgstr "სინქრონიზაცია"
 msgid "System"
 msgstr "სისტემა"
 
-#. android
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/SettingsScreen.kt
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/SettingsScreen.kt crates/ui-egui/src/print.rs
 #, fuzzy
 msgid "System default"
 msgstr "სისტემის ნაგულისხმევი"
@@ -19249,6 +19294,11 @@ msgstr "ამ საფოსტო ყუთში ორ ან მეტ ა
 msgid "Two or more of these accounts have the same address. Only confirm if every one of their servers is yours."
 msgstr "ამ ანგარიშებიდან ორს ან მეტს ერთი და იგივე მისამართი აქვს. დაადასტურეთ მხოლოდ მაშინ, თუ მათი ყველა სერვერი თქვენია."
 
+#. interface
+#: crates/ui-egui/src/print.rs
+msgid "Two sided"
+msgstr ""
+
 #. command label, interface
 #: crates/engine/src/cmd/format.rs crates/ui-egui/src/folder_properties.rs
 #, fuzzy
@@ -21154,6 +21204,11 @@ msgstr "სერვერთან {host} დაკავშირება ვ
 #, fuzzy
 msgid "day"
 msgstr "დღე"
+
+#. interface
+#: crates/ui-egui/src/print.rs
+msgid "default"
+msgstr ""
 
 #. why a mail server couldn't be used
 #: crates/net/src/sync.rs crates/proto/src/imap/password.rs
