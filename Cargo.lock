@@ -3127,6 +3127,7 @@ dependencies = [
  "mailcraft-assuan",
  "mailcraft-charset",
  "mailcraft-control-key",
+ "mailcraft-drag-out",
  "mailcraft-engine",
  "mailcraft-ews",
  "mailcraft-host",
@@ -3229,6 +3230,15 @@ dependencies = [
  "mailcraft-vcard",
  "proptest",
  "quick-xml 0.42.0",
+]
+
+[[package]]
+name = "mailcraft-drag-out"
+version = "0.13.0"
+dependencies = [
+ "windows",
+ "windows-core",
+ "x11rb",
 ]
 
 [[package]]

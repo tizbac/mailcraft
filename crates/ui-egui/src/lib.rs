@@ -105,6 +105,7 @@ pub mod digital_signatures;
 mod draft_continue_tests;
 #[cfg(test)]
 mod draft_selection_tests;
+mod drag_out;
 mod drag_pointer;
 #[cfg(test)]
 mod drag_pointer_tests;
@@ -344,6 +345,10 @@ pub struct Services {
     /// through the returned channel and wakes the UI; a dropped sender counts as cancelled. The
     /// app shows one dialog at a time ([`files`]).
     pub file_dialog: Option<Box<dyn Fn(FileDialogRequest) -> Receiver<Option<Vec<String>>>>>,
+    /// Desktop: hand files to the system as a drag the owner is making now into Explorer or a
+    /// file manager, and return when it ends (dropped or cancelled). Absent in the browser and
+    /// the tests; the window writes the files and takes them away afterwards.
+    pub drag_out: Option<Box<dyn Fn(&[std::path::PathBuf]) -> Result<(), String>>>,
     /// Web: open a file picker; what is picked arrives later through `picked`, each file with
     /// what the picker was opened for (`mailbox`, `import`, `attach`, …) and the message being
     /// written that asked, as given here ([`Delivered::picked`]): the picker's answer is never
@@ -5710,6 +5715,8 @@ impl MailApp {
         agent_gate::show(self, &ctx);
         // While messages are dragged: the pointer for what is under it (#430).
         drag_pointer::apply(&ctx);
+        // A message dragged past the window's edge is handed to the desktop.
+        drag_out::escalate(self, &ctx);
         self.by_hand = false;
         self.refusal();
         let title = format!("{} - MailCraft", self.title_stem());

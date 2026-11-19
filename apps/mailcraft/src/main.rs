@@ -1163,6 +1163,8 @@ fn services(
         file_dialog: Some(file_dialog),
         #[cfg(any(target_os = "windows", target_os = "macos"))]
         spelling: Some(Box::new(spelling::NativeChecker::default())),
+        // A message dragged out of the window goes to Explorer or a file manager as a real file.
+        drag_out: Some(Box::new(mailcraft_drag_out::start_drag)),
         #[cfg(windows)]
         recent_attachments: Some(Box::new(|ctx| background(ctx, "recent attachments", recent_attachments::list))),
         // Mail arrives in pieces as the run goes (what was sent, then folder by folder), through a

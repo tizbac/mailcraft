@@ -1,0 +1,32 @@
+[package]
+name = "mailcraft-drag-out"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "Dragging files out of MailCraft's window, to Explorer or a file manager"
+
+[dependencies]
+
+[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
+# The X11 connection and XDND: the pure Rust client, the same one the app already carries for
+# the tray (#1183). Apache-2.0 OR MIT.
+x11rb = { version = "0.13", default-features = false }
+
+[target.'cfg(windows)'.dependencies]
+# OLE's drag source and data object (`DoDragDrop`, `IDataObject`, `IDropSource`): the Windows
+# bindings the app already carries. MIT OR Apache-2.0.
+# The `#[implement]` macro writes its code against this crate by name.
+windows-core = "0.62"
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Memory",
+    "Win32_System_Ole",
+    "Win32_System_SystemServices",
+    "Win32_UI_Shell",
+] }
+
