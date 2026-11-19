@@ -1159,6 +1159,8 @@ fn services(
     Services {
         platform_calls,
         file_dialog: Some(file_dialog),
+        // A message dragged out of the window goes to Explorer or a file manager as a real file.
+        drag_out: Some(Box::new(mailcraft_drag_out::start_drag)),
         #[cfg(windows)]
         recent_attachments: Some(Box::new(|ctx| background(ctx, "recent attachments", recent_attachments::list))),
         // Mail arrives in pieces as the run goes (what was sent, then folder by folder), through a
