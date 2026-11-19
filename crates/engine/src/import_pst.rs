@@ -346,11 +346,12 @@ struct Brought {
 /// Most bytes of the start of a file its identity is worked out from when it has no record key.
 const HEAD_BYTES: u64 = 4096;
 
-/// Writes each batch's attachments to the content folder beside the mailbox file before the
-/// batch is handed over (#815), on the reader's thread: the window's thread only takes the batch
-/// in. Each file is looked at and written (or its time renewed) once per carrier, so content
-/// that went missing between batches is written again. A disk that refuses is left alone for the
-/// rest of the batch (what is left stays in memory, against [`MEMORY_BUDGET`]) and said once.
+/// Writes each batch's attachments, and the bodies over what the mailbox file keeps inline, to
+/// the content folder beside the mailbox file before the batch is handed over (#815), on the
+/// reader's thread: the window's thread only takes the batch in. Each file is looked at and
+/// written (or its time renewed) once per carrier, so content that went missing between batches
+/// is written again. A disk that refuses is left alone for the rest of the batch (what is left
+/// stays in memory, against [`MEMORY_BUDGET`]) and said once.
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) struct Spiller {
     path: Option<std::path::PathBuf>,
@@ -389,8 +390,72 @@ impl Spiller {
                     }
                 }
             }
+            if refused {
+                return;
+            }
+            // The body, its HTML and the words the sender hid, over what the mailbox file keeps
+            // inline, go the same way: the message names them and holds neither, as it does
+            // after a save. A big import thus holds no bodies, nor do the Undo steps that hold
+            // it, and every part comes back through `Session::content`.
+            let had = m.kept.is_some();
+            let mut kept = m.kept.take().unwrap_or_default();
+            kept.text_hash = mailcraft_model::text_hash(&m.body.text);
+            if m.body.text.len() > SPILL_MIN
+                && let Err(e) = spill_part(path, m.body.text.as_bytes(), &mut kept.text)
+            {
+                refused = true;
+                say(&mut self.said, "bodies", &e);
+            }
+            if let Some(html) = m.body.html.take() {
+                if html.len() > SPILL_MIN {
+                    if let Err(e) = spill_part(path, html.as_bytes(), &mut kept.html) {
+                        refused = true;
+                        m.body.html = Some(html);
+                        say(&mut self.said, "bodies", &e);
+                    }
+                } else {
+                    m.body.html = Some(html);
+                }
+            }
+            if m.hidden_text.len() > SPILL_MIN
+                && let Err(e) = spill_part(path, m.hidden_text.as_bytes(), &mut kept.hidden)
+            {
+                refused = true;
+                say(&mut self.said, "hidden words", &e);
+            }
+            // (The empty field and the name go together: the file is there.)
+            if kept.text.is_some() {
+                m.body.text.clear();
+            }
+            if kept.hidden.is_some() {
+                m.hidden_text.clear();
+            }
+            if had || !kept.is_empty() {
+                m.kept = Some(kept);
+            }
+            if refused {
+                return;
+            }
         }
     }
+}
+
+/// Says once (per import) that content couldn't be written ahead and is held in memory.
+#[cfg(not(target_arch = "wasm32"))]
+fn say(said: &mut bool, what: &str, why: &str) {
+    if !*said {
+        *said = true;
+        log::warn!("a .pst import couldn't write {what} ahead: {why}; they are held in memory");
+    }
+}
+
+/// `bytes` written to `path`'s content folder, and named in `slot` (nothing written when the
+/// bytes are already there).
+#[cfg(not(target_arch = "wasm32"))]
+fn spill_part(path: &std::path::Path, bytes: &[u8], slot: &mut Option<mailcraft_model::ContentRef>) -> Result<(), String> {
+    let r = crate::store::stash(path, &crate::store::Digest::of(bytes), bytes)?;
+    *slot = Some(r);
+    Ok(())
 }
 
 /// Read a .pst file over `reader` and hand over its mail in batches through `sink` (nothing,
@@ -1259,16 +1324,15 @@ impl Running {
         Ok(at)
     }
 
-    /// Count what `m` adds to memory against [`MEMORY_BUDGET`] (#815). Its attachments are in the
-    /// content folder already when there is a mailbox file (the reader wrote them: `kept`); what
-    /// is held is counted, a file carried by many messages once, and shared among them. Without
-    /// a mailbox file the text, HTML and hidden words count too.
-    fn account(&mut self, with_file: bool, m: &mut Message) -> Result<(), CmdError> {
-        let mut cost: u64 = 0;
-        if !with_file {
-            let body = m.body.text.len().saturating_add(m.body.html.as_ref().map_or(0, String::len)).saturating_add(m.hidden_text.len());
-            cost = cost.saturating_add(body as u64);
-        }
+    /// Count what `m` still holds in memory against [`MEMORY_BUDGET`] (#815). Its attachments are
+    /// in the content folder already when there is a mailbox file (the reader wrote them:
+    /// `kept`), and so are the bodies over what the mailbox file keeps inline; what is still held
+    /// is counted — text, HTML, hidden words, a file carried by many messages once, shared among
+    /// them — and an import that would pass the budget stops with an error rather than run the
+    /// computer out of memory.
+    fn account(&mut self, m: &mut Message) -> Result<(), CmdError> {
+        let body = m.body.text.len().saturating_add(m.body.html.as_ref().map_or(0, String::len)).saturating_add(m.hidden_text.len());
+        let mut cost: u64 = body as u64;
         for a in &mut m.attachments {
             if a.kept.is_some() {
                 continue;
@@ -1391,8 +1455,9 @@ fn check_top(s: &Session, top: Id) -> Result<(), CmdError> {
 }
 
 /// Put a batch of read messages into the mailbox, under the place asked for. Quick: no file is
-/// read or written here (the reader's thread has written the attachments to the content folder,
-/// and they come in named by their content). A batch that can't all go in is taken out again.
+/// read or written here (the reader's thread has written the attachments, and the bodies over
+/// what the mailbox file keeps inline, to the content folder, and they come in named by their
+/// content). A batch that can't all go in is taken out again.
 pub fn apply(s: &mut Session, place: &Place, batch: Batch) -> Result<usize, CmdError> {
     let mut run = match s.pst_running.take() {
         Some(r) if r.identity == batch.identity => r,
@@ -1426,10 +1491,9 @@ fn put(s: &mut Session, run: &mut Running, batch: Batch) -> Result<usize, CmdErr
     }
     let now = s.now();
     let mut n = 0usize;
-    let with_file = s.path.is_some() && cfg!(not(target_arch = "wasm32"));
     for (path, mut m) in batch.messages {
         let folder = run.folder(s, &path)?;
-        run.account(with_file, &mut m)?;
+        run.account(&mut m)?;
         m.id = 0;
         m.uid = 0;
         m.folder = folder;
@@ -1443,6 +1507,12 @@ fn put(s: &mut Session, run: &mut Running, batch: Batch) -> Result<usize, CmdErr
         if let Some(path) = s.path.as_deref() {
             for r in m.attachments.iter().filter_map(|a| a.kept.as_ref()) {
                 crate::store::protect_ref(path, r);
+            }
+            // (The body, its HTML and the hidden words the reader wrote ahead too.)
+            if let Some(kept) = m.kept.as_deref() {
+                for r in [kept.text, kept.html, kept.hidden].into_iter().flatten() {
+                    crate::store::protect_ref(path, &r);
+                }
             }
         }
         let id = s.mailbox.add_message(m).map_err(|e| fail(e.to_string()))?;
