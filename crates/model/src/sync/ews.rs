@@ -62,6 +62,11 @@ pub const MAX_EWS_ID: usize = 1024;
 /// Most messages one page of an answer holds.
 pub const MAX_EWS_PAGE_MESSAGES: usize = 2000;
 
+/// Most read-state changes one page of an answer holds: an id and a flag, no text, so a server
+/// working through a long list of them (Grommunio sends the read states it already sent along with
+/// each new page) can give thousands of those at once while its items stay within what was asked.
+pub const MAX_EWS_PAGE_READ: usize = 20_000;
+
 /// Most pages one piece of an answer holds.
 pub const MAX_EWS_PAGES: usize = 10_000;
 
@@ -487,6 +492,30 @@ pub struct EwsMessagePage {
     pub state: String,
 }
 
+/// How far the changes made here have gone up in a run (#252): how many of them the server has
+/// taken on, of how many the run had to send — the changes of folders and of messages, the
+/// drafts and the sends together. A piece of the run that carries changes carries its progress,
+/// so that a run pushing a large batch of marks (tens of thousands of messages marked read) is
+/// seen to move rather than a spinner saying only that it is at the folders.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpProgress {
+    pub done: u32,
+    pub total: u32,
+}
+
+/// A change in a folder's page that couldn't be taken in (#252): the folder (a server id, which the
+/// engine names), the kind of change the server sent, and the subject of its item when the answer
+/// had one — for the owner to find the message. No id is kept, and the log never takes the
+/// subject.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct UnreadableChange {
+    pub folder: String,
+    pub kind: String,
+    pub subject: String,
+}
+
 /// What a run for an Exchange server account brought back, or a piece of it.
 ///
 /// A run arrives in pieces, in the order things were done (`partial` on all but the last), each
@@ -539,6 +568,10 @@ pub struct EwsMailResult {
     /// it was, is read again next time, and blocks the end of the run that would sweep.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub blocked: Vec<String>,
+    /// Those changes, each with its folder, the kind of change, and the subject of its item when
+    /// the answer had one: what the owner can find the message by.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub unreadable: Vec<UnreadableChange>,
     /// Problems worth telling the owner; empty when all went well.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub errors: Vec<String>,
@@ -559,6 +592,9 @@ pub struct EwsMailResult {
     /// How far the run has got, for the status bar.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub progress: Option<GraphProgress>,
+    /// How far what was changed here has gone up, while the run pushes it: the panel's bar.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub up: Option<UpProgress>,
     /// The server turned the password down (a 401): the owner is asked for it again, and the run
     /// is not repeated by itself.
     #[serde(skip_serializing_if = "is_false")]
@@ -648,6 +684,14 @@ impl EwsMailResult {
         if self.blocked.len() > MAX_LISTED_FOLDERS || !self.blocked.iter().all(|id| id_ok(id)) {
             return Err(ODD_ID);
         }
+        if self.unreadable.len() > MAX_LISTED_FOLDERS
+            || self
+                .unreadable
+                .iter()
+                .any(|u| !id_ok(&u.folder) || u.kind.len() > 32 || u.subject.chars().count() > MAX_TEXT || u.kind.chars().any(char::is_control))
+        {
+            return Err("has an unreadable change that can't be told");
+        }
         if self.threads.len() > MAX_THREAD_ASKS {
             return Err(TOO_MANY);
         }
@@ -672,6 +716,11 @@ impl EwsMailResult {
         if self.pages.iter().any(|p| !state_ok(&p.state) || !state_ok(&p.from)) {
             return Err("has a sync state that can't be one");
         }
+        if let Some(up) = self.up
+            && up.done > up.total
+        {
+            return Err("has gone further up than it had to");
+        }
         if let Some(directory) = &self.directory {
             directory.check()?;
         }
@@ -694,7 +743,7 @@ impl EwsMailResult {
             }
         }
         for page in &self.pages {
-            if page.messages.len() > MAX_EWS_PAGE_MESSAGES || page.removed.len() > MAX_EWS_PAGE_MESSAGES || page.read.len() > MAX_EWS_PAGE_MESSAGES {
+            if page.messages.len() > MAX_EWS_PAGE_MESSAGES || page.removed.len() > MAX_EWS_PAGE_MESSAGES || page.read.len() > MAX_EWS_PAGE_READ {
                 return Err(TOO_MANY);
             }
             let message_odd = |m: &GraphMessage| !id_ok(&m.server.id) || (!m.server.folder.is_empty() && !id_ok(&m.server.folder));
@@ -740,13 +789,19 @@ impl EwsMailResult {
             self.hierarchy = piece.hierarchy;
         }
         self.pages.extend(piece.pages);
-        self.blocked.extend(piece.blocked);
+        if !piece.blocked.is_empty() {
+            self.blocked.extend(piece.blocked);
+        }
+        self.unreadable.extend(piece.unreadable);
         self.threads.extend(piece.threads);
         self.errors.extend(piece.errors);
         self.busy_for = piece.busy_for.or(self.busy_for);
         (self.partial, self.whole, self.stopped) = (piece.partial, piece.whole, piece.stopped);
         if piece.progress.is_some() {
             self.progress = piece.progress;
+        }
+        if piece.up.is_some() {
+            self.up = piece.up;
         }
         self.auth_refused |= piece.auth_refused;
         if !piece.untrusted.is_empty() {

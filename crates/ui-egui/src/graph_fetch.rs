@@ -81,6 +81,16 @@ impl Fetching {
     }
 }
 
+/// What the log calls an account's fetching of messages whole: the kind of server it is on.
+fn fetch_name(session: &mailcraft_engine::Session, account: Id) -> &'static str {
+    match session.mailbox.account(account).map_or(AccountKind::Local, |a| a.kind) {
+        AccountKind::Microsoft => "graph",
+        AccountKind::Jmap => "jmap",
+        AccountKind::Exchange => "ews",
+        _ => "message",
+    }
+}
+
 /// A Graph token of this session for `account` that is still good.
 fn access(app: &MailApp, account: Id) -> Option<String> {
     app.graph_tokens.get(&account).filter(|t| t.fresh(mailcraft_time::now())).map(|t| t.access.clone())
@@ -323,11 +333,13 @@ impl MailApp {
         // (Stopped by the owner, it is no server's doing: nothing to wait out.)
         let paused = self.session.sync_progress.full_paused;
         if let Some(stopped) = self.session.driver.fetch.background_came(account, paused, &result, now_ms()) {
-            // Said once, when it first stops, not every time it tries again.
+            // Said once, when it first stops, not every time it tries again. Named by the kind of
+            // server the account is on: a batch of an Exchange account is not a Graph fetch.
             if stopped.first {
                 let why = result.errors.first().map_or("no answer", String::as_str);
                 log::warn!(
-                    "graph fetch, account {account}: the background download stopped ({why}); it tries again in {} s",
+                    "{} fetch, account {account}: the background download stopped ({why}); it tries again in {} s",
+                    fetch_name(&self.session, account),
                     (stopped.wait_ms / 1_000.0) as u64
                 );
             }
@@ -438,6 +450,23 @@ mod tests {
                 .unwrap();
         }
         whose
+    }
+
+    #[test]
+    fn a_stopped_background_fetch_is_named_by_the_server_it_went_to() {
+        let (mut app, accounts, _) = window(1);
+        fn add(app: &mut MailApp, p: Value) -> u64 {
+            app.execute("account.add", p).unwrap()["id"].as_u64().unwrap()
+        }
+        let exchange =
+            add(&mut app, json!({"email": "ex@example.org", "kind": "exchange", "ews": {"url": "https://exchange.example.org/EWS/Exchange.asmx"}}));
+        let jmap = add(&mut app, json!({"email": "jm@example.org", "kind": "jmap", "jmap": {"session": "https://jmap.example.org/jmap/"}}));
+        let imap = add(&mut app, json!({"email": "im@example.org", "kind": "imap"}));
+        assert_eq!(fetch_name(&app.session, accounts[0]), "graph", "a Microsoft account is a Graph fetch");
+        assert_eq!(fetch_name(&app.session, exchange), "ews", "an Exchange account is not a Graph fetch");
+        assert_eq!(fetch_name(&app.session, jmap), "jmap");
+        assert_eq!(fetch_name(&app.session, imap), "message", "an account the host fetches nothing for");
+        assert_eq!(fetch_name(&app.session, 0), "message", "an account that isn't in the mailbox");
     }
 
     #[test]

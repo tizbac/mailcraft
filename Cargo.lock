@@ -913,6 +913,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cfb"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d38f2da7a0a2c4ccf0065be06397cc26a81f4e528be095826eee9d4adbb8c60f"
+dependencies = [
+ "byteorder",
+ "fnv",
+ "uuid",
+]
+
+[[package]]
 name = "cfb-mode"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1144,6 +1155,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f8f80099a98041a3d1622845c271458a2d73e688351bf3cb999266764b81d48"
 
 [[package]]
+name = "core_maths"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77745e017f5edba1a9c1d854f6f3a52dac8a12dd5af5d2f54aecf61e43d80d30"
+dependencies = [
+ "libm",
+]
+
+[[package]]
 name = "cpubits"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1165,6 +1185,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ca28b0ae3115b884660db4118d803791fd6756b6e88f39c0f3f7859060d7566"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "craft-print"
+version = "1.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "974c53a4717319060732c5176d1e8bc71ae7376a6eb11a64c8a52a5e604a298e"
+dependencies = [
+ "miniz_oxide 0.9.1",
+ "roxmltree",
+ "tempfile",
+ "winprint",
+ "winsafe",
 ]
 
 [[package]]
@@ -2006,7 +2039,7 @@ dependencies = [
  "ecolor",
  "emath",
  "epaint_default_fonts",
- "font-types",
+ "font-types 0.12.7",
  "harfrust",
  "log",
  "nohash-hasher",
@@ -2172,6 +2205,31 @@ name = "float-cmp"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "fmt-derive"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1cb4a4b45c26455885f8b462db12978e51f60cc914337bccb9a36faf93410169"
+dependencies = [
+ "fmt-derive-proc",
+]
+
+[[package]]
+name = "fmt-derive-proc"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7704da0760734344ce8753f15b21e97c6be85dc5a8f2c3a963fbd042b3380d23"
+dependencies = [
+ "proc-macro-crate 3.5.0",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
 
 [[package]]
 name = "fmv-macos-events"
@@ -2201,6 +2259,15 @@ name = "foldhash"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
+
+[[package]]
+name = "font-types"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b38ad915f6dadd993ced50848a8291a543bd41ca62bc10740d5e64e2ab4cfd7"
+dependencies = [
+ "bytemuck",
+]
 
 [[package]]
 name = "font-types"
@@ -2719,6 +2786,12 @@ dependencies = [
 
 [[package]]
 name = "imagesize"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09e54e57b4c48b40f7aec75635392b12b3421fa26fe8b4332e63138ed278459c"
+
+[[package]]
+name = "imagesize"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65b27460c2c92b037f3f94c538ed9a3342f3fdf923606781629ccb35f82d042a"
@@ -2980,6 +3053,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "krilla"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27da593198b20eeba65caeb73c2bbeec3e53ab08fa549898312ce81c4fce5e33"
+dependencies = [
+ "base64 0.22.1",
+ "bumpalo",
+ "flate2",
+ "float-cmp",
+ "gif",
+ "image-webp",
+ "imagesize 0.14.0",
+ "indexmap",
+ "pdf-writer",
+ "png",
+ "rustc-hash 2.1.3",
+ "rustybuzz",
+ "siphasher",
+ "skrifa 0.42.1",
+ "smallvec",
+ "subsetter",
+ "tiny-skia-path 0.12.0",
+ "xmp-writer",
+ "yoke",
+ "zune-jpeg",
+]
+
+[[package]]
 name = "ksni"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3055,6 +3156,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "limn-dnd"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9b6101d3268da4985d10a2357be2ae756a1ccd8350f6383077fd536c8aa9427"
+dependencies = [
+ "raw-window-handle",
+ "smithay-client-toolkit 0.20.0",
+ "wayland-backend",
+]
+
+[[package]]
 name = "linebender_resource_handle"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3095,13 +3207,18 @@ checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
 name = "mailcraft"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "apple-native-keyring-store",
  "arboard",
  "base64 0.23.1",
  "block2 0.6.2",
  "cms",
+ "craft-print",
  "cryptoki",
  "der 0.8.3",
  "dispatch2",
@@ -3112,10 +3229,12 @@ dependencies = [
  "image",
  "keyring-core",
  "ksni",
+ "limn-dnd",
  "log",
  "mailcraft-assuan",
  "mailcraft-charset",
  "mailcraft-control-key",
+ "mailcraft-drag-out",
  "mailcraft-engine",
  "mailcraft-ews",
  "mailcraft-host",
@@ -3165,7 +3284,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-assuan"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "proptest",
  "thiserror 2.0.21",
@@ -3173,11 +3296,19 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-ber"
+<<<<<<< HEAD
 version = "0.15.0"
 
 [[package]]
 name = "mailcraft-charset"
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+
+[[package]]
+name = "mailcraft-charset"
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "base64 0.23.1",
  "encoding_rs",
@@ -3186,7 +3317,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-cli"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-charset",
  "mailcraft-engine",
@@ -3201,14 +3336,22 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-control-key"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "ring",
 ]
 
 [[package]]
 name = "mailcraft-dav"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-ical",
  "mailcraft-link",
@@ -3220,8 +3363,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "mailcraft-drag-out"
+version = "0.13.0-rc.1"
+dependencies = [
+ "log",
+ "windows",
+ "windows-core",
+ "x11rb",
+]
+
+[[package]]
 name = "mailcraft-engine"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "image",
  "libc",
@@ -3251,7 +3408,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-ews"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "hmac 0.13.0",
  "log",
@@ -3268,7 +3429,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-host"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "log",
  "mailcraft-engine",
@@ -3281,7 +3446,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-html"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-link",
  "mailcraft-names",
@@ -3292,14 +3461,22 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-i18n"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "proptest",
 ]
 
 [[package]]
 name = "mailcraft-ical"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-model",
  "mailcraft-time",
@@ -3308,7 +3485,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-jmap"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "log",
  "mailcraft-charset",
@@ -3323,7 +3504,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-jmap-types"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "proptest",
  "serde",
@@ -3332,7 +3517,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-link"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-names",
  "proptest",
@@ -3340,7 +3529,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-mcp"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "log",
  "mailcraft-control-key",
@@ -3353,7 +3546,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-mime"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-ber",
  "mailcraft-charset",
@@ -3367,19 +3564,29 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-mime-model"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
+ "cfb",
  "mailcraft-html",
  "mailcraft-mime",
  "mailcraft-model",
  "mailcraft-time",
  "proptest",
  "serde_json",
+ "uuid",
 ]
 
 [[package]]
 name = "mailcraft-mobile"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "jni",
  "log",
@@ -3402,7 +3609,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-model"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-charset",
  "mailcraft-i18n",
@@ -3417,14 +3628,22 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-names"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "proptest",
 ]
 
 [[package]]
 name = "mailcraft-net"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "cryptoki",
  "flate2",
@@ -3449,7 +3668,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-openpgp"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "ed25519-dalek",
  "mailcraft-names",
@@ -3464,8 +3687,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "mailcraft-print"
+version = "0.13.0-rc.1"
+dependencies = [
+ "image",
+ "krilla",
+ "mailcraft-html",
+ "ttf-parser",
+]
+
+[[package]]
 name = "mailcraft-proto"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "log",
  "mailcraft-charset",
@@ -3475,7 +3712,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-pst"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-charset",
  "proptest",
@@ -3483,7 +3724,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-smime"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "aes 0.9.4",
  "cbc",
@@ -3514,7 +3759,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-time"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "jiff",
  "js-sys",
@@ -3524,7 +3773,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-tnef"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-charset",
  "mailcraft-pst",
@@ -3533,7 +3786,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-ui-egui"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "egui",
  "egui_kittest",
@@ -3550,6 +3807,7 @@ dependencies = [
  "mailcraft-model",
  "mailcraft-names",
  "mailcraft-net",
+ "mailcraft-print",
  "mailcraft-pst",
  "mailcraft-time",
  "serde",
@@ -3562,7 +3820,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-vcard"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-charset",
  "mailcraft-model",
@@ -3573,7 +3835,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-web"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "eframe",
  "egui",
@@ -4545,6 +4811,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pdf-writer"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5e456864a7a304047bff84977dc6fb162bd956475d40ba50b2dcecaada7f753"
+dependencies = [
+ "bitflags 2.13.2",
+ "itoa",
+ "memchr",
+ "ryu",
+]
+
+[[package]]
 name = "pem-rfc7468"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5163,12 +5441,22 @@ dependencies = [
 
 [[package]]
 name = "read-fonts"
+version = "0.39.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4ed38b89c2c77ff968c524145ad65fb010f38af5c7a224b53b81d47ac2daa81"
+dependencies = [
+ "bytemuck",
+ "font-types 0.11.3",
+]
+
+[[package]]
+name = "read-fonts"
 version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "046a7d674daf459825b32f5062056d6882db0d2f5a479fbd76ccfc870ac18709"
 dependencies = [
  "bytemuck",
- "font-types",
+ "font-types 0.12.7",
  "once_cell",
 ]
 
@@ -5180,7 +5468,7 @@ checksum = "a39d2f8f681030a7bcbbcf3e8568775ac2393afd51401a2e2133ee89e3953897"
 dependencies = [
  "bytemuck",
  "foldhash 0.2.0",
- "font-types",
+ "font-types 0.12.7",
  "once_cell",
  "smallvec",
  "yoke",
@@ -5546,6 +5834,30 @@ dependencies = [
  "tempfile",
  "wait-timeout",
 ]
+
+[[package]]
+name = "rustybuzz"
+version = "0.20.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd3c7c96f8a08ee34eff8857b11b49b07d71d1c3f4e88f8a88d4c9e9f90b1702"
+dependencies = [
+ "bitflags 2.13.2",
+ "bytemuck",
+ "core_maths",
+ "log",
+ "smallvec",
+ "ttf-parser",
+ "unicode-bidi-mirroring",
+ "unicode-ccc",
+ "unicode-properties",
+ "unicode-script",
+]
+
+[[package]]
+name = "ryu"
+version = "1.0.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
 name = "same-file"
@@ -5919,6 +6231,16 @@ checksum = "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256"
 
 [[package]]
 name = "skrifa"
+version = "0.42.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c34617370ae968efb7161bb2beb517d9084659aae19e24b89e3db25b46e4564"
+dependencies = [
+ "bytemuck",
+ "read-fonts 0.39.2",
+]
+
+[[package]]
+name = "skrifa"
 version = "0.44.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "819ab7d62b1d3e72d9d9dea5650bac30424f9111364bb94928dbf5ecad1baa68"
@@ -6129,6 +6451,39 @@ name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
+
+[[package]]
+name = "strum"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9628de9b8791db39ceda2b119bbe13134770b56c138ec1d3af810d045c04f9bd"
+dependencies = [
+ "strum_macros",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab85eea0270ee17587ed4156089e10b9e6880ee688791d45a905f5b1ca36f664"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "subsetter"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38803281d1c23166c5ebcb455439a5d2afe711cc909cf88af72448c297756ad6"
+dependencies = [
+ "kurbo",
+ "rustc-hash 2.1.3",
+ "skrifa 0.42.1",
+ "write-fonts",
+]
 
 [[package]]
 name = "subtle"
@@ -6520,6 +6875,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ttf-parser"
+version = "0.25.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2df906b07856748fa3f6e0ad0cbaa047052d4a7dd609e231c4f72cee8c36f31"
+dependencies = [
+ "core_maths",
+]
+
+[[package]]
 name = "twofish"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6561,6 +6925,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eaea85b334db583fe3274d12b4cd1880032beab409c0d774be044d4480ab9a94"
 
 [[package]]
+name = "unicode-bidi-mirroring"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5dfa6e8c60bb66d49db113e0125ee8711b7647b5579dc7f5f19c42357ed039fe"
+
+[[package]]
+name = "unicode-ccc"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce61d488bcdc9bc8b5d1772c404828b17fc481c0a582b5581e95fb233aef503e"
+
+[[package]]
 name = "unicode-general-category"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6577,6 +6953,12 @@ name = "unicode-properties"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7df058c713841ad818f1dc5d3fd88063241cc61f49f5fbea4b951e8cf5a8d71d"
+
+[[package]]
+name = "unicode-script"
+version = "0.5.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa04c955db05429d464c74d495c1ee677e1866e783a4c3747f9c0cef7756cabf"
 
 [[package]]
 name = "unicode-segmentation"
@@ -6698,7 +7080,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bdb896f04730b97805bbc3191fc57e4bf03face0f14577dd42e783c4d8c98802"
 dependencies = [
  "data-url",
- "imagesize",
+ "imagesize 0.15.0",
  "kurbo",
  "log",
  "pico-args",
@@ -7505,6 +7887,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "winprint"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "979f74f7bbc8a771a27bb1b7fd4889d037d6fe9fde1d7cf9332506d7b824af1f"
+dependencies = [
+ "fmt-derive",
+ "scopeguard",
+ "strum",
+ "thiserror 2.0.21",
+ "windows 0.62.2",
+ "windows-core 0.62.2",
+ "windows-implement 0.60.2",
+ "windows-numerics",
+ "xml",
+]
+
+[[package]]
 name = "winreg"
 version = "0.56.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7523,6 +7922,12 @@ dependencies = [
  "toml",
  "version_check",
 ]
+
+[[package]]
+name = "winsafe"
+version = "0.0.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ef0ffc427f045c0cc9ebffd6f4f91153dcd2a1547b5c3c29ee3f541e16e95c6"
 
 [[package]]
 name = "wit-bindgen"
@@ -7558,6 +7963,19 @@ dependencies = [
  "group 0.14.0",
  "hybrid-array",
  "primefield",
+]
+
+[[package]]
+name = "write-fonts"
+version = "0.48.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb731d4c4d93eacc69a1ad2f270f905788a98e4a3438267bcafbe08d3431c8d8"
+dependencies = [
+ "font-types 0.11.3",
+ "indexmap",
+ "kurbo",
+ "log",
+ "read-fonts 0.39.2",
 ]
 
 [[package]]
@@ -7686,14 +8104,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9cc00251562a284751c9973bace760d86c0276c471b4be569fe6b068ee97a56"
 
 [[package]]
+name = "xml"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f45bb2c13fec6a6cb4c0f76a7e94839e110a14ec803ec2940777a94c347bc52"
+
+[[package]]
 name = "xml-rs"
 version = "0.8.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7"
 
 [[package]]
+name = "xmp-writer"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9440ea3e5aeabb0ac63af70daf835274065238cdd0cec83418f417eae38bacee"
+
+[[package]]
 name = "xtask"
+<<<<<<< HEAD
 version = "0.15.0"
+=======
+version = "0.13.0-rc.1"
+>>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "image",
  "mailcraft-charset",

@@ -513,24 +513,38 @@ fn take_in(s: &mut Session, result: EwsMailResult) -> CmdResult {
         errors.insert(0, mailcraft_i18n::fmt(lang.t("The certificate of the server of {name} needs your say"), &[("name", &name)]));
     }
     // The folders that hold a change that can't be taken in stay where they were, and are named as
-    // the owner knows them (no id, no state): one line each, up to a few.
-    let blocked: Vec<String> = result
-        .blocked
-        .iter()
-        .filter_map(|id| s.mailbox.folder_by_server(account, id).and_then(|f| s.mailbox.folder(f)).map(|f| sync_progress::shown(&f.name)))
-        .take(MAX_BLOCKED_SHOWN)
-        .collect();
-    for folder in &blocked {
-        errors.push(mailcraft_i18n::fmt(lang.t("{folder} couldn't be read from the server"), &[("folder", folder)]));
+    // the owner knows them (no id, no state), with what kind of change it was and, when the answer
+    // had one, the subject of its item: one line each, up to a few.
+    let reasons: std::collections::HashMap<&str, &mailcraft_model::sync::UnreadableChange> =
+        result.unreadable.iter().map(|change| (change.folder.as_str(), change)).collect();
+    let mut blocked: Vec<String> = Vec::new();
+    for id in result.blocked.iter().take(MAX_BLOCKED_SHOWN) {
+        let Some(folder) = s.mailbox.folder_by_server(account, id).and_then(|f| s.mailbox.folder(f)) else { continue };
+        let name = sync_progress::shown(&folder.name);
+        let line = match reasons.get(id.as_str()) {
+            Some(change) if !change.subject.is_empty() => mailcraft_i18n::fmt(
+                lang.t("{folder}: “{subject}” couldn't be read from the server"),
+                &[("folder", &name), ("subject", &sync_progress::shown(&change.subject))],
+            ),
+            Some(change) if !change.kind.is_empty() => {
+                mailcraft_i18n::fmt(lang.t("{folder}: the server's {kind} couldn't be taken in"), &[("folder", &name), ("kind", &change.kind)])
+            }
+            _ => mailcraft_i18n::fmt(lang.t("{folder} couldn't be read from the server"), &[("folder", &name)]),
+        };
+        blocked.push(name);
+        errors.push(line);
     }
     // Send/Receive Progress: where the run is, what it brought, what went wrong.
-    let step = match (&result.progress, &result.folders) {
-        (Some(progress), _) => {
+    let step = match (&result.up, &result.progress, &result.folders) {
+        // (The changes that went up: how many of how many, no folder, so that a long push shows a
+        // bar moving rather than a spinner saying only that it is at the folders.)
+        (Some(up), _, _) => Some((SyncPhase::Folders, String::new(), up.done.min(up.total), up.total)),
+        (None, Some(progress), _) => {
             let name = s.mailbox.folder_by_server(account, &progress.folder).and_then(|f| s.mailbox.folder(f)).map(|f| f.name.as_str());
             Some((SyncPhase::NewMail, sync_progress::shown(name.unwrap_or_default()), progress.read.min(progress.total), progress.total))
         }
-        (None, Some(_)) => Some((SyncPhase::Folders, String::new(), 0, 0)),
-        (None, None) => None,
+        (None, None, Some(_)) => Some((SyncPhase::Folders, String::new(), 0, 0)),
+        (None, None, None) => None,
     };
     let piece = Piece {
         step,
