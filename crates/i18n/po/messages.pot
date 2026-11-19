@@ -6093,6 +6093,11 @@ msgid "Interface theme"
 msgstr ""
 
 #. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Internet message (.eml)"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/import_pst.rs
 msgid "Into your contacts on this computer, each marked as imported from the file."
 msgstr ""
@@ -9601,6 +9606,11 @@ msgstr ""
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 msgid "Outgoing mail (SMTP)"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Outlook Message (.msg)"
 msgstr ""
 
 #. command label

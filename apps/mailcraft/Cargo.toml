@@ -22,6 +22,8 @@ image = { workspace = true }
 tempfile = { workspace = true }
 mailcraft-host = { workspace = true }
 mailcraft-ui-egui = { workspace = true }
+# Dragging a message out of the window: OLE on Windows, XDND on Linux.
+mailcraft-drag-out = { workspace = true }
 # The control key file's location (shared with the MCP bridge).
 mailcraft-control-key = { workspace = true }
 # Sockets: Send/Receive runs on a background thread.
@@ -143,6 +145,11 @@ windows = { version = "0.62", features = [
 ] }
 # A `.p12` goes to the Windows Runtime's import as base64 text (`key_holders/windows_store.rs`).
 base64 = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Dragging a file out of the window on Wayland: a data source on the window's own wl_display, the
+# one thing winit leaves unimplemented (`drag_out`). MIT OR Apache-2.0.
+limn-dnd = "0.1.43"
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
 # Probe X11 before choosing it for close-to-tray, so a stale DISPLAY keeps native Wayland.

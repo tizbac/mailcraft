@@ -7374,6 +7374,11 @@ msgid "Interface theme"
 msgstr "Tema interfeței"
 
 #. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Internet message (.eml)"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/import_pst.rs
 #, fuzzy
 msgid "Into your contacts on this computer, each marked as imported from the file."
@@ -11611,6 +11616,11 @@ msgstr "Mesaje de trimis"
 #, fuzzy
 msgid "Outgoing mail (SMTP)"
 msgstr "E-mail de ieșire (SMTP)"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Outlook Message (.msg)"
+msgstr ""
 
 #. command label
 #: crates/ui-egui/src/lib.rs

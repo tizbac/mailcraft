@@ -1,0 +1,1 @@
+- A message saved as an Outlook `.msg` file opens in Outlook: the file is marked as a message at its root (the class Outlook looks for), its message flags are the long they are, its text is null-terminated, and its recipients and attachments say what they are.

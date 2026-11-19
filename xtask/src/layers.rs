@@ -80,6 +80,9 @@ pub const TABLE: &[(&str, Class)] = &[
     ("mailcraft", Class::Exempt),
     ("cli", Class::Exempt),
     ("web", Class::Exempt),
+    // Dragging files out of the window: the platform's C interfaces, kept apart so that no other
+    // crate needs unsafe.
+    ("drag-out", Class::Exempt),
     ("xtask", Class::Exempt),
 ];
 

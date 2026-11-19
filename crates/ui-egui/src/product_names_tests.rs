@@ -68,6 +68,7 @@ const ALLOWED_PHRASES: &[(&str, &str)] = &[
     ("Sync with Outlook", "File › Info's line for what is kept in step with the mailbox's server (#661)"),
     ("Add to Outlook", "sends a category kept on this computer only to the mailbox's server (#661)"),
     ("Outlook's colours", "the 25 colours a category takes on the mailbox's server (#661)"),
+    ("Outlook Message", "the name of the .msg file format, as File › Options offers it"),
     ("what you see in Outlook", "an account kept in step through Microsoft Graph shows the same mail"),
     ("Out of Office", "the plain phrase for being away, a show-as state, not a product"),
 ];
