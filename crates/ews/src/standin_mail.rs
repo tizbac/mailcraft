@@ -609,19 +609,30 @@ impl State {
         };
         // Where the read goes on from: the state it was given, or the start.
         enum From {
-            Listing { done: usize, rev: u64 },
-            Since(u64),
+            Listing {
+                done: usize,
+                rev: u64,
+            },
+            /// `since` is the revision the folder was last read to; `from` the revision its list of
+            /// changes of read state began at, which a server that repeats the read states it
+            /// already sent keeps in the state it hands back (#252).
+            Since {
+                since: u64,
+                from: u64,
+            },
         }
         let from = match parts.get(2).copied().flatten() {
             None => From::Listing { done: 0, rev: self.rev },
             Some(node) => {
                 Check::is(node, MESSAGES, "SyncState", &[])?;
                 Check::no_children(node)?;
+                let number = |t: &str| t.parse().map_err(|_| invalid("bad state"));
                 match self.state_parts(node.text.trim()).as_deref() {
                     Some(["i", id, done, rev]) if *id == folder.id => {
                         From::Listing { done: done.parse().map_err(|_| invalid("bad state"))?, rev: rev.parse().map_err(|_| invalid("bad state"))? }
                     }
-                    Some(["d", id, rev]) if *id == folder.id => From::Since(rev.parse().map_err(|_| invalid("bad state"))?),
+                    Some(["d", id, rev]) if *id == folder.id => From::Since { since: number(rev)?, from: number(rev)? },
+                    Some(["d", id, rev, start]) if *id == folder.id => From::Since { since: number(rev)?, from: number(start)? },
                     _ => return Ok(invalid_state("SyncFolderItems")),
                 }
             }
@@ -641,8 +652,24 @@ impl State {
                     (self.state_text(&["i", &folder.id, &reached.to_string(), &rev.to_string()]), false)
                 }
             }
-            From::Since(since) => {
+            From::Since { since, from } => {
                 let log: Vec<&ItemLog> = self.item_log.iter().filter(|l| l.rev > since && l.folder == folder.id).collect();
+                // (Grommunio answers each page of a folder it is catching up on with the read
+                // states of the changes it already told of, ahead of the new ones (#252).)
+                if self.repeats_read_flags {
+                    for entry in
+                        self.item_log.iter().filter(|l| l.folder == folder.id && l.rev > from && l.rev <= since && l.kind == ItemChange::Read)
+                    {
+                        if let Some(item) = self.item(&entry.id) {
+                            changes.push_str(&format!(
+                                "<t:ReadFlagChange><t:ItemId Id=\"{}\" ChangeKey=\"{}\"/><t:IsRead>{}</t:IsRead></t:ReadFlagChange>",
+                                escape(&item.id),
+                                escape(&item.change_key),
+                                item.read
+                            ));
+                        }
+                    }
+                }
                 let mut reached = since;
                 for entry in log.iter().take(max) {
                     reached = entry.rev;
@@ -670,7 +697,11 @@ impl State {
                 if !more {
                     reached = self.rev.max(reached);
                 }
-                (self.state_text(&["d", &folder.id, &reached.to_string()]), !more)
+                let state = match (self.repeats_read_flags, more) {
+                    (true, true) => self.state_text(&["d", &folder.id, &reached.to_string(), &from.to_string()]),
+                    _ => self.state_text(&["d", &folder.id, &reached.to_string()]),
+                };
+                (state, !more)
             }
         };
         let inner = format!(

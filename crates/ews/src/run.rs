@@ -56,9 +56,11 @@ use crate::items::{GetItemConversations, GetItemMime, GetItemRecipients, MAX_CON
 use crate::reply::Reply;
 use crate::soap::Element;
 
-/// How many changes one page of a folder asks for: enough that a large folder is a few hundred
-/// requests, few enough that a page is quick to take in.
-pub const PAGE: u32 = 200;
+/// How many changes one page of a folder asks for: the most the schema allows, so a large folder is
+/// as few requests as it can be. A server that works through a long list of read states sends the
+/// ones it already sent along with each new page (#252), so the traffic of a folder grows with the
+/// square of its pages: asking for the biggest page cuts it to a quarter of what 200 would.
+pub const PAGE: u32 = 512;
 /// How many times one request is made again for a busy server.
 const BUSY_TRIES: u32 = 3;
 /// The most folders one run reads, and the most pages of one folder.
@@ -149,6 +151,8 @@ pub(crate) struct Run<'a, E: HttpExchange> {
     pub(crate) flag_lacking: bool,
     /// A read-state change that said no state was passed over: said once a run, with no id.
     pub(crate) read_unsaid: bool,
+    /// A page carried more read states than a page takes in: said once a run, with how many.
+    pub(crate) read_overflow: bool,
     /// The ids of the server's other own folders ([`OWN`]) it has, as far as it said (#779): a
     /// change of one is never sent.
     pub(crate) own: HashSet<String>,
@@ -175,6 +179,7 @@ impl<'a, E: HttpExchange> Run<'a, E> {
             shape: Shape::Full,
             flag_lacking: false,
             read_unsaid: false,
+            read_overflow: false,
             own: HashSet::new(),
             reread_folders: false,
             needs_change_key: false,
@@ -696,6 +701,13 @@ impl<E: HttpExchange> Run<'_, E> {
                     if page.read_unsaid > 0 && !self.read_unsaid {
                         self.read_unsaid = true;
                         log::info!("ews mail: the server gave a read-state change that says no state; it is passed over");
+                    }
+                    if page.read_left_out > 0 && !self.read_overflow {
+                        self.read_overflow = true;
+                        log::warn!(
+                            "ews mail: a page carried {} read-state changes more than a page takes in; the newest are kept, the rest are left out, and the folder goes on from the state the server gave",
+                            page.read_left_out
+                        );
                     }
                     page
                 }
