@@ -183,7 +183,7 @@ fn the_print_dialog_prints_with_what_the_owner_chose() {
         Ok("job 7 on Office laser".to_owned())
     }));
     r.app.execute("mail.select", json!({"id": r.rich})).unwrap();
-    let mut ask = Ask::open(&r.app).unwrap_or_else(|why| panic!("the dialog opened: {why}"));
+    let mut ask = Ask::open(&r.app, 0).unwrap_or_else(|why| panic!("the dialog opened: {why}"));
     // The system's default printer is the one marked default.
     assert_eq!(ask.printer.as_deref(), Some("Home inkjet"));
     assert_eq!(printers(&r.app).len(), 2);
@@ -198,13 +198,13 @@ fn the_print_dialog_prints_with_what_the_owner_chose() {
     assert!(job.pdf.starts_with(b"%PDF-"), "the pages handed over are a PDF");
     // Nothing selected: the dialog says so, and prints nothing.
     r.app.execute("mail.select", json!({"ids": []})).unwrap();
-    assert!(Ask::open(&r.app).is_err(), "nothing to print");
+    assert!(Ask::open(&r.app, 0).is_err(), "nothing to print");
 }
 
 #[test]
 fn without_a_spooler_the_dialog_says_so() {
     let mut r = rig();
     r.app.execute("mail.select", json!({"id": r.plain})).unwrap();
-    let why = Ask::open(&r.app).err().expect("no printer here");
+    let why = Ask::open(&r.app, 0).err().expect("no printer here");
     assert!(why.contains("printing isn't available"), "{why}");
 }
