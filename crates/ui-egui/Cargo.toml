@@ -14,6 +14,8 @@ mailcraft-time = { workspace = true }
 mailcraft-i18n = { workspace = true }
 mailcraft-model = { workspace = true }
 mailcraft-html = { workspace = true }
+# A message set on paper as a PDF, from the same display blocks the reading pane draws (gap 15).
+mailcraft-print = { workspace = true }
 mailcraft-engine = { workspace = true }
 mailcraft-host = { workspace = true }
 # The emoji faces, behind a feature of their own since egui 0.37 (#832).

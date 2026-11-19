@@ -1,0 +1,1 @@
+| 2026-11-19 | minor | `print` added to the layer table (L2): a crate that sets a message's pages from `html`'s display blocks — its heading, formatting, lists, tables and pictures — on A4 or Letter, with the caps on picture bytes, sides, pixels and sheets |
