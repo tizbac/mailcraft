@@ -8,7 +8,7 @@
 
 | Tab | Has a command | Complete | In scope |
 |---|---|---|---|
-| File | 21 | 0 | 24 |
+| File | 22 | 0 | 24 |
 | Quick Access | 3 | 0 | 3 |
 | Search | 12 | 0 | 13 |
 | Home | 55 | 0 | 62 |
@@ -34,7 +34,6 @@
 
 | Tab | Group | Feature | Command id |
 |---|---|---|---|
-| File | Backstage | Print | `file.print` |
 | File | Backstage | Mailbox Cleanup | `file.cleanup` |
 | File | Backstage | Open Data File | `file.openDataFile` |
 | Search | Options | Search Folders | `folder.newSearchFolder` |

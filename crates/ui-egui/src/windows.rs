@@ -1320,10 +1320,13 @@ fn show_native(app: &mut MailApp, ctx: &egui::Context, window: &mut Open, last: 
             let waits = !app.asking.is_empty() || window.what.form().is_some_and(Form::waiting);
             crate::keys::gate(&ctx, waits);
         }
-        // A dialog about the message written here (Check Names' choice, or one its ribbon or keys
-        // opened: Insert Link, Word Count…) comes up over this window, not over the main one
-        // behind it, and has its keys.
-        let dialog_here = |app: &MailApp, window: &Open| !inside && window.what.compose().is_some() && dialog_compose(app) == window.what.compose();
+        // A dialog about what is written or read here (Check Names' choice, printing this message)
+        // comes up over this window, not over the main one behind it, and has its keys.
+        let dialog_here = |app: &MailApp, window: &Open| {
+            !inside
+                && (window.what.compose().is_some() && dialog_compose(app) == window.what.compose()
+                    || app.dialog.as_ref().and_then(crate::dialogs::Dialog::window) == Some(window.id));
+        };
         let wish = if dialog_here(app, window) { Keys::default() } else { keys_of(&ctx, window, ui.layer_id()) };
         if !inside {
             place_native(app, &ctx, window, kind);
@@ -1506,8 +1509,12 @@ enum Action {
 /// deleted the message and the window should close.
 fn actions(app: &mut MailApp, ui: &mut Ui, m: &Arc<Message>, id: u64, own_keys: bool, toolbar: bool) -> bool {
     let flagged = m.flag == FlagStatus::Flagged;
-    let mut row: Vec<(&str, &str, &'static str, Action, &'static str)> =
-        crate::reading::ACTIONS.iter().map(|(icon, label, command)| (*icon, *label, *command, Action::Run(command), hit_kind(command))).collect();
+    let mut row: Vec<(&str, &str, &'static str, Action, &'static str)> = crate::reading::ACTIONS
+        .iter()
+        // (Print is here only where the window has a spooler to hand pages to.)
+        .filter(|(.., command)| *command != "ui.printDialog" || app.services.print.is_some())
+        .map(|(icon, label, command)| (*icon, *label, *command, Action::Run(command), hit_kind(command)))
+        .collect();
     row.push(("flag", if flagged { "Clear Flag" } else { "Flag" }, "mail.toggleFlag", Action::Flag, "windowFlag"));
     let (icon, label, command) =
         if m.read { ("markUnread", "Mark as unread", "mail.markUnread") } else { ("markRead", "Mark as read", "mail.markRead") };
@@ -1532,8 +1539,9 @@ fn actions(app: &mut MailApp, ui: &mut Ui, m: &Arc<Message>, id: u64, own_keys: 
     if toolbar {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
-            for (n, (icon, label, command, action, kind)) in row.iter().enumerate() {
-                if n == 3 || n == 4 {
+            for (icon, label, command, action, kind) in &row {
+                // (A little room between the respond group, Delete, and the marks.)
+                if matches!(*command, "mail.delete" | "mail.toggleFlag") {
                     ui.add_space(8.0);
                 }
                 let key = crate::widgets::shortcut_text(app, command);
@@ -1576,7 +1584,8 @@ fn actions(app: &mut MailApp, ui: &mut Ui, m: &Arc<Message>, id: u64, own_keys: 
         },
         Action::Run(command) => {
             // Replying and forwarding are written in a window of their own (#286); at the bound
-            // of windows, in the main window's reading pane.
+            // of windows, in the main window's reading pane. Printing asks for the window it was
+            // opened from, so its dialog comes up over that window.
             app.windows.place = Some(Opens::Window { behind: false });
             // The original is quoted as this window read it.
             let r = app.run(command, json!({"id": m.id, "window": id}));
@@ -1601,6 +1610,7 @@ fn hit_kind(command: &str) -> &'static str {
         "mail.reply" => "windowReply",
         "mail.replyAll" => "windowReplyAll",
         "mail.forward" => "windowForward",
+        "ui.printDialog" => "windowPrint",
         _ => "windowDelete",
     }
 }
