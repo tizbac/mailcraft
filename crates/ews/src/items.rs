@@ -158,18 +158,18 @@ impl SyncFolderItems {
         let Some(changes) = node.child_in(MESSAGES, "Changes") else { return Ok(page) };
         // (What the model takes in of one page: more than that is a page that can't be taken in.)
         if changes.children.len() > MAX_PAGE {
-            return Err(Error::Unreadable);
+            return Err(unreadable("a page", "more changes in it than are taken in"));
         }
         for change in changes.children.iter().filter(|c| *c.namespace == *TYPES) {
             let id = || change.child_in(TYPES, "ItemId").and_then(|id| id.attribute("Id")).filter(|id| valid_id(id));
             match change.name.as_str() {
                 "Create" | "Update" => {
                     let item = change.children.iter().find(|c| *c.namespace == *TYPES).and_then(read_item);
-                    page.messages.push(item.ok_or(Error::Unreadable)?);
+                    page.messages.push(item.ok_or_else(|| unreadable(&change.name, "an item with no usable id"))?);
                 }
-                "Delete" => page.removed.push(id().ok_or(Error::Unreadable)?.to_owned()),
+                "Delete" => page.removed.push(id().ok_or_else(|| unreadable("Delete", "no usable item id"))?.to_owned()),
                 "ReadFlagChange" => {
-                    let id = id().ok_or(Error::Unreadable)?;
+                    let id = id().ok_or_else(|| unreadable("ReadFlagChange", "no usable item id"))?;
                     match change.child_in(TYPES, "IsRead").map(|n| n.text.trim().eq_ignore_ascii_case("true")) {
                         Some(read) => page.read.push(ReadState { id: id.to_owned(), read }),
                         None => page.read_unsaid = page.read_unsaid.saturating_add(1),
@@ -180,6 +180,14 @@ impl SyncFolderItems {
         }
         Ok(page)
     }
+}
+
+/// What a page's change that can't be taken in is, for the log: the kind of change and why — never
+/// its id nor what it holds (a server's answer is hostile, and an id would name nothing to the
+/// owner anyway). The folder it is in stays where it was and is read again next time.
+fn unreadable(kind: &str, why: &str) -> Error {
+    log::warn!("ews mail: a change of kind {kind} can't be taken in ({why}); its folder stays where it was and is read again next time");
+    Error::Unreadable
 }
 
 /// `text` on one line, `most` characters at the most.
