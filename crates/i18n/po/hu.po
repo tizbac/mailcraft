@@ -23970,10 +23970,20 @@ msgid "{folder} couldn't be read from the server"
 msgstr "{folder} nem volt olvasható a szerverről."
 
 #. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder}: the server's {kind} couldn't be taken in"
+msgstr ""
+
+#. what a command says
 #: crates/model/src/sync/progress.rs
 #, fuzzy
 msgid "{folder}: {done} of {total}"
 msgstr "{folder}: {done} / {total}"
+
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder}: “{subject}” couldn't be read from the server"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/reading/signature.rs
