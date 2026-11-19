@@ -3,7 +3,7 @@
 //! The attachment verdict by file name (AU3-V3, AU3-V4): one table of names and what is done
 //! with them, so that the lists in `opening` can't drift from what is tested.
 
-use crate::opening::{BLOCKED, Chooser, Verdict, verdict_for};
+use crate::opening::{BLOCKED, Chooser, Verdict, drag_name, verdict_for};
 use Verdict::{Blocked, Macros, Open, Scripts};
 
 /// (name, verdict). Every `BLOCKED` entry has a row of its own.
@@ -290,4 +290,21 @@ fn every_blocked_kind_is_in_the_table() {
         let name = format!("a.{ext}");
         assert!(TABLE.iter().any(|(n, v)| *n == name && *v == Blocked), "{name} has no row in TABLE");
     }
+}
+
+/// The name a message dragged to a folder takes: its subject as a slug, characters that make a
+/// name odd turned into `_`, at most 64 of them, with the extension of the chosen format.
+#[test]
+fn a_dragged_message_is_named_from_its_subject() {
+    use crate::SaveMessageFormat::{Eml, Msg};
+    assert_eq!(drag_name("Quarterly report: Q3/Q4", Eml), "Quarterly_report__Q3_Q4.eml");
+    assert_eq!(drag_name("  Café — résumé  ", Msg), "Café___résumé.msg");
+    assert_eq!(drag_name("", Eml), "message.eml");
+    assert_eq!(drag_name("***", Msg), "message.msg");
+    assert_eq!(drag_name("CON", Eml), "_CON.eml", "a name Windows reserves");
+    let long = "a".repeat(200);
+    let named = drag_name(&long, Eml);
+    assert_eq!(named, format!("{}.eml", "a".repeat(64)), "at most 64 characters of it");
+    // The characters a file manager would take for folders or a shell never survive.
+    assert_eq!(drag_name("a/b\\c:d*e?f\"g<h>i|j", Eml), "a_b_c_d_e_f_g_h_i_j.eml");
 }

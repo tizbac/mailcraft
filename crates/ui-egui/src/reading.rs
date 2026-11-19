@@ -823,7 +823,10 @@ fn file_item(
     let drop_rect = Rect::from_min_max(pos2(r.max.x - crate::ribbon::DROP_W, r.min.y), r.max);
     let main_rect = Rect::from_min_max(r.min, pos2(drop_rect.min.x, r.max.y));
     let filed = m.id != 0;
-    let resp = ui.interact(main_rect, ui.make_persistent_id(("attachment", m.id, index)), Sense::click());
+    // A filed attachment can be dragged out (its chip carries its file); one not yet in a
+    // folder has nothing to write.
+    let main_sense = if filed { Sense::click_and_drag() } else { Sense::click() };
+    let resp = ui.interact(main_rect, ui.make_persistent_id(("attachment", m.id, index)), main_sense);
     let drop_sense = if filed { Sense::click() } else { Sense::hover() };
     let drop = ui.interact(drop_rect, ui.make_persistent_id(("attachmentMenu", m.id, index)), drop_sense);
     app.hit.add("attachment", attachment_key(m.id, index), main_rect);
@@ -860,6 +863,11 @@ fn file_item(
         return;
     }
     let hint = tl!("Click to select {name}; double-click to open it");
+    // Dragging the chip carries the file itself: let go over a file manager, it is written
+    // there (like a message dragged out of the list).
+    if resp.drag_started() {
+        resp.dnd_set_drag_payload(crate::mail_view::AttachmentDrag { id: m.id, index });
+    }
     let resp = resp.on_hover_text(crate::i18n::fmt(hint, &[("name", shown)]));
     if resp.double_clicked() {
         crate::attachment_preview::cancel_click(app);

@@ -20,3 +20,7 @@ reason = "rsa Marvin attack: a timing leak of a private key while it decrypts or
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0387"
 reason = "crypto-bigint 0.5 timing on secret integers; mailcraft-openpgp (rPGP 0.21) only verifies with public keys. This ignore must be removed or justified again before MailCraft signs or decrypts with a key it holds (#30 parts 5 and 6)"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0370"
+reason = "Unmaintained notice, not a vulnerability: proc-macro-error is a build-time macro of glib-macros, brought in by the Windows-only `drag` crate; nothing of it ships or runs in MailCraft. Look again when `drag` moves past 2.1.1"
