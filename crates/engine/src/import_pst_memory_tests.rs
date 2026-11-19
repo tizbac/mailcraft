@@ -157,6 +157,41 @@ fn attachments_go_to_the_content_folder_and_come_back_byte_for_byte() {
 }
 
 #[test]
+fn a_body_over_what_the_mailbox_file_keeps_inline_is_written_ahead_and_named() {
+    let dir = Temp::new("spilled-bodies");
+    let mut spec = mail("A long letter", vec![]);
+    spec.body = "The numbers are in, and the quarter was kind. ".repeat(120);
+    assert!(spec.body.len() > store::INLINE_MAX);
+    let pst = dir.pst(&file_of(vec![spec]));
+    // The body as the reader gives it, from a mailbox with no file (nothing to write beside).
+    let mut bare = Session::at(Mailbox::with_local_account("", ""), now(), 0);
+    import(&mut bare, &pst).unwrap();
+    let expected = bare
+        .mailbox
+        .messages
+        .values()
+        .next()
+        .map(|m| m.body.text.clone())
+        .filter(|text| text.len() > store::INLINE_MAX)
+        .expect("the reader gives a long body");
+    // With a file, the body is on disk before the batch is taken in, and the message names it.
+    let mut s = kept_session(&dir);
+    import(&mut s, &pst).unwrap();
+    let (id, m) = s.mailbox.messages.iter().next().map(|(id, m)| (*id, m.clone())).expect("one message");
+    assert!(m.body.text.is_empty(), "the body is not held in memory");
+    let kept = m.kept.as_deref().and_then(|k| k.text).expect("the body is named by its content");
+    assert_eq!(kept.len, expected.len() as u64);
+    assert_eq!(s.content(id, Part::Text).unwrap().as_slice(), expected.as_bytes());
+    assert_eq!(dir.blobs(), 1, "the body is a content file of its own");
+    // And a save and a reopen keep it.
+    s.run("file.save", &json!({})).unwrap();
+    drop(s);
+    let mut mb = store::open(&dir.mailbox()).unwrap().mailbox;
+    store::load_all(&dir.mailbox(), &mut mb).unwrap();
+    assert_eq!(mb.messages.values().next().map(|m| m.body.text.as_str()), Some(expected.as_str()));
+}
+
+#[test]
 fn content_written_ahead_is_not_swept_before_a_save_names_it() {
     let dir = Temp::new("sweep");
     let mut s = kept_session(&dir);

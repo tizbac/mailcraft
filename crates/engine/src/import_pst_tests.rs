@@ -1783,13 +1783,16 @@ fn a_small_file_of_rich_text_can_not_bring_more_than_the_cap() {
     let by = |subject: &str| *inbox.iter().find(|m| m.subject == subject).unwrap();
     assert_eq!(by("Bomb").body.text, "");
     assert_eq!(by("Bomb").attachments[0].name, "message body (compressed rich text).bin");
-    assert!(by("Long").body.text.len() <= 32 << 20 && by("Long").body.text.len() > 30 << 20);
+    // (The body is over what the mailbox file keeps inline: it is read through the session, which
+    // has it from the content folder the import wrote it to.)
+    let long_text = |subject: &str| s.content(by(subject).id, crate::Part::Text).expect("the body").len();
+    assert!(long_text("Long") <= 32 << 20 && long_text("Long") > 30 << 20);
     let why = texts(&answer, "notes", "why");
     assert!(why.iter().any(|w| w.contains("could not be read")), "{why:?}");
     assert!(why.iter().any(|w| w.contains("text is cut")), "{why:?}");
     assert!(by("Long").attachments.iter().any(|a| a.name == "message body.rtf"));
     // Together they stay within what one import may take from rich text.
-    let total: usize = inbox.iter().map(|m| m.body.text.len()).sum();
+    let total: usize = inbox.iter().map(|m| s.content(m.id, crate::Part::Text).map_or(0, |b| b.len())).sum();
     assert!(total as u64 <= crate::import_pst::item::RTF_TEXT_BUDGET + 4096, "{total}");
 }
 
