@@ -44,6 +44,8 @@ mailcraft-mcp = { path = "crates/mcp" }
 mailcraft-control-key = { path = "crates/control-key" }
 mailcraft-host = { path = "crates/host" }
 mailcraft-ui-egui = { path = "crates/ui-egui" }
+# Dragging a message out of the window to Explorer or a file manager (desktop only).
+mailcraft-drag-out = { path = "apps/drag-out" }
 
 # foundation
 thiserror = "2"
