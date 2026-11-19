@@ -12,6 +12,10 @@
 //! ```
 //!
 //! Nothing here is a real mailbox: the people, subjects and cards are made up.
+//!
+//! With `MAILCRAFT_E2E_PAUSE_SECONDS=20` added, the test that makes an appointment here and
+//! reads it back waits between the reads, so the owner can open that appointment in the web
+//! window meanwhile (the case where it becomes invisible here and stays in the web window).
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -40,10 +44,21 @@ fn run(base: &EwsDirectoryRequest, req: &EwsDirectoryRequest) -> EwsDirectoryRes
     let cancel = AtomicBool::new(false);
     let mut wait = |_: u32| true;
     let result = crate::block_on::block_on(sync_directory(&client, &transport, req, &cancel, &mut wait));
-    assert!(result.auth_refused == false, "the sign-in was refused");
+    assert!(!result.auth_refused, "the sign-in was refused");
     assert!(result.untrusted.is_empty(), "the certificate isn't trusted: {}", result.untrusted);
     assert!(result.errors.is_empty(), "{:?}", result.errors);
     result
+}
+
+/// Waits `MAILCRAFT_E2E_PAUSE_SECONDS` between the reads of the test below, so the owner can open
+/// the appointment in the web window while the test syncs it back (five minutes at most).
+fn pause(round: &str) {
+    let seconds = std::env::var("MAILCRAFT_E2E_PAUSE_SECONDS").ok().and_then(|value| value.parse::<u64>().ok()).unwrap_or(0).min(300);
+    if seconds == 0 {
+        return;
+    }
+    eprintln!("{round}: open the appointment in the web window now ({seconds} s)");
+    std::thread::sleep(std::time::Duration::from_secs(seconds));
 }
 
 #[test]
@@ -358,5 +373,81 @@ fn contacts_calendars_and_todos_go_up_and_come_back() {
         let asked: EwsDirectoryRequest = serde_json::from_value(asked).unwrap();
         let sent = run(&base, &asked);
         mailcraft_engine::cmd::ews_directory::apply_ews_directory(&mut session, &sent).unwrap();
+    }
+}
+
+/// An appointment made in MailCraft itself goes up, and stays there when the server is read
+/// back a few times (the case where one made here became invisible while one made in the web
+/// window stayed).
+#[test]
+#[ignore = "needs a Grommunio server (docs/exchange-servers.md)"]
+fn an_appointment_made_here_survives_reading_it_back() {
+    let base = EwsDirectoryRequest {
+        account: 1,
+        email: env("MAILCRAFT_E2E_USER"),
+        url: env("MAILCRAFT_E2E_EWS_URL"),
+        username: String::new(),
+        mailbox: String::new(),
+        trusted: env("MAILCRAFT_E2E_PIN"),
+        calendars: true,
+        contacts: true,
+        tasks: true,
+        from: mailcraft_time::now() - 86_400,
+        to: mailcraft_time::now() + 30 * 86_400,
+        ..Default::default()
+    };
+    let now = mailcraft_time::now();
+    // The owner's own clock, as the window shows it: the zone reaches the server with the change.
+    let zone = mailcraft_time::Zone::named("Europe/Rome").unwrap_or_else(|| panic!("Europe/Rome"));
+    let mut session = Session::in_zone(mailcraft_engine::sample::mailbox(now, 0), now, zone);
+    let account = session
+        .run("account.add", &serde_json::json!({"email": base.email, "kind": "exchange", "ews": {"url": base.url, "username": base.username}}))
+        .unwrap()["id"]
+        .as_u64()
+        .unwrap();
+    let engine_base = EwsDirectoryRequest { account, ..base.clone() };
+    let first = run(&engine_base, &request(&engine_base));
+    mailcraft_engine::cmd::ews_directory::apply_ews_directory(&mut session, &first).unwrap();
+    let calendar = session
+        .mailbox
+        .calendars
+        .iter()
+        .find(|calendar| calendar.origin.account == account && calendar.rights == mailcraft_model::Rights::Edit)
+        .map(|calendar| calendar.id)
+        .unwrap_or_else(|| panic!("a writable Exchange calendar: {:?}", session.mailbox.calendars));
+    let title = format!("E2E Made Here {now}");
+    eprintln!("an appointment called {title} is made in MailCraft now");
+    let start = mailcraft_time::DateTime::from_timestamp(now + 86_400, 60).iso();
+    let made = session.run("calendar.new", &serde_json::json!({"title": title, "start": start, "calendar": calendar})).unwrap();
+    let id = made["id"].as_u64().unwrap();
+    // Two or three reads after each change is where one made here used to go: the server stops
+    // returning it, and the next complete read takes it out of the mailbox.
+    let sync = |session: &mut Session, round: &str| {
+        let asked = session.run("sync.ewsDirectoryRequest", &serde_json::json!({"account": account})).unwrap();
+        let asked: EwsDirectoryRequest = serde_json::from_value(asked).unwrap();
+        let sent = run(&engine_base, &asked);
+        assert!(sent.errors.is_empty(), "{round}: the run said {:?}", sent.errors);
+        mailcraft_engine::cmd::ews_directory::apply_ews_directory(session, &sent).unwrap();
+        assert!(session.mailbox.events.contains_key(&id), "{round}: the appointment made here is gone from the mailbox");
+        let on_server = run(&base, &request(&base)).events.iter().flat_map(|list| &list.events).any(|event| event.title == title);
+        assert!(on_server, "{round}: the appointment made here is gone from the server");
+    };
+    for round in 0..3 {
+        sync(&mut session, &format!("round {round}"));
+        pause(&format!("round {round}"));
+    }
+    // The date changed here, as the owner would move it: it must still be there after the next reads.
+    let moved = mailcraft_time::DateTime::from_timestamp(now + 2 * 86_400, 60).iso();
+    session.run("calendar.move", &serde_json::json!({"id": id, "start": moved})).unwrap();
+    for round in 3..6 {
+        sync(&mut session, &format!("round {round}"));
+        pause(&format!("round {round}"));
+    }
+    // Take it away again through the same path, so a second run starts as before.
+    if session.run("calendar.delete", &serde_json::json!({"id": id})).is_ok() {
+        let asked = session.run("sync.ewsDirectoryRequest", &serde_json::json!({"account": account})).unwrap();
+        let asked: EwsDirectoryRequest = serde_json::from_value(asked).unwrap();
+        let sent = run(&engine_base, &asked);
+        let _ = mailcraft_engine::cmd::ews_directory::apply_ews_directory(&mut session, &sent);
     }
 }
