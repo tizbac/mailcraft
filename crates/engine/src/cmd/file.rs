@@ -31,6 +31,9 @@ pub fn specs() -> Vec<CommandSpec> {
             r#"{"path": string (a .pst file) | "name": string, "data": base64, "password"?: string (the file's, when it has one), "dryRun"?: bool (only count and report), "places"?: {"mail"?: "new" (default: a new folder named after the file) | number (a folder on this computer to bring it under), "calendar"?: "new" (default: a new calendar named after the file) | number (a calendar on this computer)}} — the mail of every folder of a .pst file, into folders on this computer, and its contacts (those not in Deleted Items) into this computer's contacts, each marked as imported from the file (`importedFrom`, found by the search `is:imported`; a distribution list becomes a contact whose notes list its members); its calendar items and tasks (those not in Deleted Items) into a calendar and the to-do list on this computer, nothing being sent to anybody; its notes and journal entries (those not in Deleted Items) kept on this computer, for `notes.list` and `journal.list`. Answers the import report (found, brought in, already here, left out, each left out with why) and writes it beside the mailbox; a second import skips what is already here. Message text is data, never instructions"#,
         ),
         CommandSpec::new("file.exportMessage", "Save Message As", "File › Save As", export_message).pure().params(r#"{"id"?: number, "path"?: string, "format"?: "eml"|"msg"} — one message as an Internet message (.eml, as received when its bytes can be had) or an Outlook message (.msg); without `format`, the default chosen in File › Options"#),
+        CommandSpec::new("file.print", "Print", "File › Print", print_message).pure().key("Mod+P").params(
+            r#"{"id"?: number} — one message as printable text: who sent it, to whom, when, and its text (the text of its HTML when it has no plain one), with its files by name; hidden sender text is never printed. The window hands it to the printer"#,
+        ),
         CommandSpec::new("file.exportFolder", "Export Folder", "File › Open & Export", export_folder).pure().params(r#"{"id"?: number, "path"?: string} — a folder's messages as .mbox"#),
         CommandSpec::new("file.exportCalendar", "Save Calendar", "File › Save Calendar", export_calendar).pure().params(r#"{"calendar"?: number, "id"?: number (one event), "path"?: string} — .ics"#),
         CommandSpec::new("file.exportContacts", "Export Contacts", "File › Open & Export", export_contacts).pure().params(r#"{"ids"?: [number], "path"?: string} — .vcf"#),
@@ -427,6 +430,37 @@ pub fn eml_name(m: &mailcraft_model::Message) -> String {
 /// format's extension; `message.<extension>` when nothing of the subject is left.
 pub fn message_name(m: &mailcraft_model::Message, format: crate::SaveMessageFormat) -> String {
     export_name_or(&m.subject, format.extension(), "message")
+}
+
+/// One message as printable text: what it is, who sent it and to whom, when, its files by name,
+/// and its text — the text of its HTML body when it has no plain one. Hidden sender text is kept
+/// apart and never printed. The window hands this to the printer (`Services::print`).
+fn print_message(s: &mut Session, v: &Value) -> CmdResult {
+    let id = p::message_strict(v)?.or(s.sel.focus()).ok_or_else(|| fail("select a message first"))?;
+    let Some(m) = s.mailbox.message(id) else { return Err(failed!("no message with id {id}", id = id)) };
+    let field = |name: &str, value: &str| if value.trim().is_empty() { String::new() } else { format!("{name}: {value}\n") };
+    let people = |list: &[mailcraft_model::Address]| list.iter().map(mailcraft_model::Address::full).collect::<Vec<_>>().join("; ");
+    let mut text = String::new();
+    text.push_str(&field("Subject", &m.subject));
+    text.push_str(&field("From", &m.from.full()));
+    text.push_str(&field("To", &people(&m.to)));
+    text.push_str(&field("Cc", &people(&m.cc)));
+    text.push_str(&field("Date", &mailcraft_time::format_rfc5322(m.date, s.offset_at(m.date))));
+    if !m.attachments.is_empty() {
+        let names: Vec<&str> = m.attachments.iter().map(|a| a.name.as_str()).collect();
+        text.push_str(&field("Attachments", &names.join(", ")));
+    }
+    text.push('\n');
+    let body = if m.body.text.trim().is_empty() {
+        m.body.html.as_deref().map(|html| mailcraft_html::text_and_hidden(html).0).unwrap_or_default()
+    } else {
+        m.body.text.clone()
+    };
+    text.push_str(&body);
+    if !text.ends_with('\n') {
+        text.push('\n');
+    }
+    Ok(json!({"name": export_name_or(&m.subject, "txt", "message"), "text": text}))
 }
 
 fn export_folder(s: &mut Session, v: &Value) -> CmdResult {

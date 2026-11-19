@@ -12349,6 +12349,11 @@ msgstr "Tylko poczta główna"
 msgid "Primary, Social, Promotions, Updates and Forums, as Gmail sorts your Inbox. Your mail stays in the Inbox."
 msgstr "Główne, Społeczności, Oferty, Aktualności i Fora, tak jak Gmail sortuje skrzynkę odbiorczą. Twoja poczta pozostaje w skrzynce odbiorczej."
 
+#. command label, ribbon, ribbon location
+#: crates/engine/src/cmd/file.rs crates/ui-egui/src/ribbon.rs
+msgid "Print"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AboutPages.kt
 #, fuzzy

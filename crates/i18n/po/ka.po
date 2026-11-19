@@ -12281,6 +12281,11 @@ msgstr "მხოლოდ „მთავარში“ მოსული ფ
 msgid "Primary, Social, Promotions, Updates and Forums, as Gmail sorts your Inbox. Your mail stays in the Inbox."
 msgstr "„მთავარი“, „სოციალური“, „აქციები“, „განახლებები“ და „ფორუმები“, როგორც Gmail ახარისხებს თქვენს „შემოსულებს“. თქვენი ფოსტა „შემოსულებში“ რჩება."
 
+#. command label, ribbon, ribbon location
+#: crates/engine/src/cmd/file.rs crates/ui-egui/src/ribbon.rs
+msgid "Print"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AboutPages.kt
 #, fuzzy

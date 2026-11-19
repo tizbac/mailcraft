@@ -510,6 +510,7 @@ fn home_mail(app: &MailApp) -> Tab {
                 Item::small("forwardAsAttachment", "Forward as Attachment", "", "mail.forwardAsAttachment", no()).under("mail.forward"),
                 Item::small("delete", "Reply and Delete", "", "mail.replyAndDelete", no()).under("mail.reply"),
                 Item::small("open", "View Source", "", "mail.viewSource", no()).under("mail.forward"),
+                Item::small("print", "Print", "", "file.print", no()).under("mail.forward"),
                 Item::small("meeting", "Meeting", "Reply with Meeting", "calendar.fromMessage", no()).at(5, 6),
                 Item::small("newContact", "Add Sender", "Add to Contacts", "people.fromMessage", no()).at(5, 7),
             ],
