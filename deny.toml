@@ -38,6 +38,11 @@ ignore = [
     # rPGP moves to rsa 0.10 / crypto-bigint 0.7.
     { id = "RUSTSEC-2023-0071", reason = "rsa Marvin attack: private-key timing; mailcraft-openpgp only verifies with public keys; remove or justify again before MailCraft signs or decrypts with a key it holds (#30 parts 5 and 6)" },
     { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5 timing on secret integers; mailcraft-openpgp only verifies with public keys; remove or justify again before MailCraft signs or decrypts with a key it holds (#30 parts 5 and 6)" },
+    # 2026-11-19: the `drag` crate (2.1.1, for dragging files out on Windows) brings glib 0.18,
+    # whose build-time macro uses proc-macro-error 1.0.4, whose maintainer is gone. A proc macro
+    # run while building, not a library that ships or handles mail. Look again when `drag` moves
+    # past 2.1.1.
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error (build-time macro of glib-macros, through the Windows-only drag crate) is unmaintained, not a vulnerability; nothing of it runs in MailCraft" },
 ]
 
 [licenses]
