@@ -3207,11 +3207,7 @@ checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
 name = "mailcraft"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "apple-native-keyring-store",
  "arboard",
@@ -3284,11 +3280,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-assuan"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "proptest",
  "thiserror 2.0.21",
@@ -3296,19 +3288,11 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-ber"
-<<<<<<< HEAD
 version = "0.15.0"
 
 [[package]]
 name = "mailcraft-charset"
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
-
-[[package]]
-name = "mailcraft-charset"
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "base64 0.23.1",
  "encoding_rs",
@@ -3317,11 +3301,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-cli"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-charset",
  "mailcraft-engine",
@@ -3336,22 +3316,14 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-control-key"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "ring",
 ]
 
 [[package]]
 name = "mailcraft-dav"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-ical",
  "mailcraft-link",
@@ -3374,11 +3346,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-engine"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "image",
  "libc",
@@ -3408,11 +3376,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-ews"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "hmac 0.13.0",
  "log",
@@ -3429,11 +3393,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-host"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "log",
  "mailcraft-engine",
@@ -3446,11 +3406,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-html"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-link",
  "mailcraft-names",
@@ -3461,22 +3417,14 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-i18n"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "proptest",
 ]
 
 [[package]]
 name = "mailcraft-ical"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-model",
  "mailcraft-time",
@@ -3485,11 +3433,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-jmap"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "log",
  "mailcraft-charset",
@@ -3504,11 +3448,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-jmap-types"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "proptest",
  "serde",
@@ -3517,11 +3457,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-link"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-names",
  "proptest",
@@ -3529,11 +3465,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-mcp"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "log",
  "mailcraft-control-key",
@@ -3546,11 +3478,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-mime"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-ber",
  "mailcraft-charset",
@@ -3564,11 +3492,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-mime-model"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "cfb",
  "mailcraft-html",
@@ -3582,11 +3506,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-mobile"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "jni",
  "log",
@@ -3609,11 +3529,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-model"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-charset",
  "mailcraft-i18n",
@@ -3628,22 +3544,14 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-names"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "proptest",
 ]
 
 [[package]]
 name = "mailcraft-net"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "cryptoki",
  "flate2",
@@ -3668,11 +3576,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-openpgp"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "ed25519-dalek",
  "mailcraft-names",
@@ -3698,11 +3602,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-proto"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "log",
  "mailcraft-charset",
@@ -3712,11 +3612,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-pst"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-charset",
  "proptest",
@@ -3724,11 +3620,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-smime"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "aes 0.9.4",
  "cbc",
@@ -3759,11 +3651,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-time"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "jiff",
  "js-sys",
@@ -3773,11 +3661,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-tnef"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-charset",
  "mailcraft-pst",
@@ -3786,11 +3670,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-ui-egui"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "egui",
  "egui_kittest",
@@ -3820,11 +3700,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-vcard"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "mailcraft-charset",
  "mailcraft-model",
@@ -3835,11 +3711,7 @@ dependencies = [
 
 [[package]]
 name = "mailcraft-web"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "eframe",
  "egui",
@@ -8123,11 +7995,7 @@ checksum = "9440ea3e5aeabb0ac63af70daf835274065238cdd0cec83418f417eae38bacee"
 
 [[package]]
 name = "xtask"
-<<<<<<< HEAD
 version = "0.15.0"
-=======
-version = "0.13.0-rc.1"
->>>>>>> 374150ee1 (ews: a folder's page of changes is taken in whole, and its read states counted apart (#252))
 dependencies = [
  "image",
  "mailcraft-charset",

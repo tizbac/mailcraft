@@ -31,6 +31,7 @@ mailcraft-pst = { path = "crates/pst" }
 mailcraft-tnef = { path = "crates/tnef" }
 mailcraft-openpgp = { path = "crates/openpgp" }
 mailcraft-smime = { path = "crates/smime" }
+mailcraft-print = { path = "crates/print" }
 mailcraft-proto = { path = "crates/proto" }
 mailcraft-assuan = { path = "crates/assuan" }
 mailcraft-jmap-types = { path = "crates/jmap-types" }

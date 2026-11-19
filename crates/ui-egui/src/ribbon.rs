@@ -562,6 +562,7 @@ fn home_mail(app: &MailApp) -> Tab {
                 Item::small("forwardAsAttachment", "Forward as Attachment", "", "mail.forwardAsAttachment", no()).under("mail.forward"),
                 Item::small("delete", "Reply and Delete", "", "mail.replyAndDelete", no()).under("mail.reply"),
                 Item::small("open", "View Source", "", "mail.viewSource", no()).under("mail.forward"),
+                Item::small("print", "Print", "", "ui.printDialog", no()).under("mail.forward"),
                 Item::small("meeting", "Meeting", "Reply with Meeting", "calendar.fromMessage", no()).at(5, 6),
                 Item::small("newContact", "Add Sender", "Add to Contacts", "people.fromMessage", no()).at(5, 7),
             ],
@@ -3472,7 +3473,17 @@ mod tests {
                 ("Delete", vec!["Delete", "Archive", "Junk", "Delete Permanently"]),
                 (
                     "Respond",
-                    vec!["Reply", "Reply\nAll", "Forward", "Forward as Attachment", "Reply and Delete", "View Source", "Meeting", "Add Sender"]
+                    vec![
+                        "Reply",
+                        "Reply\nAll",
+                        "Forward",
+                        "Forward as Attachment",
+                        "Reply and Delete",
+                        "View Source",
+                        "Print",
+                        "Meeting",
+                        "Add Sender"
+                    ]
                 ),
                 ("Move", vec!["Move", "Rules", "Resend Message"]),
                 ("Tags", vec!["Unread/\nRead", "Categorize", "Follow\nUp", "Pin"]),

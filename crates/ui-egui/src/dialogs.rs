@@ -160,6 +160,9 @@ pub enum Dialog {
     /// File › Info › Automatic Replies ([`crate::auto_replies`]): it only collects what the owner
     /// wants, then runs `account.setAutomaticReplies`.
     AutomaticReplies(Box<crate::auto_replies::Draft>),
+    /// Print a message ([`crate::print`]): the printer, the copies, the sheet; Print runs
+    /// `file.print` with what the owner chose (gap 15).
+    Print(Box<crate::print::Ask>),
     /// What is in a folder of mbox files, before it is imported ([`crate::import_tree`]).
     ImportTree(Box<crate::import_tree::ImportTree>),
     /// A .pst file, before and while its mail is imported ([`crate::import_pst`]).
@@ -288,6 +291,15 @@ impl Dialog {
         }
     }
 
+    /// The window of its own a dialog belongs to, when it does: the message window that asked to
+    /// print (`0`: the main window).
+    pub(crate) fn window(&self) -> Option<u64> {
+        match self {
+            Dialog::Print(ask) => Some(ask.window),
+            _ => None,
+        }
+    }
+
     /// The name `ui.dialog` opens it by (and `ui.inspect` reports).
     pub fn name(&self) -> &'static str {
         match self {
@@ -319,6 +331,7 @@ impl Dialog {
             Dialog::Meeting(d) => d.name(),
             Dialog::FolderProperties(_) => "folderProperties",
             Dialog::AutomaticReplies(_) => "automaticReplies",
+            Dialog::Print(_) => "print",
             Dialog::ImportTree(_) => "importTree",
             Dialog::ImportPst(_) => "importPst",
             Dialog::MergeContacts(_) => "mergeContacts",
@@ -373,6 +386,7 @@ impl Dialog {
                 }
             }
             "goToDate" => Dialog::GoToDate { text: app.session.view.date.iso(), error: String::new() },
+            "printDialog" => Dialog::Print(Box::new(crate::print::Ask::open(app, params.get("window").and_then(Value::as_u64).unwrap_or(0)).ok()?)),
             "addReminder" => Dialog::AddReminder(crate::reminder_dialog::AddReminder::open(app, crate::reminder_dialog::Target::Messages)?),
             "followUpDate" => Dialog::AddReminder(crate::reminder_dialog::AddReminder::open(app, crate::reminder_dialog::Target::Composing)?),
             "moveItems" | "copyItems" => Dialog::MoveItems(crate::move_items::MoveItems::open(app, name == "copyItems")?),
@@ -2281,17 +2295,24 @@ pub(crate) fn scrim_layer() -> egui::LayerId {
 /// The frame shared by the dialogs: a centred window with a title. Returns `false` when it was
 /// closed with its close button.
 pub(crate) fn window(ctx: &egui::Context, title: &str, width: f32, add: impl FnOnce(&mut Ui)) -> bool {
+    window_over(ctx, title, width, ctx.content_rect(), add).0
+}
+
+/// The same, centred on `over`: the whole screen for the main window, the place of a window of
+/// its own for a dialog that belongs to it. Answers whether it is open and where it stands.
+pub(crate) fn window_over(ctx: &egui::Context, title: &str, width: f32, over: egui::Rect, add: impl FnOnce(&mut Ui)) -> (bool, egui::Rect) {
     let mut open = true;
     let id = egui::Id::unique("dialog");
     // A click on the scrim lifts it to the top of its order, over the dialog, where it would take
     // every click after (Escape alone still answered): the dialog goes back above it each frame.
     ctx.move_to_top(egui::LayerId::new(egui::Order::Middle, id));
-    egui::Window::new(egui::RichText::new(title).font(semibold(14.0)))
+    let shown = egui::Window::new(egui::RichText::new(title).font(semibold(14.0)))
         .id(id)
         .open(&mut open)
         .collapsible(false)
         .resizable(false)
         .anchor(Align2::CENTER_CENTER, vec2(0.0, -40.0))
+        .constrain_to(over)
         .default_width(width)
         .min_width(width)
         .max_width(width)
@@ -2299,7 +2320,7 @@ pub(crate) fn window(ctx: &egui::Context, title: &str, width: f32, add: impl FnO
             ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
             add(ui);
         });
-    open
+    (open, shown.map(|r| r.response.rect).unwrap_or(egui::Rect::NOTHING))
 }
 
 /// A row of buttons along the right edge, one button high and no more. (A right-to-left layout
@@ -3210,6 +3231,16 @@ pub fn show(app: &mut MailApp, ctx: &egui::Context) {
             let mut done = false;
             let title = dialog.title();
             let open = window(ctx, &title, crate::auto_replies::WIDTH, |ui| done = dialog.show(app, ui));
+            close |= !open || done;
+        }
+        Dialog::Print(dialog) => {
+            let mut done = false;
+            // The dialog stands over the window the message was opened in, when it has one: a
+            // window of the system draws it inside itself ([`crate::windows::show`]), one folded
+            // into the main window is centred on it here.
+            let over = Some(dialog.window).filter(|w| *w != 0).and_then(|w| app.hit.rect("window", w)).unwrap_or_else(|| ctx.content_rect());
+            let (open, place) = window_over(ctx, tl!("Print"), crate::print::WIDTH, over, |ui| done = dialog.show(app, ui));
+            app.hit.add("printDialog", dialog.window, place);
             close |= !open || done;
         }
         Dialog::Security(security) => {

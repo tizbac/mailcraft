@@ -537,9 +537,7 @@ fn message() -> impl Strategy<Value = Message> {
             headers,
             fresh_stamps: false,
             draft: true,
-<<<<<<< HEAD
             headers_cut: false,
-=======
             pinned: true,
             warnings_dismissed: vec!["external".into()],
             forwarded: true,
@@ -566,7 +564,6 @@ fn message() -> impl Strategy<Value = Message> {
             sign_with: None,
             answers: None,
             kept: None,
->>>>>>> 352445004 (outgoing mail can be signed (#30 parts 4–5))
             original: None,
         },
     )
