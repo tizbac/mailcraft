@@ -16,7 +16,6 @@ use mailcraft_model::signing::SigningKey;
 use serde_json::json;
 
 use super::{SigningChoice, SigningHost};
-use crate::own_keys::KeyPlace;
 use crate::{MailApp, Services};
 
 const NOW: i64 = 1_794_441_600;
