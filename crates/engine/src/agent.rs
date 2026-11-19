@@ -125,6 +125,8 @@ const SAFE: &[&str] = &[
     "file.exportCalendar",
     "file.exportContacts",
     "file.info",
+    // The message as printable text; the window prints it (an agent only gets the text).
+    "file.print",
     // Reads what is known of the automatic replies (and has the window read them again).
     "account.automaticReplies",
     "edit.undo",

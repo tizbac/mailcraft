@@ -27,11 +27,7 @@ pub fn print(name: &str, text: &str) -> Result<(), String> {
 #[cfg(windows)]
 fn platform(file: &std::path::Path) -> Result<(), String> {
     // Notepad prints a text file to the default printer and exits (`/p`).
-    let status = Command::new("notepad.exe")
-        .arg("/p")
-        .arg(file)
-        .status()
-        .map_err(|why| format!("couldn't start the printer: {why}"))?;
+    let status = Command::new("notepad.exe").arg("/p").arg(file).status().map_err(|why| format!("couldn't start the printer: {why}"))?;
     if status.success() { Ok(()) } else { Err("the printer didn't take the message".to_owned()) }
 }
 

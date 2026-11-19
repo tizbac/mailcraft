@@ -6169,13 +6169,13 @@ pub fn now_ms() -> f64 {
 }
 
 #[cfg(test)]
+mod print_tests;
+#[cfg(test)]
 mod privacy_tests;
 #[cfg(test)]
 mod problem_log_tests;
 #[cfg(test)]
 mod product_names_tests;
-#[cfg(test)]
-mod print_tests;
 #[cfg(test)]
 mod shift_delete_tests;
 #[cfg(test)]

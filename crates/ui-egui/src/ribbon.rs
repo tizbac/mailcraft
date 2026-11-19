@@ -3344,7 +3344,17 @@ mod tests {
                 ("Delete", vec!["Delete", "Archive", "Junk", "Delete Permanently"]),
                 (
                     "Respond",
-                    vec!["Reply", "Reply\nAll", "Forward", "Forward as Attachment", "Reply and Delete", "View Source", "Meeting", "Add Sender"]
+                    vec![
+                        "Reply",
+                        "Reply\nAll",
+                        "Forward",
+                        "Forward as Attachment",
+                        "Reply and Delete",
+                        "View Source",
+                        "Print",
+                        "Meeting",
+                        "Add Sender"
+                    ]
                 ),
                 ("Move", vec!["Move", "Rules", "Resend Message"]),
                 ("Tags", vec!["Unread/\nRead", "Categorize", "Follow\nUp", "Pin"]),
