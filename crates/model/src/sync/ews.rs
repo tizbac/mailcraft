@@ -60,6 +60,11 @@ pub const MAX_EWS_ID: usize = 1024;
 /// Most messages one page of an answer holds.
 pub const MAX_EWS_PAGE_MESSAGES: usize = 2000;
 
+/// Most read-state changes one page of an answer holds: an id and a flag, no text, so a server
+/// working through a long list of them (Grommunio sends the read states it already sent along with
+/// each new page) can give thousands of those at once while its items stay within what was asked.
+pub const MAX_EWS_PAGE_READ: usize = 20_000;
+
 /// Most pages one piece of an answer holds.
 pub const MAX_EWS_PAGES: usize = 10_000;
 
@@ -519,7 +524,7 @@ impl EwsMailResult {
             }
         }
         for page in &self.pages {
-            if page.messages.len() > MAX_EWS_PAGE_MESSAGES || page.removed.len() > MAX_EWS_PAGE_MESSAGES || page.read.len() > MAX_EWS_PAGE_MESSAGES {
+            if page.messages.len() > MAX_EWS_PAGE_MESSAGES || page.removed.len() > MAX_EWS_PAGE_MESSAGES || page.read.len() > MAX_EWS_PAGE_READ {
                 return Err(TOO_MANY);
             }
             let message_odd = |m: &GraphMessage| !id_ok(&m.server.id) || (!m.server.folder.is_empty() && !id_ok(&m.server.folder));

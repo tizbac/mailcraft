@@ -57,7 +57,7 @@ fn the_first_run_lists_the_folders_and_downloads_the_inbox_in_pages() {
     let standin = StandIn::new();
     {
         let mut s = standin.state();
-        for n in 0..450 {
+        for n in 0..1300 {
             s.deliver("inbox", &format!("Mail {n:03}"), n % 2 == 0);
         }
     }
@@ -72,9 +72,9 @@ fn the_first_run_lists_the_folders_and_downloads_the_inbox_in_pages() {
     assert!(folders.changed.iter().all(|f| f.name != "Calendar"));
     assert!(folders.changed.iter().all(|f| f.parent.is_empty()), "folders at the top have no parent here");
     assert!(!pieces.iter().find_map(|p| (!p.hierarchy.is_empty()).then(|| p.hierarchy.clone())).unwrap().is_empty());
-    // 450 messages, 200 to a page.
+    // 1,300 messages, 512 to a page.
     let inbox_pages: Vec<_> = pieces.iter().flat_map(|p| &p.pages).filter(|page| page.messages.len() > 1).collect();
-    assert_eq!(inbox_pages.iter().map(|p| p.messages.len()).collect::<Vec<_>>(), vec![200, 200, 50]);
+    assert_eq!(inbox_pages.iter().map(|p| p.messages.len()).collect::<Vec<_>>(), vec![512, 512, 276]);
     assert!(inbox_pages[0].afresh && !inbox_pages[1].afresh, "only the first page begins a fresh read");
     assert_eq!(inbox_pages.iter().map(|p| p.last).collect::<Vec<_>>(), vec![false, false, true]);
     let first = &inbox_pages[0].messages[0];
@@ -85,6 +85,38 @@ fn the_first_run_lists_the_folders_and_downloads_the_inbox_in_pages() {
     assert!(last(&pieces).whole && !last(&pieces).partial && last(&pieces).errors.is_empty());
     // Each page comes with the state to go on from.
     assert!(pieces.iter().filter(|p| !p.pages.is_empty()).all(|p| p.pages.len() == 1 && !p.pages[0].state.is_empty()));
+}
+
+/// A server that answers every page of a folder it is catching up on with the read states it
+/// already sent (Grommunio, #252): the pages are taken in rather than refused, so the folder is
+/// not left stuck, and every item's read state comes through.
+#[test]
+fn a_folder_whose_read_states_come_back_page_after_page_is_not_stuck() {
+    let standin = StandIn::new();
+    let ids: Vec<String> = {
+        let mut s = standin.state();
+        (0..21_000).map(|n| s.deliver("inbox", &format!("Bulk read {n}"), false)).collect()
+    };
+    let (first, _) = run(&standin, &request());
+    {
+        let mut s = standin.state();
+        s.repeats_read_flags = true;
+        for id in &ids {
+            s.set_read(id, true);
+        }
+    }
+    let hierarchy = first.iter().find_map(|p| (!p.hierarchy.is_empty()).then(|| p.hierarchy.clone())).unwrap();
+    let (pieces, _) = run(&standin, &EwsMailRequest { hierarchy, states: states_of(&first), ..request() });
+    assert!(pieces.iter().all(|p| p.blocked.is_empty() && p.unreadable.is_empty()), "a page of read states is not a page that can't be taken in");
+    assert!(last(&pieces).whole && last(&pieces).errors.is_empty(), "the run ends whole");
+    let pages: Vec<usize> = pieces.iter().flat_map(|p| &p.pages).map(|page| page.read.len()).collect();
+    assert!(pages.iter().all(|n| *n <= mailcraft_model::sync::MAX_EWS_PAGE_READ), "no page hands on more read states than the model takes in");
+    assert!(pages.contains(&mailcraft_model::sync::MAX_EWS_PAGE_READ), "a page longer than the cap was taken in at its cap rather than refused");
+    // (Each page keeps the tail of its list — the states the folder hasn't had — and the earlier
+    // pages had the head, so every item's read state arrives in the run.)
+    let seen: std::collections::HashSet<String> =
+        pieces.iter().flat_map(|p| &p.pages).flat_map(|page| page.read.iter().map(|r| r.id.clone())).collect();
+    assert!(ids.iter().all(|id| seen.contains(id)), "every item's read state came through the run");
 }
 
 /// A server that leaves a folder's class out of the listing unless it is asked for (Grommunio's

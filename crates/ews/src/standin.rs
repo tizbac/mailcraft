@@ -185,6 +185,9 @@ pub struct State {
     pub busy_get_item: bool,
     /// A server that ignores `MaxChangesReturned` and gives every change it has in one answer.
     pub ignores_max: bool,
+    /// A server that sends the changes of read state it already sent at the front of every new
+    /// page of a folder while it works through a long list of them, as Grommunio does (#252).
+    pub repeats_read_flags: bool,
     /// With [`Hostile::BadItems`]: only the items of this folder (its id) are bad; empty for all.
     pub bad_items_in: String,
     /// How many ids have been given out.
@@ -286,6 +289,7 @@ impl Default for State {
             lacks_conversation: false,
             busy_get_item: false,
             ignores_max: false,
+            repeats_read_flags: false,
             bad_items_in: String::new(),
             issued: 0,
             lacks_flag: false,

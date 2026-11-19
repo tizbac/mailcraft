@@ -89,3 +89,59 @@ fn a_page_larger_than_the_model_takes_in_is_no_page() {
         (0..mailcraft_model::sync::MAX_EWS_PAGE_MESSAGES + 1).map(|n| format!("<t:Create>{}</t:Create>", bare(&format!("ID{n}")))).collect();
     assert!(matches!(page(&changes, 512).unwrap_err(), Error::Unreadable(_)));
 }
+
+#[test]
+fn a_page_of_read_state_changes_by_the_thousand_is_still_a_page() {
+    // (Grommunio sends the read states it already sent along with each new page: a folder whose mail
+    // was read in bulk answers with thousands of `ReadFlagChange`s and no items at all. They are an
+    // id and a flag, and the state says all of them have been given, so the page is taken in whole.)
+    let changes: String =
+        (0..12_000).map(|n| format!("<t:ReadFlagChange><t:ItemId Id=\"ID{n}\"/><t:IsRead>true</t:IsRead></t:ReadFlagChange>")).collect();
+    let got = page(&changes, 512).unwrap_or_else(|why| panic!("12,000 read states are a page: {why:?}"));
+    assert_eq!((got.read.len(), got.read_left_out, got.messages.len(), got.last), (12_000, 0, 0, true));
+}
+
+#[test]
+fn a_page_of_read_states_past_the_cap_keeps_the_newest_and_goes_on() {
+    // (The same server sends the read states it already sent at the front of every page, so a page
+    // can carry far more of them than a page takes in. Refusing it would leave the folder stuck at
+    // that page for good; instead the newest are kept and the repeats at the front are left out,
+    // and the state the server gave is taken in all the same.)
+    let past = mailcraft_model::sync::MAX_EWS_PAGE_READ;
+    let changes: String = (0..past + 10_000)
+        .map(|n| {
+            format!("<t:ReadFlagChange><t:ItemId Id=\"R{n}\"/><t:IsRead>{}</t:IsRead></t:ReadFlagChange>", if n % 2 == 0 { "true" } else { "false" })
+        })
+        .collect();
+    let got = page(&changes, 512).unwrap_or_else(|why| panic!("a page of {past} plus 10,000 read states is still a page: {why:?}"));
+    assert_eq!((got.read.len(), got.read_left_out, got.last), (past, 10_000, true));
+    assert_eq!(got.state, "S-NEW");
+    // (The tail, the states the folder hasn't had yet, is what is kept.)
+    assert_eq!(
+        (got.read.first().map(|r| r.id.clone()), got.read.last().map(|r| r.id.clone())),
+        (Some(format!("R{}", 10_000)), Some(format!("R{}", past + 9_999)))
+    );
+    assert!(got.read.iter().all(|r| r.id.starts_with('R')));
+    // (Items beside them are still items: they count against their own cap, not the read states'.)
+    let mixed: String = (0..1_000)
+        .map(|n| format!("<t:Create>{}</t:Create>", bare(&format!("ID{n}"))))
+        .chain((0..past + 5_000).map(|n| format!("<t:ReadFlagChange><t:ItemId Id=\"R{n}\"/><t:IsRead>true</t:IsRead></t:ReadFlagChange>")))
+        .collect();
+    let got = page(&mixed, 512).unwrap_or_else(|why| panic!("items with a long list of read states is a page: {why:?}"));
+    assert_eq!((got.messages.len(), got.read.len(), got.read_left_out), (1_000, past, 5_000));
+}
+
+#[test]
+fn a_page_of_more_items_than_are_taken_in_is_no_page() {
+    let changes: String =
+        (0..mailcraft_model::sync::MAX_EWS_PAGE_MESSAGES + 1).map(|n| format!("<t:Create>{}</t:Create>", bare(&format!("ID{n}")))).collect();
+    let why = page(&changes, 200).err();
+    assert!(why.is_some(), "more items than a page takes in is refused");
+    // (Read states beside them don't count against the items' cap.)
+    let mixed: String = (0..mailcraft_model::sync::MAX_EWS_PAGE_MESSAGES)
+        .map(|n| format!("<t:Create>{}</t:Create>", bare(&format!("ID{n}"))))
+        .chain((0..5_000).map(|n| format!("<t:ReadFlagChange><t:ItemId Id=\"R{n}\"/><t:IsRead>false</t:IsRead></t:ReadFlagChange>")))
+        .collect();
+    let got = page(&mixed, 200).unwrap_or_else(|why| panic!("items with read states beside them is a page: {why:?}"));
+    assert_eq!((got.messages.len(), got.read.len()), (mailcraft_model::sync::MAX_EWS_PAGE_MESSAGES, 5_000));
+}
