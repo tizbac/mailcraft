@@ -3,6 +3,7 @@
 //! What the directory operations read: the shapes of `FindItem`, `FindFolder` and the three kinds
 //! of item, held to what the model keeps.
 
+use mailcraft_model::Freq;
 use mailcraft_model::remote::{EventFields, RemoteEventKind};
 
 use super::*;
@@ -208,4 +209,26 @@ fn a_plain_appointment_says_it_is_not_a_meeting() {
     };
     let written = calendar_item(&meeting, "", None).write();
     assert!(!written.contains("33303"), "the server sets the flags of a meeting: {written}");
+}
+
+#[test]
+fn a_yearly_series_keeps_its_rule_and_an_appointment_is_the_owners() {
+    // Grommunio has no response status for an appointment made over EWS and says `IsOrganizer`
+    // instead: it is the owner's, not a copy of somebody else's meeting.
+    let page = find_items(
+        "<t:CalendarItem><t:ItemId Id=\"yearly-1\" ChangeKey=\"key\"/><t:Subject>Every year</t:Subject>\
+         <t:Start>2026-10-12T13:00:00Z</t:Start><t:End>2026-10-12T14:00:00Z</t:End><t:IsOrganizer>true</t:IsOrganizer>\
+         <t:Recurrence><t:AbsoluteYearlyRecurrence><t:Month>October</t:Month><t:DayOfMonth>12</t:DayOfMonth></t:AbsoluteYearlyRecurrence>\
+         <t:NumberedRecurrence><t:StartDate>2026-10-12</t:StartDate><t:NumberOfOccurrences>2</t:NumberOfOccurrences></t:NumberedRecurrence>\
+         </t:Recurrence></t:CalendarItem>",
+    );
+    let Item::Event(event) = &page.items[0] else { panic!("not an event") };
+    assert_eq!(event.recurrence.as_ref().map(|rule| (rule.freq, rule.count)), Some((Freq::Yearly, Some(2))));
+    assert_eq!(event.is_organizer, Some(true));
+    // (Without either field, an appointment whose response says Organizer is the owner's too.)
+    let page = find_items(
+        "<t:CalendarItem><t:ItemId Id=\"plain-1\"/><t:Subject>Plain</t:Subject><t:Start>2026-10-12T13:00:00Z</t:Start><t:End>2026-10-12T14:00:00Z</t:End><t:MyResponseType>Organizer</t:MyResponseType></t:CalendarItem>",
+    );
+    let Item::Event(event) = &page.items[0] else { panic!("not an event") };
+    assert_eq!(event.is_organizer, Some(true));
 }

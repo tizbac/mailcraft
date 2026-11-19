@@ -20226,8 +20226,18 @@ msgid "{folder} couldn't be read from the server"
 msgstr ""
 
 #. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder}: the server's {kind} couldn't be taken in"
+msgstr ""
+
+#. what a command says
 #: crates/model/src/sync/progress.rs
 msgid "{folder}: {done} of {total}"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder}: “{subject}” couldn't be read from the server"
 msgstr ""
 
 #. interface

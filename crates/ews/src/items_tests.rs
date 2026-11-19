@@ -64,18 +64,28 @@ fn a_change_with_no_usable_id_or_item_makes_the_page_no_page() {
     ];
     for (what, change) in bad {
         // Alone, and after changes that are fine: either way nothing of the page is handed on.
-        assert_eq!(page(&change, 10).unwrap_err(), Error::Unreadable, "{what}");
+        assert!(matches!(page(&change, 10).unwrap_err(), Error::Unreadable(_)), "{what}");
         let after = format!("<t:Create>{}</t:Create>{change}", bare("ID1"));
-        assert_eq!(page(&after, 10).unwrap_err(), Error::Unreadable, "{what}, after a good one");
+        assert!(matches!(page(&after, 10).unwrap_err(), Error::Unreadable(_)), "{what}, after a good one");
     }
     // A delete with a good id is a removal.
     let good = page("<t:Delete><t:ItemId Id=\"ID9\" ChangeKey=\"CK\"/></t:Delete>", 10).unwrap();
     assert_eq!(good.removed, ["ID9"]);
+    // What couldn't be taken in is named by the kind of change, and by its item's subject when the
+    // answer had one (for the owner's window only: the log takes neither).
+    match page("<t:Create><t:Message><t:Subject>Hello</t:Subject></t:Message></t:Create>", 10).unwrap_err() {
+        Error::Unreadable(why) => assert_eq!((why.kind.as_str(), why.subject.as_str()), ("Create", "Hello")),
+        other => panic!("{other:?}"),
+    }
+    match page("<t:Delete/>", 10).unwrap_err() {
+        Error::Unreadable(why) => assert_eq!((why.kind.as_str(), why.subject.as_str()), ("Delete", "")),
+        other => panic!("{other:?}"),
+    }
 }
 
 #[test]
 fn a_page_larger_than_the_model_takes_in_is_no_page() {
     let changes: String =
         (0..mailcraft_model::sync::MAX_EWS_PAGE_MESSAGES + 1).map(|n| format!("<t:Create>{}</t:Create>", bare(&format!("ID{n}")))).collect();
-    assert_eq!(page(&changes, 512).unwrap_err(), Error::Unreadable);
+    assert!(matches!(page(&changes, 512).unwrap_err(), Error::Unreadable(_)));
 }

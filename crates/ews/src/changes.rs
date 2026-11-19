@@ -354,7 +354,7 @@ impl UpdateItems {
         Ok(messages
             .into_iter()
             .map(|message| match message.ok() {
-                Ok(node) => first_item(node).ok_or(Error::Unreadable),
+                Ok(node) => first_item(node).ok_or(Error::Unexpected),
                 Err(error) => Err(error),
             })
             .collect())

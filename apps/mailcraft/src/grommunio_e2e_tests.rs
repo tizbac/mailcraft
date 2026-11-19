@@ -25,7 +25,7 @@ use mailcraft_model::remote::{ContactChangeKind, ContactOp, ContactsUpload, Even
 use mailcraft_model::remote_tasks::TaskResult;
 use mailcraft_model::remote_tasks::{TaskOp, TaskOpKind, TasksUpload};
 use mailcraft_model::sync::{EwsDirectoryRequest, EwsDirectoryResult};
-use mailcraft_model::{Contact, Event, Labeled, TaskPatch};
+use mailcraft_model::{Contact, Event, Freq, Labeled, TaskPatch};
 
 use crate::ews_runner::{Transport, client};
 use mailcraft_engine::Session;
@@ -450,4 +450,86 @@ fn an_appointment_made_here_survives_reading_it_back() {
         let sent = run(&engine_base, &asked);
         let _ = mailcraft_engine::cmd::ews_directory::apply_ews_directory(&mut session, &sent);
     }
+}
+
+#[test]
+#[ignore = "needs a Grommunio server (docs/exchange-servers.md)"]
+fn a_series_made_here_comes_back_and_changes() {
+    let base = EwsDirectoryRequest {
+        account: 1,
+        email: env("MAILCRAFT_E2E_USER"),
+        url: env("MAILCRAFT_E2E_EWS_URL"),
+        username: String::new(),
+        mailbox: String::new(),
+        trusted: env("MAILCRAFT_E2E_PIN"),
+        calendars: true,
+        contacts: true,
+        tasks: true,
+        from: mailcraft_time::now() - 86_400,
+        to: mailcraft_time::now() + 120 * 86_400,
+        ..Default::default()
+    };
+    let now = mailcraft_time::now();
+    let zone = mailcraft_time::Zone::named("Europe/Rome").unwrap_or_else(|| panic!("Europe/Rome"));
+    let mut session = Session::in_zone(mailcraft_engine::sample::mailbox(now, 0), now, zone);
+    let account = session
+        .run("account.add", &serde_json::json!({"email": base.email, "kind": "exchange", "ews": {"url": base.url, "username": base.username}}))
+        .unwrap()["id"]
+        .as_u64()
+        .unwrap();
+    let engine_base = EwsDirectoryRequest { account, ..base.clone() };
+    let first = run(&engine_base, &request(&engine_base));
+    mailcraft_engine::cmd::ews_directory::apply_ews_directory(&mut session, &first).unwrap();
+    let calendar = session
+        .mailbox
+        .calendars
+        .iter()
+        .find(|calendar| calendar.origin.account == account && calendar.rights == mailcraft_model::Rights::Edit)
+        .map(|calendar| calendar.id)
+        .unwrap_or_else(|| panic!("a writable Exchange calendar"));
+    let title = format!("E2E Weekly {now}");
+    eprintln!("a weekly series called {title} is made in MailCraft now");
+    let start = mailcraft_time::DateTime::from_timestamp(now + 86_400, 60).iso();
+    let made = session
+        .run(
+            "calendar.new",
+            &serde_json::json!({"title": title, "start": start, "calendar": calendar,
+                "recurrence": {"freq": "weekly", "interval": 1, "count": 3}}),
+        )
+        .unwrap();
+    let id = made["id"].as_u64().unwrap();
+    let sync = |session: &mut Session, round: &str| {
+        let asked = session.run("sync.ewsDirectoryRequest", &serde_json::json!({"account": account})).unwrap();
+        let asked: EwsDirectoryRequest = serde_json::from_value(asked).unwrap();
+        let sent = run(&engine_base, &asked);
+        assert!(sent.errors.is_empty(), "{round}: {:?}", sent.errors);
+        let outcomes = sent.uploaded.as_ref().map(|u| u.outcomes.iter().map(|o| o.result).collect::<Vec<_>>());
+        assert!(outcomes.as_ref().is_none_or(|o| o.iter().all(|r| *r == EventResult::Done)), "{round}: {outcomes:?}");
+        mailcraft_engine::cmd::ews_directory::apply_ews_directory(session, &sent).unwrap();
+    };
+    let found = |title: &str| {
+        let read = run(&base, &request(&base));
+        assert!(read.errors.is_empty(), "the read said {:?}", read.errors);
+        let event = read.events.iter().flat_map(|list| &list.events).find(|event| event.title == title).cloned();
+        assert!(event.is_some(), "{title} came back from the server");
+        event.unwrap_or_default()
+    };
+    sync(&mut session, "made");
+    let seen = found(&title);
+    assert_eq!(seen.recurrence.as_ref().map(|r| (r.freq, r.count)), Some((Freq::Weekly, Some(3))), "the series repeats as made");
+    assert_eq!(seen.is_organizer, Some(true), "the series is the owner's, not somebody else's");
+    assert!(session.mailbox.events.contains_key(&id), "and it is still in the mailbox");
+    // The time moved, the rule kept.
+    let moved = mailcraft_time::DateTime::from_timestamp(now + 2 * 86_400 + 7_200, 60).iso();
+    session.run("calendar.move", &serde_json::json!({"id": id, "start": moved})).unwrap();
+    sync(&mut session, "moved");
+    found(&title);
+    // The rule changed too: the series repeats eight times now.
+    session.run("calendar.edit", &serde_json::json!({"id": id, "recurrence": {"freq": "weekly", "interval": 1, "count": 8}})).unwrap();
+    sync(&mut session, "rule changed");
+    let seen = found(&title);
+    assert_eq!(seen.recurrence.as_ref().and_then(|r| r.count), Some(8), "the new rule reached the server");
+    // Take it away again through the same path.
+    let _ = session.run("calendar.delete", &serde_json::json!({"id": id}));
+    let _ = sync(&mut session, "taken away");
 }

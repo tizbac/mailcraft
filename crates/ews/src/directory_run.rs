@@ -71,7 +71,7 @@ pub async fn sync_directory<E: HttpExchange>(
     if let Err(stop) = run.directory(request, &mut out).await {
         match stop {
             Asked::Stop(why) => stop_line(why, &mut out),
-            Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable => {
+            Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable(_) => {
                 out.errors.push("The server's answer for the calendar, contacts or to-dos couldn't be used".to_owned());
             }
         }

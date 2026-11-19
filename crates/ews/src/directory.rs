@@ -465,7 +465,14 @@ fn read_calendar(node: &Node) -> Option<RemoteEvent> {
         kind,
         reminder_minutes,
         modified: child_time(node, "LastModifiedTime").unwrap_or(0),
-        is_organizer: Some(child_text(node, "MyResponseType") == "Organizer"),
+        is_organizer: Some(
+            // (Grommunio has no `PidLidResponseStatus` for an appointment made over EWS and says
+            // `IsOrganizer` instead: read that when the server sends it; an item of its own is
+            // the owner's, not somebody else's.)
+            node.child_in(TYPES, "IsOrganizer")
+                .map(|n| n.text.trim().eq_ignore_ascii_case("true"))
+                .unwrap_or_else(|| child_text(node, "MyResponseType") == "Organizer"),
+        ),
         recurrence,
         series_day: if all_day { all_day_day(start_text, &start_zone) } else { child_day(node, "Start") },
         original: child_time(node, "OriginalStart"),
@@ -509,6 +516,12 @@ fn read_recurrence(node: &Node) -> Option<Recurrence> {
         }
         "AbsoluteMonthlyRecurrence" => {
             rule.freq = Freq::Monthly;
+            named = true;
+        }
+        // (A yearly series on a day of the month: January's own in what the answer says, and its
+        // day of the month. Without this a yearly series came back as no series at all.)
+        "AbsoluteYearlyRecurrence" => {
+            rule.freq = Freq::Yearly;
             named = true;
         }
         "RelativeMonthlyRecurrence" | "RelativeYearlyRecurrence" => {
