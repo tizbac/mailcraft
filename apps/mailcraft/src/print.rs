@@ -32,8 +32,14 @@ pub fn spool(job: Job) -> Result<String, String> {
         duplex: Some(if job.two_sided { Duplex::LongEdge } else { Duplex::Off }),
         scaling: Scaling::Exact,
         grayscale: job.grayscale,
+        // MailCraft's own pages are not pre-greyed: the driver is asked for grey, and a CUPS
+        // queue that has no grey option still prints.
+        grey_pages: false,
         title: job.title.clone(),
         options: Vec::new(),
+        // The Windows driver's own dialog settings are not taken: every choice in the Print
+        // dialog is MailCraft's.
+        driver_settings: None,
     };
     craft_print::submit(&job.pdf, &spool).map_err(|why| format!("the printer didn't take the message: {why}"))
 }

@@ -117,6 +117,7 @@ be shown when they can't.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-19 | minor | Print: the Print dialog stands over the message window that asked for it, instead of over the main window behind it |
 | 2026-11-19 | minor | Print: File › Print (Ctrl+P) and the reading pane's Print button open a Print dialog — the printer, the copies, collating, two sided, black and white, A4 or Letter — and print the message as pages MailCraft sets from the reading pane's display blocks, its pictures and tables on them; no print preview yet |
 | 2026-11-16 | minor | #544: The tray’s top-left red badge follows unread Inbox mail in the owner’s own server accounts, clears after the last unread Inbox message is read or removed, and works independently of desktop alerts |
 | 2026-11-16 | minor | Move Items, Copy Items and the Move to Folder and Copy to Folder menus: the folders of every account, the one in view's first and the others' under their names, not only that account's |
