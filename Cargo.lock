@@ -3247,6 +3247,7 @@ dependencies = [
 name = "mailcraft-drag-out"
 version = "0.13.0"
 dependencies = [
+ "log",
  "windows",
  "windows-core",
  "x11rb",

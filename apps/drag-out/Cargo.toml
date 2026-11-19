@@ -15,6 +15,8 @@ description = "Dragging files out of MailCraft's window, to Explorer or a file m
 x11rb = { version = "0.13", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
+# Why a drag fell back, or hadn't started (the same logger the app uses).
+log = { workspace = true }
 # OLE's drag source and data object (`DoDragDrop`, `IDataObject`, `IDropSource`): the Windows
 # bindings the app already carries. MIT OR Apache-2.0.
 # The `#[implement]` macro writes its code against this crate by name.
@@ -28,5 +30,6 @@ windows = { version = "0.62", features = [
     "Win32_System_Ole",
     "Win32_System_SystemServices",
     "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
 ] }
 

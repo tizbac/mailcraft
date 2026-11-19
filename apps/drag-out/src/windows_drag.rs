@@ -8,15 +8,19 @@ use std::os::windows::ffi::OsStrExt as _;
 use std::path::{Path, PathBuf};
 
 use windows::Win32::Foundation::{DV_E_FORMATETC, E_NOTIMPL, HGLOBAL, OLE_E_ADVISENOTSUPPORTED, POINT};
+use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::System::Com::{
-    DATADIR_GET, FORMATETC, IAdviseSink, IDataObject, IDataObject_Impl, IEnumFORMATETC, IEnumSTATDATA, STGMEDIUM, STGMEDIUM_0, TYMED_HGLOBAL,
+    DATADIR_GET, DVASPECT_CONTENT, FORMATETC, IAdviseSink, IDataObject, IDataObject_Impl, IEnumFORMATETC, IEnumSTATDATA, STGMEDIUM, STGMEDIUM_0,
+    TYMED_HGLOBAL,
 };
 use windows::Win32::System::Memory::{GMEM_MOVEABLE, GMEM_ZEROINIT, GlobalAlloc, GlobalLock, GlobalUnlock};
 use windows::Win32::System::Ole::{
     DROPEFFECT, DROPEFFECT_COPY, DROPEFFECT_LINK, DROPEFFECT_MOVE, DoDragDrop, IDropSource, IDropSource_Impl, OleInitialize,
 };
 use windows::Win32::System::SystemServices::{MK_LBUTTON, MODIFIERKEYS_FLAGS};
-use windows::Win32::UI::Shell::DROPFILES;
+use windows::Win32::UI::Shell::Common::ITEMIDLIST;
+use windows::Win32::UI::Shell::{DROPFILES, SHCreateDataObject, SHCreateStdEnumFmtEtc, SHParseDisplayName};
+use windows::core::PCWSTR;
 use windows::core::{BOOL, HRESULT, Ref, Result as WinResult, implement};
 
 /// `CF_HDROP`: the clipboard format of a list of files (a `DROPFILES` block).
@@ -37,8 +41,14 @@ pub(super) fn start(paths: &[&Path]) -> Result<(), String> {
         Err(why) if why.code() == RPC_E_CHANGED_MODE => {}
         Err(why) => return Err(why.message()),
     }
-    let data: IDataObject = Drag { paths: paths.clone() }.into();
-    let source: IDropSource = Drag { paths }.into();
+    // What Explorer takes with no complaint: a shell data object over the very files. The
+    // hand-built `CF_HDROP` object is the fallback when the shell can't make one (a path it
+    // cannot resolve, say).
+    let data: IDataObject = shell_files(&paths).unwrap_or_else(|why| {
+        log::warn!("drag: the shell made no data object ({why}); falling back to CF_HDROP");
+        Drag { paths: paths.clone() }.into()
+    });
+    let source: IDropSource = DropSource.into();
     let mut effect = DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK;
     let done = unsafe { DoDragDrop(&data, &source, DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK, &mut effect) };
     if done.is_err() {
@@ -47,10 +57,40 @@ pub(super) fn start(paths: &[&Path]) -> Result<(), String> {
     Ok(())
 }
 
-/// The data object and the drop source in one: the files, the same however many times they are
-/// asked for.
+/// A shell data object over `paths`, which every OLE drop target (Explorer first) already knows
+/// how to read: the files as items, their `CF_HDROP`, and the rest the shell puts in.
+fn shell_files(paths: &[PathBuf]) -> WinResult<IDataObject> {
+    let mut wide: Vec<Vec<u16>> = Vec::new();
+    let mut pidls: Vec<*const ITEMIDLIST> = Vec::new();
+    for path in paths {
+        let name: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let mut pidl: *mut ITEMIDLIST = std::ptr::null_mut();
+        unsafe { SHParseDisplayName(PCWSTR(name.as_ptr()), None, &mut pidl, 0, None)? };
+        if pidl.is_null() {
+            continue;
+        }
+        wide.push(name);
+        pidls.push(pidl);
+    }
+    if pidls.is_empty() {
+        return Err(windows::core::Error::from(DV_E_FORMATETC));
+    }
+    let made: IDataObject = unsafe { SHCreateDataObject(None, Some(&pidls), None::<&IDataObject>) }?;
+    for pidl in pidls {
+        unsafe { CoTaskMemFree(Some(pidl.cast())) };
+    }
+    Ok(made)
+}
+
+/// The drop source: the button's state ends the drag.
 #[derive(Clone)]
-#[implement(IDataObject, IDropSource)]
+#[implement(IDropSource)]
+struct DropSource;
+
+/// The `CF_HDROP` data object, a fallback for [`shell_files`]: the files, the same however many
+/// times they are asked for.
+#[derive(Clone)]
+#[implement(IDataObject)]
 struct Drag {
     paths: Vec<PathBuf>,
 }
@@ -115,9 +155,14 @@ impl IDataObject_Impl for Drag_Impl {
         Err(E_NOTIMPL.into())
     }
 
-    fn EnumFormatEtc(&self, _direction: u32) -> WinResult<IEnumFORMATETC> {
-        let _ = DATADIR_GET;
-        Err(E_NOTIMPL.into())
+    fn EnumFormatEtc(&self, direction: u32) -> WinResult<IEnumFORMATETC> {
+        // A target that walks the formats (Explorer does) must find the one there is.
+        if direction != DATADIR_GET.0 as u32 {
+            return Err(E_NOTIMPL.into());
+        }
+        let format =
+            FORMATETC { cfFormat: CF_HDROP, ptd: std::ptr::null_mut(), dwAspect: DVASPECT_CONTENT.0, lindex: -1, tymed: TYMED_HGLOBAL.0 as u32 };
+        unsafe { SHCreateStdEnumFmtEtc(&[format]) }
     }
 
     fn DAdvise(&self, _format: *const FORMATETC, _flags: u32, _sink: Ref<IAdviseSink>) -> WinResult<u32> {
@@ -133,7 +178,7 @@ impl IDataObject_Impl for Drag_Impl {
     }
 }
 
-impl IDropSource_Impl for Drag_Impl {
+impl IDropSource_Impl for DropSource_Impl {
     fn QueryContinueDrag(&self, escape: BOOL, keys: MODIFIERKEYS_FLAGS) -> HRESULT {
         if escape.as_bool() {
             DRAGDROP_S_CANCEL
