@@ -265,10 +265,14 @@ parameters.
 | 2026-11-11 | patch | #661: a new or changed to-do or event, a meeting with a contact, and a rule made, switched on or run that put a name new on a list kept in step with Outlook on an item ask `send`, naming the categories; an undo or redo that would make a category in Outlook again or give one there another colour asks `send`, naming it |
 | 2026-11-11 | patch | #661: making a category in Outlook or giving one there another colour (New Category, Categorize with a new name) asks `send`, naming it; a change of a list MailCraft may not change in Outlook is refused at once; an undo or redo that writes a name in other letters in Outlook asks `delete`; deleting a category a to-do in a shared list has needs `delete` too when it goes from Outlook |
 | 2026-11-11 | minor | #30 part 4a: `mail.digitalSignature` checks OpenPGP too (`format`); `keys.list` (safe), `keys.import` and `keys.remove` (settings; a path only from the owner) |
+| 2026-11-11 | minor | #30 part 5: `compose.sign` and `account.setSigning` |
+| 2026-11-11 | minor | #30 part 5: `compose.sign` and `account.setSigning`; turning Sign off asks the owner, and the Send question says how the message is signed |
+| 2026-11-11 | minor | #30 part 4a: `mail.digitalSignature` checks OpenPGP too (`format`); `keys.list` (safe), `keys.import` and `keys.remove` (settings; a path only from the owner) |
 | 2026-11-11 | minor | #30 part 4b: the window's key commands (`ui.importPrivateKey`, `ui.removePrivateKey`, `ui.refreshOwnKeys`, `ui.importPublicKey`, `ui.verifyKey`, `ui.markKeyVerified`) are never for agents |
 | 2026-11-10 | patch | #661: an undo or redo that would send a category kept on this computer only to Outlook asks `send`, naming it |
 | 2026-11-09 | minor | #30 part 2: `mail.digitalSignature` (and `digitalSignature` in `mail.get`) says what checking an S/MIME Digital signature found, read only |
 | 2026-11-09 | patch | #911: `mail.setGmailCategory` moves the messages named and their copies of the same Gmail message, never the rest of their conversations |
+| 2026-11-08 | minor | #30: `mail.checkAgain` (safe) downloads a signed or encrypted message's own bytes again; those bytes are never in an answer to an agent |
 | 2026-11-08 | minor | #30: `mail.checkAgain` (safe) downloads a signed or encrypted message's own bytes again; those bytes are never in an answer to an agent |
 | 2026-11-08 | minor | #911: a Gmail Inbox's messages carry `gmailCategory`; `gmail:` searches Gmail's categories and `folder.select` takes `gmail` |
 | 2026-11-08 | minor | #911: `view.gmailCategories` shows Gmail's categories as folders or as tabs |

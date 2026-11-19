@@ -1,1 +1,0 @@
-- The limits on importing mail files are yours to set in File › Options: the largest file (512 MB by default), the most messages from one file (200,000), and the largest and most messages of a folder of mailboxes (4 GB and 500,000), with a note on what they cost in memory.

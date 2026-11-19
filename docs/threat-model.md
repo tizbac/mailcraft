@@ -736,6 +736,7 @@ settings files (`crates/engine/src/store.rs`); commands from the control channel
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-16 | minor | An mbox import's limits are the owner's, kept within fixed ranges, with 512 MB a file and 200,000 messages by default |
 | 2026-11-16 | minor | #1544: a reaction sent by one click: six fixed emoji, one recipient (the sender, never the Reply-To, shown beside the emoji), nothing quoted, refused for a message with a sender warning, for drafts, own mail, Junk E-mail and automated mail, held back by Undo Send, asked about for an agent |
 | 2026-11-15 | patch | Known limits: S/MIME and OpenPGP signatures are checked; encrypting and signing sent mail are not built |
 | 2026-11-14 | patch | #1262: Check Names and People's Address Book ask an Exchange server account's address list only on the owner's press or search, and read its answer within caps, keeping a name, an address, four short lines and two numbers of each person, in the window alone |

@@ -1,6 +1,6 @@
 # Interface parity
 
-> **Last reviewed:** 2026-10-21 · **Last updated:** 2026-11-16 · **Change:** minor · **Target:** Microsoft Outlook (Microsoft 365, classic desktop)
+> **Last reviewed:** 2026-10-21 · **Last updated:** 2026-11-19 · **Change:** minor · **Target:** Microsoft Outlook (Microsoft 365, classic desktop)
 
 How the window compares with the target's. The look is the Craft apps' own (MailCraft's own colours,
 a cool grey window and a blue accent, one set of tokens for every pane); the *arrangement* is the one
@@ -117,6 +117,7 @@ be shown when they can't.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-19 | minor | Print: File › Print (Ctrl+P) and the reading pane's Print button open a Print dialog — the printer, the copies, collating, two sided, black and white, A4 or Letter — and print the message as pages MailCraft sets from the reading pane's display blocks, its pictures and tables on them; no print preview yet |
 | 2026-11-16 | minor | #544: The tray’s top-left red badge follows unread Inbox mail in the owner’s own server accounts, clears after the last unread Inbox message is read or removed, and works independently of desktop alerts |
 | 2026-11-16 | minor | Move Items, Copy Items and the Move to Folder and Copy to Folder menus: the folders of every account, the one in view's first and the others' under their names, not only that account's |
 | 2026-11-16 | minor | #1544: a React button beside Forward in the reading pane opens six emoji; one click sends it to the sender as a short mail (greyed for automated mail too) |

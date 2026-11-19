@@ -1,6 +1,6 @@
 # Where MailCraft falls short of Outlook
 
-> **Last reviewed:** 2026-10-20 · **Last updated:** 2026-11-18 · **Change:** minor
+> **Last reviewed:** 2026-10-20 · **Last updated:** 2026-11-19 · **Change:** minor
 
 The ranked list of shortfalls and rough edges. The direction is in [`ROADMAP.md`](../ROADMAP.md):
 where MailCraft stands, the beta checklist and the steps to it, and what comes after beta; the order
@@ -76,6 +76,8 @@ this code base.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-19 | minor | Gap 15: a message prints as pages MailCraft sets itself — its header, its formatting, its tables and its pictures — on the sheet the owner chooses, with the printer, the copies, collating, two sided and black and white in a Print dialog; the calendar, the contacts and tasks still print nothing |
+| 2026-11-18 | patch | Gap 12: Save Message As writes an Outlook `.msg` file, and File › Options chooses the default between `.eml` and `.msg`; reading a `.msg` is still missing |
 | 2026-11-18 | patch | #1581: gap 2: File › Info says how many messages of an account are left out for failing to download, with Try again (`sync.retryFailed`) |
 | 2026-11-17 | patch | #1581: gap 2: a message that fails to download over IMAP is passed over after a fresh connection and left out after three runs; Retry Skipped Messages (`sync.retryFailed`) takes it up again, and nothing shows the left-out messages beyond the one line the run said; an Exchange server or JMAP account that loses its secure connection on a message still stops that fetch |
 | 2026-11-17 | minor | Gap 19: the phone runs the calendar, To Do and message-fetch sync on its own, in the background too (MB3.18), and sends the Outbox; what is not on the phone yet is listed |
@@ -118,6 +120,8 @@ this code base.
 | 2026-11-11 | patch | #661: a deleted category leaves the server once the items that carried it there no longer do; items given a category kept on this computer only still carry its name to the server |
 | 2026-11-11 | patch | #661: Outlook's changes to the categories show here when MailCraft starts and with the calendar's wider look every quarter of an hour, not every few minutes |
 | 2026-11-11 | patch | #661: the question for keeping in step with Outlook, once closed, isn't put again by itself until MailCraft starts again or another mailbox is opened; what keeps a renamed category's old name on the server is named |
+| 2026-11-11 | patch | #30 part 4a: gap 16: OpenPGP Digital signatures are checked in the reading pane; the Public keys kept are listed, imported and removed by command; no window for them or for the owner's own keys yet |
+| 2026-11-11 | minor | #30 part 5: gap 16 says outgoing mail is Digitally signed at Send, how, and what isn't yet (the chain carried where the system's store has it) |
 | 2026-11-11 | minor | #1074 part 2: gap 5: a JMAP account sends its mail |
 | 2026-11-11 | minor | #1074 part 1: gap 5: a JMAP account's marks, moves and deletions go up; nothing is sent yet |
 | 2026-11-11 | minor | #815 part 5: gap 12: a `.pst` file's notes and journal entries import, HTML kept in rich text comes in as HTML, and the import is no longer a preview |
@@ -133,6 +137,8 @@ this code base.
 | 2026-11-09 | patch | #620: rough edges: what an agent and the owner still share in one window (the message being written, Undo) |
 | 2026-11-08 | minor | #603: gaps 6 and 13: Hebrew and Arabic paragraphs stand at the right of the reading pane (`dir` or `direction` in HTML, as in a browser; the first strong letter in plain text); a line's mixed runs in visual order stay open with #483 |
 | 2026-11-08 | patch | #30 part 1: gap 16: signed and encrypted messages keep the bytes they came as (well-formed only; 64 MB a message, 1 GB a mailbox), and a move onto another IMAP server, Save Message As and Forward as Attachment write their body as it came under a header written from the message; rough edges: the move note says so, that a moved copy carries no DKIM signature or ARC seal, and that a copy into a Microsoft mailbox is still made from its parts; the bytes stay named until a download brings them, are asked for again once, and a move waits for them from the copy it came from, which stays until it has brought them (a refusal is asked again, ever less often, over at least a day; a refusal past that, bytes too big to take or no room here hold the move, the status bar says why, and Check again asks once more; the copy it came from goes only once the bytes were written into the copy where it is now, are read whole from the disk here then (in memory only once saved), or that copy brought none, also when it is moved on, and an undo of a move on that can't put it back says why); a message with a part sent as `binary` goes onto an IMAP server made from its parts |
+| 2026-11-08 | minor | #603: gaps 6 and 13: Hebrew and Arabic paragraphs stand at the right of the reading pane (`dir` or `direction` in HTML, as in a browser; the first strong letter in plain text); a line's mixed runs in visual order stay open with #483 |
+| 2026-11-08 | patch | #30 part 1: gap 16: signed and encrypted messages keep the bytes they came as (well-formed only; 64 MB a message, 1 GB a mailbox), and a move onto another IMAP server, Save Message As and Forward as Attachment write their body as it came under a header written from the message; rough edges: the move note says so, that a moved copy carries no DKIM signature or ARC seal, and that a copy into a Microsoft mailbox is still made from its parts; the bytes stay named until a download brings them, are asked for again once, and a move waits for them from the copy it came from, which stays until it has brought them (a refusal is asked again, ever less often, over at least a day; a refusal past that, bytes too big to take or no room here hold the move, the status bar says why, and Check again asks once more; the copy it came from goes only once the bytes were written into the copy where it is now, are read whole from the disk here then (in memory only once saved), or that copy brought none, also when it is moved on, and an undo of a move on that can't put it back says why); a message with a part sent as `binary` goes onto an IMAP server made from its parts |
 | 2026-11-07 | patch | Gap 14: why an IMAP or SMTP server couldn't be used is said in the interface language wherever the window shows it, a server's own reason as the server wrote it, #872 |
 | 2026-11-07 | patch | AU3-V1: gap 5: Autodiscover asks before the sign-in goes to any host in the owner's domain but its Autodiscover host and the hosts its SRV record names, naming the host whole |
 | 2026-11-05 | minor | #842: gap 6: a link is underlined unless the message says otherwise for it, a link or span written as a block with a look of its own is a box as wide as its line, `display: table` is a box, full-width boxes and narrow tables keep their width, a border in its box's own colour shows no edge, and tables nest 20 deep |
@@ -144,6 +150,7 @@ this code base.
 | 2026-11-05 | minor | #815 part 2: gap 12: a `.pst` file's mail imports (preview), with its report; calendar, contacts, tasks and notes left for a later part |
 | 2026-11-05 | minor | #745: gap 8: selecting copies nothing, a change to the mailbox costs what it changed (chunked messages) and the conversations are kept through it: a click 1.3–3.9 ms, a Shift+click 0.1 ms, Undo of 1,000 deletes 30 + 14 ms at 326,000 messages |
 | 2026-11-05 | minor | #600: gap 6: a message is drawn in the first of its fonts installed on this computer; no font is fetched |
+| 2026-11-04 | minor | #252: gap 5: Exchange server accounts keep their calendars, address books and to-dos in step both ways, and open a person's calendar or address book by address, with their defaults under Shared Calendars or the account's books; tried on a Grommunio container |
 | 2026-11-04 | minor | #232: state the primary-address limit for Workspace OAuth while retaining public release requirements |
 | 2026-11-04 | patch | #795: conversations are threads, not subjects; legacy mail fills its server's thread id a run at a time |
 | 2026-11-04 | minor | #252: gap 5: Exchange server accounts keep their calendars, address books and to-dos in step both ways, and open a person's calendar or address book by address, with their defaults under Shared Calendars or the account's books; tried on a Grommunio container |

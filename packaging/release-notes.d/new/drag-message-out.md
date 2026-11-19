@@ -1,1 +1,0 @@
-- A message can be dragged out of the list to a folder of the desktop — Explorer on Windows, a file manager on X11 or Wayland — where it is written as the format File › Options chooses (`.eml` or `.msg`), named from its subject.
