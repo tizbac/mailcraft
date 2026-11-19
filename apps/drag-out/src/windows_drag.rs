@@ -1,195 +1,40 @@
 // SPDX-FileCopyrightText: MailCraft contributors
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! Windows' OLE drag, as the source: a data object that carries `CF_HDROP` (the file paths), a
-//! drop source that ends the drag when the button is let go, and `DoDragDrop` over both. Explorer
-//! (and every other OLE drop target) then copies the file where the owner drops it.
+//! Windows' drag-out through the `drag` crate: it builds the shell's own data object over the
+//! files and runs OLE's `DoDragDrop`, which is what Explorer accepts (a hand-made `CF_HDROP`
+//! object got the no-drop cursor). The window it asks for is remembered here at startup.
 
-use std::os::windows::ffi::OsStrExt as _;
+use std::num::NonZeroIsize;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
-use windows::Win32::Foundation::{DV_E_FORMATETC, E_NOTIMPL, HGLOBAL, OLE_E_ADVISENOTSUPPORTED, POINT};
-use windows::Win32::System::Com::CoTaskMemFree;
-use windows::Win32::System::Com::{
-    DATADIR_GET, DVASPECT_CONTENT, FORMATETC, IAdviseSink, IDataObject, IDataObject_Impl, IEnumFORMATETC, IEnumSTATDATA, STGMEDIUM, STGMEDIUM_0,
-    TYMED_HGLOBAL,
-};
-use windows::Win32::System::Memory::{GMEM_MOVEABLE, GMEM_ZEROINIT, GlobalAlloc, GlobalLock, GlobalUnlock};
-use windows::Win32::System::Ole::{
-    DROPEFFECT, DROPEFFECT_COPY, DROPEFFECT_LINK, DROPEFFECT_MOVE, DoDragDrop, IDropSource, IDropSource_Impl, OleInitialize,
-};
-use windows::Win32::System::SystemServices::{MK_LBUTTON, MODIFIERKEYS_FLAGS};
-use windows::Win32::UI::Shell::Common::ITEMIDLIST;
-use windows::Win32::UI::Shell::{DROPFILES, SHCreateDataObject, SHCreateStdEnumFmtEtc, SHParseDisplayName};
-use windows::core::PCWSTR;
-use windows::core::{BOOL, HRESULT, Ref, Result as WinResult, implement};
+use raw_window_handle::{HandleError, HasWindowHandle, RawWindowHandle, Win32WindowHandle, WindowHandle};
 
-/// `CF_HDROP`: the clipboard format of a list of files (a `DROPFILES` block).
-const CF_HDROP: u16 = 15;
-/// OLE's success codes for a drag that ended with a drop or was cancelled ([MS-OLEDS]).
-const DRAGDROP_S_DROP: HRESULT = HRESULT(0x0004_0100u32 as i32);
-const DRAGDROP_S_CANCEL: HRESULT = HRESULT(0x0004_0101u32 as i32);
-const DRAGDROP_S_USEDEFAULTCURSORS: HRESULT = HRESULT(0x0004_0102u32 as i32);
-/// `RPC_E_CHANGED_MODE`: OLE was already started on this thread in another apartment; a drag
-/// still works there.
-const RPC_E_CHANGED_MODE: HRESULT = HRESULT(0x8001_0106u32 as i32);
+/// The window the app runs in, as Windows names it; `drag` only checks that it is a Win32 one.
+static WINDOW: Mutex<Option<isize>> = Mutex::new(None);
+
+/// Remembers the window a drag starts from (called once, when the window is made).
+pub(super) fn set_window(hwnd: isize) {
+    if let Ok(mut window) = WINDOW.lock() {
+        *window = Some(hwnd);
+    }
+}
+
+struct Window(isize);
+
+impl HasWindowHandle for Window {
+    fn window_handle(&self) -> Result<WindowHandle<'_>, HandleError> {
+        let hwnd = NonZeroIsize::new(self.0).ok_or(HandleError::Unavailable)?;
+        // Safety: it is the window this program runs in, and it outlives the drag.
+        Ok(unsafe { WindowHandle::borrow_raw(RawWindowHandle::Win32(Win32WindowHandle::new(hwnd))) })
+    }
+}
 
 pub(super) fn start(paths: &[&Path]) -> Result<(), String> {
-    let paths: Vec<PathBuf> = paths.iter().map(|path| path.to_path_buf()).collect();
-    // OLE on this thread (the window's): a second call is an error to ignore.
-    match unsafe { OleInitialize(None) } {
-        Ok(()) => {}
-        Err(why) if why.code() == RPC_E_CHANGED_MODE => {}
-        Err(why) => return Err(why.message()),
-    }
-    // What Explorer takes with no complaint: a shell data object over the very files. The
-    // hand-built `CF_HDROP` object is the fallback when the shell can't make one (a path it
-    // cannot resolve, say).
-    let data: IDataObject = shell_files(&paths).unwrap_or_else(|why| {
-        log::warn!("drag: the shell made no data object ({why}); falling back to CF_HDROP");
-        Drag { paths: paths.clone() }.into()
-    });
-    let source: IDropSource = DropSource.into();
-    let mut effect = DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK;
-    let done = unsafe { DoDragDrop(&data, &source, DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK, &mut effect) };
-    if done.is_err() {
-        return Err(format!("the drag ended with {done:?}"));
-    }
-    Ok(())
-}
-
-/// A shell data object over `paths`, which every OLE drop target (Explorer first) already knows
-/// how to read: the files as items, their `CF_HDROP`, and the rest the shell puts in.
-fn shell_files(paths: &[PathBuf]) -> WinResult<IDataObject> {
-    let mut wide: Vec<Vec<u16>> = Vec::new();
-    let mut pidls: Vec<*const ITEMIDLIST> = Vec::new();
-    for path in paths {
-        let name: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
-        let mut pidl: *mut ITEMIDLIST = std::ptr::null_mut();
-        unsafe { SHParseDisplayName(PCWSTR(name.as_ptr()), None, &mut pidl, 0, None)? };
-        if pidl.is_null() {
-            continue;
-        }
-        wide.push(name);
-        pidls.push(pidl);
-    }
-    if pidls.is_empty() {
-        return Err(windows::core::Error::from(DV_E_FORMATETC));
-    }
-    let made: IDataObject = unsafe { SHCreateDataObject(None, Some(&pidls), None::<&IDataObject>) }?;
-    for pidl in pidls {
-        unsafe { CoTaskMemFree(Some(pidl.cast())) };
-    }
-    Ok(made)
-}
-
-/// The drop source: the button's state ends the drag.
-#[derive(Clone)]
-#[implement(IDropSource)]
-struct DropSource;
-
-/// The `CF_HDROP` data object, a fallback for [`shell_files`]: the files, the same however many
-/// times they are asked for.
-#[derive(Clone)]
-#[implement(IDataObject)]
-struct Drag {
-    paths: Vec<PathBuf>,
-}
-
-impl Drag {
-    /// A fresh `HGLOBAL` holding a `DROPFILES` block with the files, whose ownership passes to
-    /// the caller (the drop target frees it).
-    fn hdrop(&self) -> WinResult<HGLOBAL> {
-        let mut wide: Vec<u16> = Vec::new();
-        for path in &self.paths {
-            wide.extend(path.as_os_str().encode_wide());
-            wide.push(0);
-        }
-        wide.push(0);
-        let header = core::mem::size_of::<DROPFILES>();
-        let bytes = wide.len() * 2;
-        let handle = unsafe { GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, header + bytes)? };
-        let memory = unsafe { GlobalLock(handle) } as *mut u8;
-        if memory.is_null() {
-            return Err(windows::core::Error::from_thread());
-        }
-        let block = DROPFILES { pFiles: header as u32, pt: POINT { x: 0, y: 0 }, fNC: BOOL(0), fWide: BOOL(1) };
-        unsafe {
-            core::ptr::write_unaligned(memory as *mut DROPFILES, block);
-            core::ptr::copy_nonoverlapping(wide.as_ptr() as *const u8, memory.add(header), bytes);
-        }
-        let _ = unsafe { GlobalUnlock(handle) };
-        Ok(handle)
-    }
-
-    fn has_hdrop(format: &FORMATETC) -> bool {
-        format.cfFormat == CF_HDROP && (format.tymed == 0 || format.tymed & TYMED_HGLOBAL.0 as u32 != 0)
-    }
-}
-
-impl IDataObject_Impl for Drag_Impl {
-    fn GetData(&self, format: *const FORMATETC) -> WinResult<STGMEDIUM> {
-        let format = unsafe { format.as_ref() }.ok_or_else(|| windows::core::Error::from(DV_E_FORMATETC))?;
-        if !Drag::has_hdrop(format) {
-            return Err(DV_E_FORMATETC.into());
-        }
-        let handle = self.hdrop()?;
-        Ok(STGMEDIUM { tymed: TYMED_HGLOBAL.0 as u32, u: STGMEDIUM_0 { hGlobal: handle }, pUnkForRelease: core::mem::ManuallyDrop::new(None) })
-    }
-
-    fn GetDataHere(&self, _format: *const FORMATETC, _medium: *mut STGMEDIUM) -> WinResult<()> {
-        Err(E_NOTIMPL.into())
-    }
-
-    fn QueryGetData(&self, format: *const FORMATETC) -> HRESULT {
-        match unsafe { format.as_ref() } {
-            Some(format) if Drag::has_hdrop(format) => HRESULT(0),
-            _ => DV_E_FORMATETC,
-        }
-    }
-
-    fn GetCanonicalFormatEtc(&self, _format: *const FORMATETC, _out: *mut FORMATETC) -> HRESULT {
-        E_NOTIMPL
-    }
-
-    fn SetData(&self, _format: *const FORMATETC, _medium: *const STGMEDIUM, _release: BOOL) -> WinResult<()> {
-        Err(E_NOTIMPL.into())
-    }
-
-    fn EnumFormatEtc(&self, direction: u32) -> WinResult<IEnumFORMATETC> {
-        // A target that walks the formats (Explorer does) must find the one there is.
-        if direction != DATADIR_GET.0 as u32 {
-            return Err(E_NOTIMPL.into());
-        }
-        let format =
-            FORMATETC { cfFormat: CF_HDROP, ptd: std::ptr::null_mut(), dwAspect: DVASPECT_CONTENT.0, lindex: -1, tymed: TYMED_HGLOBAL.0 as u32 };
-        unsafe { SHCreateStdEnumFmtEtc(&[format]) }
-    }
-
-    fn DAdvise(&self, _format: *const FORMATETC, _flags: u32, _sink: Ref<IAdviseSink>) -> WinResult<u32> {
-        Err(OLE_E_ADVISENOTSUPPORTED.into())
-    }
-
-    fn DUnadvise(&self, _connection: u32) -> WinResult<()> {
-        Err(OLE_E_ADVISENOTSUPPORTED.into())
-    }
-
-    fn EnumDAdvise(&self) -> WinResult<IEnumSTATDATA> {
-        Err(OLE_E_ADVISENOTSUPPORTED.into())
-    }
-}
-
-impl IDropSource_Impl for DropSource_Impl {
-    fn QueryContinueDrag(&self, escape: BOOL, keys: MODIFIERKEYS_FLAGS) -> HRESULT {
-        if escape.as_bool() {
-            DRAGDROP_S_CANCEL
-        } else if keys.contains(MK_LBUTTON) {
-            HRESULT(0)
-        } else {
-            DRAGDROP_S_DROP
-        }
-    }
-
-    fn GiveFeedback(&self, _effect: DROPEFFECT) -> HRESULT {
-        DRAGDROP_S_USEDEFAULTCURSORS
-    }
+    let hwnd = WINDOW.lock().ok().and_then(|window| *window).ok_or("the window isn't known yet")?;
+    let files: Vec<PathBuf> = paths.iter().map(|path| path.to_path_buf()).collect();
+    // The picture beside the pointer: the program's own icon.
+    let icon = drag::Image::Raw(include_bytes!("../../../assets/app-icon/hicolor/256x256/apps/io.github.billsecond.mailcraft.png").to_vec());
+    let window = Window(hwnd);
+    drag::start_drag(&window, drag::DragItem::Files(files), icon, |_result, _at| {}, drag::Options::default()).map_err(|why| why.to_string())
 }
