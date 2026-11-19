@@ -700,6 +700,8 @@ const NEVER: &[&str] = &[
     // The owner's own answer to sending the tasks that exist only here to an account's To Do
     // (#632): an agent never gives it, asked or not.
     "tasks.sendLocal",
+    // The Print dialog is the owner's own page of choices; printing goes to the owner's printer.
+    "ui.printDialog",
     // Everything MailCraft keeps on this computer, gone (#177): only the owner's own click.
     "ui.removeAllData",
     // Another program (the file manager) started on the owner's screen, as for an attachment

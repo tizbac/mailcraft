@@ -29,6 +29,7 @@ mailcraft-mime = { path = "../crates/mime" }
 mailcraft-mime-model = { path = "../crates/mime-model" }
 mailcraft-model = { path = "../crates/model" }
 mailcraft-openpgp = { path = "../crates/openpgp" }
+mailcraft-print = { path = "../crates/print" }
 mailcraft-proto = { path = "../crates/proto" }
 mailcraft-pst = { path = "../crates/pst" }
 mailcraft-smime = { path = "../crates/smime" }
@@ -209,6 +210,13 @@ bench = false
 [[bin]]
 name = "tnef"
 path = "fuzz_targets/tnef.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "print"
+path = "fuzz_targets/print.rs"
 test = false
 doc = false
 bench = false

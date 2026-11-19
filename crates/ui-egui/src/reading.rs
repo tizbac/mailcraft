@@ -459,10 +459,11 @@ pub fn blocks_of(m: &Message) -> Vec<Block> {
 
 /// The actions on a message that is being read, as the pane's header and a message window's
 /// toolbar offer them: icon, label, command. The window adds its own to these.
-pub(crate) const ACTIONS: [(&str, &str, &str); 4] = [
+pub(crate) const ACTIONS: [(&str, &str, &str); 5] = [
     ("reply", "Reply", "mail.reply"),
     ("replyAll", "Reply All", "mail.replyAll"),
     ("forward", "Forward", "mail.forward"),
+    ("print", "Print", "ui.printDialog"),
     ("delete", "Delete", "mail.delete"),
 ];
 
@@ -492,6 +493,10 @@ fn header(app: &mut MailApp, ui: &mut Ui, m: &Arc<Message>, place: Place, pictur
                 ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
                 if place == Place::Pane {
                     for (icon, tip, id) in ACTIONS.iter().rev() {
+                        // (Print is here only where the window has a spooler to hand pages to.)
+                        if *id == "ui.printDialog" && app.services.print.is_none() {
+                            continue;
+                        }
                         let sc = crate::widgets::shortcut_text(app, id);
                         if crate::widgets::icon_button(ui, icon, &format!("{} ({sc})", tl!(tip)), 17.0, true).clicked() {
                             let _ = app.run(id, json!({}));

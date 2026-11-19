@@ -1,0 +1,20 @@
+[package]
+name = "mailcraft-print"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "A message as pages for a printer: its heading, its styled text, its pictures and tables, written as a PDF"
+
+[dependencies]
+mailcraft-html = { workspace = true }
+# PDF drawing: text in the fonts the interface has, raster pictures, lines and fills. MIT OR Apache-2.0.
+krilla = { version = "0.8.2", default-features = false, features = ["simple-text", "raster-images"] }
+# The width of a word, and whether a face has its letters. MIT.
+ttf-parser = "0.25"
+# A picture's bytes, whatever the message calls them, opened to what a PDF holds. MIT OR Apache-2.0.
+image = { workspace = true }
+
+[lints]
+workspace = true

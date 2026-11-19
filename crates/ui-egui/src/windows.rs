@@ -1402,8 +1402,12 @@ enum Action {
 /// deleted the message and the window should close.
 fn actions(app: &mut MailApp, ui: &mut Ui, m: &Arc<Message>, own_keys: bool, toolbar: bool) -> bool {
     let flagged = m.flag == FlagStatus::Flagged;
-    let mut row: Vec<(&str, &str, &'static str, Action, &'static str)> =
-        crate::reading::ACTIONS.iter().map(|(icon, label, command)| (*icon, *label, *command, Action::Run(command), hit_kind(command))).collect();
+    let mut row: Vec<(&str, &str, &'static str, Action, &'static str)> = crate::reading::ACTIONS
+        .iter()
+        // (Print is here only where the window has a spooler to hand pages to.)
+        .filter(|(.., command)| *command != "ui.printDialog" || app.services.print.is_some())
+        .map(|(icon, label, command)| (*icon, *label, *command, Action::Run(command), hit_kind(command)))
+        .collect();
     row.push(("flag", if flagged { "Clear Flag" } else { "Flag" }, "mail.toggleFlag", Action::Flag, "windowFlag"));
     let (icon, label, command) =
         if m.read { ("markUnread", "Mark as unread", "mail.markUnread") } else { ("markRead", "Mark as read", "mail.markRead") };
@@ -1428,8 +1432,9 @@ fn actions(app: &mut MailApp, ui: &mut Ui, m: &Arc<Message>, own_keys: bool, too
     if toolbar {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
-            for (n, (icon, label, command, action, kind)) in row.iter().enumerate() {
-                if n == 3 || n == 4 {
+            for (icon, label, command, action, kind) in &row {
+                // (A little room between the respond group, Delete, and the marks.)
+                if matches!(*command, "mail.delete" | "mail.toggleFlag") {
                     ui.add_space(8.0);
                 }
                 let key = crate::widgets::shortcut_text(app, command);
@@ -1496,6 +1501,7 @@ fn hit_kind(command: &str) -> &'static str {
         "mail.reply" => "windowReply",
         "mail.replyAll" => "windowReplyAll",
         "mail.forward" => "windowForward",
+        "ui.printDialog" => "windowPrint",
         _ => "windowDelete",
     }
 }

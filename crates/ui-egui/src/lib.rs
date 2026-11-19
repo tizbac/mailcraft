@@ -209,6 +209,9 @@ mod pick_item_tests;
 pub mod platform;
 #[cfg(test)]
 mod platform_tests;
+pub mod print;
+#[cfg(test)]
+mod print_pages_tests;
 mod problem_log;
 pub mod reading;
 mod recent_attachments;
@@ -374,10 +377,13 @@ pub struct Services {
     pub attachment_preview: Option<attachment_preview::Host>,
     /// Web: hand bytes to the browser as a download. An error means no download started.
     pub download: Option<Box<dyn Fn(&str, &[u8]) -> Result<(), String>>>,
-    /// Desktop: print `text` under `name` on the system's default printer, returning when the
-    /// job is handed over (or refused: no printer, no print command). Absent in the browser and
-    /// in tests, where `file.print` then says printing isn't available.
-    pub print: Option<Box<dyn Fn(&str, &str) -> Result<(), String>>>,
+    /// Desktop: print a message's pages — set here from the reading pane's blocks, spooled by the
+    /// host — returning what the spooler said (a job number, or how many sheets it took). Absent in
+    /// the browser and in tests, where printing then says it isn't available.
+    pub print: Option<Box<dyn Fn(print::Job) -> Result<String, String>>>,
+    /// Desktop: the printers the system has, as the Print dialog lists them. Empty where there is
+    /// no spooler. Absent in the browser and in tests.
+    pub printers: Option<Box<dyn Fn() -> Vec<print::Printer>>>,
     /// Web: told whether there are unsaved changes after each pass, for the leave-page guard.
     pub on_dirty: Option<Box<dyn Fn(bool)>>,
     /// Desktop: synchronise with a mail server on a background thread. What it brings arrives
@@ -1195,6 +1201,12 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
         r#"{"id"?: number (the selected message), "index": number (zero-based attachment index)} — preview the file using an installed helper, if supported"#,
     ),
     ("ui.showAttachmentMessage", "Show Message", "Attachments › Message", "{} — return from the attachment view to its message"),
+    (
+        "ui.printDialog",
+        "Print…",
+        "File › Print",
+        "{} — the Print dialog: the printer, the copies, collating, two sided, black and white, the sheet; Print then runs `file.print` with what the owner chose. The window only, never for an agent",
+    ),
     ("ui.focusSearch", "Search", "Search", "{}"),
     (
         "ui.advancedSearch",
@@ -2676,17 +2688,33 @@ impl MailApp {
             return Some(r);
         }
         Some(match id {
-            // Printing is the window's: the message is turned into printable text here in the
-            // engine (as the command line and an agent get it too), and the system prints it.
+            // Printing is the window's: the message is set on paper here from the same display
+            // blocks the reading pane shows, and the host hands the pages to the system's spooler.
             "file.print" => match self.session.run("file.print", p) {
                 Err(e) => Err(e.to_string()),
                 Ok(done) => {
-                    let name = done.get("name").and_then(Value::as_str).unwrap_or("message");
-                    let text = done.get("text").and_then(Value::as_str).unwrap_or("");
-                    match self.services.print.as_ref() {
-                        Some(print) => print(name, text).map(|()| json!({"printed": name})),
-                        None => Err("printing isn't available here".into()),
+                    let Some(id) = done.get("id").and_then(Value::as_u64) else {
+                        return Some(Err("the message to print isn't in the mailbox".into()));
+                    };
+                    let choices = print::Choices {
+                        letter: s("paper").is_some_and(|paper| paper.eq_ignore_ascii_case("letter")),
+                        copies: p.get("copies").and_then(Value::as_u64).map_or(1, |n| u32::try_from(n).unwrap_or(1)),
+                        collate: b("collate").unwrap_or(true),
+                        two_sided: b("twoSided").unwrap_or(false),
+                        grayscale: b("grayscale").unwrap_or(false),
+                    };
+                    match print::print(self, id, s("printer").map(|n| n.to_owned()), choices) {
+                        Ok(said) => Ok(json!({"printed": id, "job": said})),
+                        Err(why) => Err(why),
                     }
+                }
+            },
+            // The Print dialog: it only collects what the owner chose, then runs `file.print`.
+            "ui.printDialog" => match print::Ask::open(self) {
+                Err(why) => Err(why),
+                Ok(ask) => {
+                    self.dialog = Some(dialogs::Dialog::Print(Box::new(ask)));
+                    Ok(json!({"opened": true}))
                 }
             },
             "ui.removeAllData" => self.remove_all_data(),

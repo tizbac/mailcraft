@@ -1,47 +1,39 @@
 // SPDX-FileCopyrightText: MailCraft contributors
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! Printing a message on the system's default printer: the printable text goes to a file of its
-//! own under the temporary folder, and the system's own print command hands it over — Notepad's
-//! `/p` on Windows, `lp` (CUPS), or `lpr`, on Linux and the BSDs. Nothing is rendered by a browser
-//! and no viewer is opened: the message is text, as `file.print` makes it.
+//! Printing: MailCraft sets the pages itself (`mailcraft-print`), and the system's own spooler takes
+//! them — CUPS on Linux, macOS and the BSDs, the Windows print spooler in this process, with no
+//! shell or other program started (`craft-print`). A job that the spooler refuses is an error in
+//! words the owner can act on; nothing is written to disk for it.
 
-use std::process::Command;
+use craft_print::{Duplex, Job as Spool, Scaling};
 
-/// Prints `text` under `name`. Returns when the print command has taken the file (the job may
-/// still be queued); an error says why nothing was printed.
-pub fn print(name: &str, text: &str) -> Result<(), String> {
-    let folder = std::env::temp_dir().join("mailcraft-print");
-    std::fs::create_dir_all(&folder).map_err(|why| format!("no temporary folder to print from: {why}"))?;
-    // A name of our own making: the file name's own characters, one line, short.
-    let mut stem: String = name.chars().take(64).map(|c| if c.is_alphanumeric() || matches!(c, '.' | '-' | '_') { c } else { '_' }).collect();
-    if !stem.to_ascii_lowercase().ends_with(".txt") {
-        stem.push_str(".txt");
-    }
-    let file = folder.join(stem);
-    std::fs::write(&file, text.as_bytes()).map_err(|why| format!("couldn't write the message to print: {why}"))?;
-    let printed = platform(&file);
-    let _ = std::fs::remove_file(&file);
-    printed
+use mailcraft_ui_egui::print::{Job, Printer};
+
+/// Most copies the spooler is asked for at once.
+const MAX_COPIES: u32 = 100;
+
+/// The printers the system knows: its queues, then the driverless ones CUPS can print to without a
+/// driver. Empty where there is no spooler.
+pub fn printers() -> Vec<Printer> {
+    craft_print::printers().into_iter().map(|p| Printer { name: p.name, default: p.default, two_sided: p.two_sided }).collect()
 }
 
-#[cfg(windows)]
-fn platform(file: &std::path::Path) -> Result<(), String> {
-    // Notepad prints a text file to the default printer and exits (`/p`).
-    let status = Command::new("notepad.exe").arg("/p").arg(file).status().map_err(|why| format!("couldn't start the printer: {why}"))?;
-    if status.success() { Ok(()) } else { Err("the printer didn't take the message".to_owned()) }
-}
-
-#[cfg(not(windows))]
-fn platform(file: &std::path::Path) -> Result<(), String> {
-    // CUPS's `lp` first, then the older `lpr`. Both take a text file and hand it to the default
-    // printer; neither opens a window.
-    for command in ["lp", "lpr"] {
-        match Command::new(command).arg(file).status() {
-            Ok(status) if status.success() => return Ok(()),
-            Ok(_) => return Err(format!("{command} didn't take the message")),
-            Err(why) if why.kind() == std::io::ErrorKind::NotFound => continue,
-            Err(why) => return Err(format!("couldn't start {command}: {why}")),
-        }
+/// Hand the pages to the spooler. Answers what it said — CUPS a job number, Windows how many
+/// sheets it took — or why nothing was printed.
+pub fn spool(job: Job) -> Result<String, String> {
+    if job.pdf.is_empty() {
+        return Err("there is nothing to print".to_owned());
     }
-    Err("no printer command here (lp or lpr): printing needs CUPS".to_owned())
+    let spool = Spool {
+        printer: job.printer.clone(),
+        copies: job.copies.clamp(1, MAX_COPIES),
+        collate: job.collate,
+        // `None` would keep the printer's own habit; the owner said which they want.
+        duplex: Some(if job.two_sided { Duplex::LongEdge } else { Duplex::Off }),
+        scaling: Scaling::Exact,
+        grayscale: job.grayscale,
+        title: job.title.clone(),
+        options: Vec::new(),
+    };
+    craft_print::submit(&job.pdf, &spool).map_err(|why| format!("the printer didn't take the message: {why}"))
 }
