@@ -30,8 +30,12 @@ use quick_xml::events::{BytesRef, BytesStart, Event};
 
 /// Deepest the elements may nest.
 pub const MAX_DEPTH: usize = 40;
-/// Most elements in one answer.
-pub const MAX_NODES: usize = 100_000;
+/// Most elements in one answer. A page of a folder's changes is items, a few elements each; a
+/// server working through a long list of read states (Grommunio sends the ones it already sent
+/// along with every new page, #252) puts three elements for each of them, so this is high enough
+/// for a folder whose mail was read in bulk to come through in pages at all. What the tree may
+/// cost is held by [`budget`] however many elements there are.
+pub const MAX_NODES: usize = 150_000;
 /// Longest name of an element or an attribute that is kept (a longer one is no name anybody
 /// asks for), most attributes read of one element, and the longest value of one.
 const MAX_NAME: usize = 64;

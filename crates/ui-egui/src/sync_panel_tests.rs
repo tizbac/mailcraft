@@ -677,6 +677,13 @@ fn a_row_says_where_it_is_in_one_line() {
         ..Default::default()
     };
     assert_eq!(row(running(SyncPhase::NewMail, "Inbox", 150, 500), 0).line(), "New mail: Inbox, 150 of 500");
+    // (The changes going up have a count of their own: a bar, not a bare phase name.)
+    assert_eq!(row(running(SyncPhase::Folders, "", 300, 10_000), 0).line(), "Folders: 300 of 10000");
+    assert_eq!(
+        row(running(SyncPhase::Folders, "", 300, 10_000), 0).fraction().map(|f| (f * 100.0).round()),
+        Some(3.0),
+        "the bar moves with the changes"
+    );
     assert_eq!(row(running(SyncPhase::NewMail, "Inbox", 40, 0), 0).line(), "New mail: Inbox, 40");
     assert_eq!(row(running(SyncPhase::CalendarAndContacts, "", 0, 0), 0).line(), "Calendar and contacts");
     assert_eq!(row(running(SyncPhase::Renaming, "", 340, 1_200), 0).line(), "Renaming a category on the server: 340 of 1200");

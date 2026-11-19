@@ -149,9 +149,54 @@ fn a_server_without_a_flag_leaves_it_here_and_the_rest_goes_up() {
     assert!(matches!(done(&result, 1), MessageOutcome::Done { flag: Some(_), .. }));
     let state = standin.state();
     assert!(state.item(&a).unwrap().read && !state.item(&a).unwrap().flagged);
-    // (The second never asked: the first had told the run.)
+    // (The batch of two failed for the flag; the first was then asked by itself and made again
+    // without it, and the second, now known, had nothing to ask.)
     let updates = state.requests.iter().filter(|r| r.operation == "UpdateItem").count();
-    assert_eq!(updates, 2, "one that failed and was made again without the flag, and nothing for the second");
+    assert_eq!(updates, 3, "the batch, one that failed and was made again without the flag, and nothing for the second");
+}
+
+#[test]
+fn a_large_batch_of_marks_goes_up_a_hundred_to_a_request_and_is_seen_to_move() {
+    let standin = StandIn::new();
+    let changes: Vec<MessageChange> = (0..250)
+        .map(|i| {
+            let id = mail(&standin, &format!("Letter {i}"));
+            MessageChange::Update { message: i + 1, id, read: Some(true), flag: None, categories: None, importance: None }
+        })
+        .collect();
+    let (pieces, _) = run_with(&standin, &EwsMailRequest { messages: changes, ..base() });
+    // Three requests: a hundred changes, a hundred, and fifty.
+    let batches: Vec<usize> =
+        standin.state().requests.iter().filter(|r| r.operation == "UpdateItem").map(|r| r.body.matches("<t:ItemChange>").count()).collect();
+    assert_eq!(batches, [100, 100, 50]);
+    // How far it had got came with the pieces, a hundred changes at a time, and each piece carried
+    // the changes it had to tell of; the last says all of them are up.
+    let around: Vec<(u32, u32, usize)> = pieces.iter().filter_map(|p| p.up.map(|up| (up.done, up.total, p.messages.len()))).collect();
+    assert_eq!(around, [(100, 250, 100), (200, 250, 100), (250, 250, 50)]);
+    assert!(pieces.iter().filter(|p| p.up.is_some()).all(|p| p.partial));
+    let mut all = EwsMailResult::default();
+    for piece in pieces {
+        all.absorb(piece);
+    }
+    assert_eq!(all.messages.len(), 250);
+    assert!(all.messages.iter().all(|m| matches!(m.outcome, MessageOutcome::Done { .. })));
+    assert!(standin.state().items.iter().all(|i| i.read), "every one is read on the server");
+}
+
+#[test]
+fn a_batch_asks_again_only_the_item_the_server_refused() {
+    let standin = StandIn::new();
+    let (kept, gone) = (mail(&standin, "One"), mail(&standin, "Two"));
+    // The second is gone from the server since it was marked here.
+    standin.state().items.retain(|item| item.id != gone);
+    let change =
+        |message, id: &str| MessageChange::Update { message, id: id.to_owned(), read: Some(true), flag: None, categories: None, importance: None };
+    let result = run(&standin, &EwsMailRequest { messages: vec![change(1, &kept), change(2, &gone)], ..base() });
+    assert!(matches!(done(&result, 0), MessageOutcome::Done { .. }));
+    assert!(matches!(done(&result, 1), MessageOutcome::Gone));
+    assert!(standin.state().item(&kept).unwrap().read);
+    let updates = standin.state().requests.iter().filter(|r| r.operation == "UpdateItem").count();
+    assert_eq!(updates, 2, "the batch, and the one it refused asked by itself");
 }
 
 #[test]
