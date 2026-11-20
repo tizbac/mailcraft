@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: MailCraft contributors
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `mail.openAttachment` in the window (#126): an attachment opened with the computer's own
-//! program for that kind of file, as Outlook's double-click and Open do.
+//! program for that kind of file, as Outlook's double-click and Open do — except a message file
+//! (`.eml`, a `message/rfc822` part), which MailCraft opens itself in a window of its own, since
+//! MailCraft is the program for mail.
 //!
 //! What the sender chose is never trusted: the kind of file decides first
 //! ([`mailcraft_engine::opening::verdict`]): programs, scripts, shortcuts, installers, disk
@@ -9,8 +11,12 @@
 //! and web pages are asked about first ([`question`]). The host writes the file into a folder of
 //! MailCraft's own, under a name made safe, and asks the system to open it
 //! ([`Services::open_file`](crate::Services::open_file)). The browser has no such thing: there the
-//! file is downloaded instead. Agents can't ask for any of it (`agent::access`).
+//! file is downloaded instead, except a message file, which still opens in a window. Agents can't
+//! ask for any of it (`agent::access`).
 
+use std::sync::Arc;
+
+use mailcraft_engine::io::Format;
 use mailcraft_engine::opening::{self, Verdict};
 use mailcraft_model::Id;
 use serde_json::{Value, json};
@@ -31,6 +37,14 @@ fn target(app: &MailApp, p: &Value) -> Result<(Id, usize, String), String> {
     let m = app.session.mailbox.message(id).ok_or_else(|| tl!("The message isn't there any more").to_string())?;
     let a = m.attachments.get(index).ok_or_else(|| tl!("The message has no such attachment").to_string())?;
     Ok((id, index, a.name.clone()))
+}
+
+/// Whether an attachment is a message itself: MailCraft opens that in a window of its own instead
+/// of handing it to the computer's program for it. The name decides, as everywhere else; a part
+/// the server called `message/rfc822` counts too, whatever it was named.
+fn message_file(name: &str, mime: &str) -> bool {
+    matches!(Format::detect(&opening::file_name(name), &[]), Some(Format::Eml))
+        || mime.split(';').next().unwrap_or("").trim().eq_ignore_ascii_case("message/rfc822")
 }
 
 /// What the owner is asked before an Office file with macros, a web page, Markdown, or a key,
@@ -77,8 +91,12 @@ pub(crate) fn ui_command(app: &mut MailApp, id: &str, p: &Value) -> Option<Resul
 
 fn open(app: &mut MailApp, p: &Value) -> Result<Value, String> {
     let (message, index, name) = target(app, p)?;
+    let mime = app.session.mailbox.message(message).and_then(|m| m.attachments.get(index).map(|a| a.mime.clone())).unwrap_or_default();
+    // MailCraft is the program for mail: a message attached to a message is read here, whatever
+    // the sender named it, since nothing of it reaches the computer.
+    let mail = message_file(&name, &mime);
     let verdict = opening::verdict(&name);
-    if verdict == Verdict::Blocked {
+    if !mail && verdict == Verdict::Blocked {
         return Err(opening::blocked_message(&name));
     }
     // The window asks first ([`question`]) and its yes says so; any other caller says so itself.
@@ -87,6 +105,12 @@ fn open(app: &mut MailApp, p: &Value) -> Result<Value, String> {
     }
     let file = opening::file_name(&name);
     let bytes = app.session.content(message, mailcraft_engine::Part::Attachment(index)).map_err(|e| e.to_string())?;
+    // (A message file is mail: MailCraft reads it in a window of its own, the same one a message
+    // file handed over by the system gets — read-only, in memory, nothing filed until the owner
+    // says where it goes. Nothing is written to disk for it, and nothing is fetched.)
+    if mail {
+        return open_message_file(app, &file, bytes);
+    }
     if let Some(open_file) = &app.services.open_file {
         open_file(&file, bytes.as_slice())?;
         app.status(crate::i18n::fmt(tl!("Opening {name}"), &[("name", &file)]));
@@ -99,6 +123,24 @@ fn open(app: &mut MailApp, p: &Value) -> Result<Value, String> {
         return Ok(json!({"name": file, "downloaded": true}));
     }
     Err(tl!("Attachments can't be opened here: save it with Save As instead.").to_string())
+}
+
+/// A message file attachment, read and shown in a window of MailCraft's own: nothing is written
+/// to disk for it and nothing is given to the computer.
+fn open_message_file(app: &mut MailApp, name: &str, bytes: Arc<Vec<u8>>) -> Result<Value, String> {
+    let too_large = || {
+        crate::i18n::fmt(
+            tl!("The message file is larger than {mb} MB: save it with Save As and open it from there"),
+            &[("mb", &(crate::opened_message::MAX_BYTES >> 20).to_string())],
+        )
+    };
+    if u64::try_from(bytes.len()).map_or(true, |n| n > crate::opened_message::MAX_BYTES) {
+        return Err(too_large());
+    }
+    let message = mailcraft_engine::io::parse_unfiled(name, &bytes).map_err(|e| e.to_string())?;
+    let window = app.windows.add_file(Arc::new(message), bytes)?;
+    app.status(crate::i18n::fmt(tl!("Opened {name} in MailCraft"), &[("name", name)]));
+    Ok(json!({"name": name, "opened": true, "window": window}))
 }
 
 #[cfg(test)]
