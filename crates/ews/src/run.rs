@@ -96,9 +96,25 @@ pub(crate) enum Stop {
     Auth,
     Busy(u32),
     Tls,
-    /// The server could not be reached at all.
-    Unreachable,
+    /// The server could not be reached at all: which one, and what the connection said about it.
+    Unreachable {
+        host: String,
+        why: String,
+    },
     Line(&'static str),
+}
+
+/// A line for a server that could not be reached: the address it is at, and what the connection
+/// said — the transport's own few words when it has them, else the kind of trouble. The address is
+/// one the owner gave in Account Settings, and the words are what the connection itself said:
+/// nothing of the owner's mail, and no credential (docs/mail-privacy-rules.md).
+pub(crate) fn unreachable_line(host: &str, why: &str) -> String {
+    match (host, why) {
+        ("", "") => "Couldn't reach the server".to_owned(),
+        ("", why) => format!("Couldn't reach the server ({why})"),
+        (host, "") => format!("Couldn't reach the server at {host}"),
+        (host, why) => format!("Couldn't reach the server at {host} ({why})"),
+    }
 }
 
 /// How a run ended so far.
@@ -134,7 +150,7 @@ impl Outcome {
             Stop::Auth => self.auth_refused = true,
             Stop::Busy(seconds) => self.busy_for = Some(seconds),
             Stop::Tls => self.line("Couldn't set up a secure connection with the server"),
-            Stop::Unreachable => self.line("Couldn't reach the server"),
+            Stop::Unreachable { host, why } => self.line(&unreachable_line(&host, &why)),
             Stop::Line(text) => self.line(text),
         }
     }
@@ -190,6 +206,13 @@ impl<'a, E: HttpExchange> Run<'a, E> {
 }
 
 impl<E: HttpExchange> Run<'_, E> {
+    /// A run's end for a transport that could not get an answer at all: the server's address, and
+    /// what the connection said about it — the transport's own words when it gave any, else the
+    /// kind of trouble ([`TransportError::words`](TransportError)).
+    fn unreachable(&self, error: TransportError) -> Stop {
+        Stop::Unreachable { host: self.client.host(), why: self.exchange.trouble().unwrap_or_else(|| error.words().to_owned()) }
+    }
+
     /// Sends `operation` and reads the answer with `read`, again after a busy server's wait.
     pub(crate) async fn ask<T>(&mut self, operation: &Element, read: &dyn Fn(&Reply) -> Result<T, Error>) -> Result<T, Asked> {
         self.ask_with(operation, read, false).await
@@ -233,9 +256,11 @@ impl<E: HttpExchange> Run<'_, E> {
                 Error::Endpoint(_) => return Err(Asked::Stop(Stop::Line("The server's address can't be used"))),
                 Error::Transport(TransportError::Aborted) => return Err(Asked::Stop(Stop::Cancelled)),
                 Error::Transport(TransportError::Tls) => return Err(Asked::Stop(Stop::Tls)),
-                Error::Transport(TransportError::Unreachable) => return Err(Asked::Stop(Stop::Unreachable)),
+                // Nothing went out at all, so the request may be made again: the run stops, and
+                // says which server and what the connection said about it.
+                Error::Transport(error) if error == TransportError::Unreachable => return Err(Asked::Stop(self.unreachable(error))),
                 Error::Transport(_) if once => return Err(Asked::Lost),
-                Error::Transport(_) => return Err(Asked::Stop(Stop::Unreachable)),
+                Error::Transport(error) => return Err(Asked::Stop(self.unreachable(error))),
                 Error::Server(code) => return Err(Asked::Code(code)),
                 // (An answer that is none the service gives, to a request that may have been done.)
                 Error::Status(_) | Error::Malformed | Error::TooLarge | Error::Unexpected if once => return Err(Asked::Lost),
@@ -838,14 +863,14 @@ pub async fn fetch_messages<E: HttpExchange>(
                 if let Stop::Busy(seconds) = stop {
                     out.busy_for = Some(seconds.max(1));
                 }
-                out.offline = matches!(stop, Stop::Unreachable);
+                out.offline = matches!(stop, Stop::Unreachable { .. });
                 let line = match stop {
                     Stop::Cancelled => None,
-                    Stop::Unreachable => Some("Couldn't reach the server"),
-                    Stop::Auth => Some("The server turned down the sign-in"),
-                    Stop::Busy(_) => Some("The server is busy"),
-                    Stop::Tls => Some("Couldn't set up a secure connection with the server"),
-                    Stop::Line(text) => Some(text),
+                    Stop::Unreachable { host, why } => Some(unreachable_line(&host, &why)),
+                    Stop::Auth => Some("The server turned down the sign-in".to_owned()),
+                    Stop::Busy(_) => Some("The server is busy".to_owned()),
+                    Stop::Tls => Some("Couldn't set up a secure connection with the server".to_owned()),
+                    Stop::Line(text) => Some(text.to_owned()),
                 };
                 if let Some(line) = line {
                     outcome.line(&format!("Couldn't download the messages from the server: {line}"));

@@ -1,0 +1,1 @@
+| 2026-11-20 | minor | A line about a connection that failed may name the server it failed against (its host and port) and what the connection reported; the server's address is otherwise still a setting that is not logged |

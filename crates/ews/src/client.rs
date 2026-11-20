@@ -59,6 +59,14 @@ impl Client {
         Version::from_index(self.version.load(Ordering::Relaxed))
     }
 
+    /// The server the endpoint is on, as it is written in the address: lower case, with its port
+    /// when there is one (`mail.example.org:444`). Empty when the address names no host. It goes
+    /// into the line that says which server could not be reached, which is why the address the
+    /// owner typed is allowed to appear there (docs/mail-privacy-rules.md).
+    pub fn host(&self) -> String {
+        endpoint_host(&self.endpoint)
+    }
+
     /// The request for `operation`, ready to send.
     pub fn request(&self, operation: &Element) -> Result<HttpRequest, Error> {
         self.request_in(self.version(), operation)
@@ -135,4 +143,20 @@ impl Client {
         let get = GetFolder::new(&[DistinguishedFolder::Inbox]);
         self.get_folders(exchange, &get).await?.into_iter().next().ok_or(Error::Unexpected)?
     }
+}
+
+/// The most a host held for a line about it may be.
+const MAX_HOST: usize = 100;
+
+/// The host of an endpoint address, as written: `mail.example.org:444` of
+/// `https://mail.example.org:444/EWS/Exchange.asmx`, lower case. Nothing but letters, digits,
+/// hyphens, dots, colons and the brackets of an IPv6 address: an address [`check_endpoint`]
+/// already read, held short and clean before it reaches a line the owner sees.
+fn endpoint_host(endpoint: &str) -> String {
+    let rest = endpoint.split_once("://").map_or(endpoint, |(_, rest)| rest);
+    let authority: String = rest.split(['/', '?', '#']).next().unwrap_or("").chars().take(MAX_HOST).flat_map(|c| c.to_lowercase()).collect();
+    if authority.is_empty() || !authority.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b':' | b'[' | b']')) {
+        return String::new();
+    }
+    authority
 }

@@ -31,7 +31,7 @@ use crate::directory::{self, Answer, Item, ItemUp, Kind};
 use crate::error::{Error, ResponseCode};
 use crate::folder::{DistinguishedFolder, FindFolder, FolderInfo, GetFolder};
 use crate::http::HttpExchange;
-use crate::run::{Asked, Run, Stop};
+use crate::run::{Asked, Run, Stop, unreachable_line};
 use crate::soap::Element;
 
 /// How many pages of one listing are followed, and how many items one run takes in.
@@ -81,14 +81,15 @@ pub async fn sync_directory<E: HttpExchange>(
     out
 }
 
-/// What a stop says, in words that name nothing of the server.
+/// What a stop says. A server that could not be reached is named by its address and by what the
+/// connection said (docs/mail-privacy-rules.md); nothing else names the server.
 fn stop_line(stop: Stop, out: &mut mailcraft_model::sync::EwsDirectoryResult) {
     match stop {
         Stop::Cancelled => {}
         Stop::Auth => out.auth_refused = true,
         Stop::Busy(seconds) => out.busy_for = Some(seconds.max(1)),
         Stop::Tls => out.errors.push("Couldn't set up a secure connection with the server".to_owned()),
-        Stop::Unreachable => out.errors.push("Couldn't reach the server".to_owned()),
+        Stop::Unreachable { host, why } => out.errors.push(unreachable_line(&host, &why)),
         Stop::Line(text) => out.errors.push(text.to_owned()),
     }
 }
@@ -533,7 +534,7 @@ impl<E: HttpExchange> Run<'_, E> {
                 outcome.result = EventResult::Failed;
                 outcome.error = "the server turned the sign-in down".to_owned();
             }
-            Err(Asked::Stop(Stop::Unreachable | Stop::Tls)) => {
+            Err(Asked::Stop(Stop::Unreachable { .. } | Stop::Tls)) => {
                 outcome.result = EventResult::Failed;
                 outcome.error = "the server couldn't be reached".to_owned();
             }
