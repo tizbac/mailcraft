@@ -281,10 +281,18 @@ fn an_account_whose_server_cannot_be_reached_says_so_and_asks_nothing_of_the_own
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         format!("http://{}/EWS/Exchange.asmx", listener.local_addr().unwrap())
     };
-    let server = Server { url: gone, standin: Arc::new(StandIn::new()), stop: Arc::new(AtomicBool::new(true)) };
+    let server = Server { url: gone.clone(), standin: Arc::new(StandIn::new()), stop: Arc::new(AtomicBool::new(true)) };
     let (mut app, account) = window(&server);
     send_receive(&mut app, json!({"account": account, "password": PASSWORD}));
-    assert!(app.session.sync_status.contains("Couldn't reach the server"), "{}", app.session.sync_status);
+    // Which server, and what the connection said: so an account whose server is unreachable is not
+    // taken for one whose sign-in was refused. Nothing of the password is in the line.
+    let host = gone.trim_start_matches("http://").split('/').next().unwrap_or("").to_owned();
+    assert!(
+        app.session.sync_status.contains(&format!("Couldn't reach the server at {host} (the server refused the connection)")),
+        "{}",
+        app.session.sync_status
+    );
+    assert!(!app.session.sync_status.contains(PASSWORD), "{}", app.session.sync_status);
     assert!(app.dialog.is_none());
 }
 

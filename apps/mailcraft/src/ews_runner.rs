@@ -104,6 +104,10 @@ pub(crate) struct Transport {
     sign_in: Mutex<SignIn>,
     /// Why the sign-in could not be had, when that is what stopped the run.
     auth_problem: Mutex<Option<AuthProblem>>,
+    /// What the last exchange's connection said when it could not get an answer, in a few of its
+    /// own words ("the server refused the connection"): for the line naming which server could not
+    /// be reached. Cleared with every new request.
+    trouble: Mutex<Option<String>>,
     /// How many EWS requests the run has made, for its timings ([`Transport::requests_asked`]).
     asked: AtomicU32,
 }
@@ -128,6 +132,7 @@ impl Transport {
             sign_in: Mutex::new(SignIn::default()),
             auth_problem: Mutex::new(None),
             asked: AtomicU32::new(0),
+            trouble: Mutex::new(None),
         }
     }
 
@@ -358,17 +363,40 @@ impl Transport {
 
     /// What a failed exchange is to the run. A certificate that is not accepted is kept apart (never
     /// a plain TLS error to the run's machine: it ends the run at once and asks); the rest is
-    /// told by its kind.
+    /// told by its kind. A connection that could not be made at all keeps a few of its own words,
+    /// so that the line naming the server can say what went wrong ([`HttpExchange::trouble`](crate::http::HttpExchange)).
     fn judged(&self, error: NetError) -> TransportError {
         match error {
             NetError::Certificate(problem) => {
                 *self.stopped_at.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(*problem);
                 TransportError::Tls
             }
-            NetError::Tls { .. } => TransportError::Tls,
-            NetError::Connect { .. } => TransportError::Unreachable,
+            NetError::Tls { reason, .. } => {
+                self.note_trouble(&reason.to_string());
+                TransportError::Tls
+            }
+            NetError::Connect { reason, .. } => {
+                self.note_trouble(&reason.to_string());
+                TransportError::Unreachable
+            }
             _ => TransportError::Other,
         }
+    }
+
+    /// A few words of what the connection itself said, for the line that says which server could
+    /// not be reached. Words only: control characters gone, at most 200 of them, nothing of the
+    /// owner's mail or of a credential (what a server answers is never kept here).
+    fn note_trouble(&self, said: &str) {
+        let clean: String = said.chars().take(200).filter(|c| !c.is_control()).collect();
+        let clean = clean.trim();
+        if !clean.is_empty() {
+            *self.trouble.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(clean.to_owned());
+        }
+    }
+
+    /// Nothing is known about the last connection: the next request's failure says its own thing.
+    fn forget_trouble(&self) {
+        *self.trouble.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
     }
 }
 
@@ -376,7 +404,14 @@ impl HttpExchange for Transport {
     fn exchange(&self, request: &HttpRequest) -> impl Future<Output = Result<HttpResponse, TransportError>> {
         // (The call blocks, on the run's own thread.)
         self.count_request();
+        // A new request: what an earlier connection said is no longer the thing to say about this
+        // one, even if this one gets an answer.
+        self.forget_trouble();
         ready(self.send(request))
+    }
+
+    fn trouble(&self) -> Option<String> {
+        self.trouble.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone()
     }
 }
 

@@ -336,7 +336,13 @@ impl MailApp {
             // Said once, when it first stops, not every time it tries again. Named by the kind of
             // server the account is on: a batch of an Exchange account is not a Graph fetch.
             if stopped.first {
-                let why = result.errors.first().map_or("no answer", String::as_str);
+                // What the run said, up to the three lines it kept: the first is usually which
+                // server could not be had and what the connection said about it.
+                let why = if result.errors.is_empty() {
+                    "no answer came".to_owned()
+                } else {
+                    result.errors.iter().take(3).map(String::as_str).collect::<Vec<_>>().join("; ")
+                };
                 log::warn!(
                     "{} fetch, account {account}: the background download stopped ({why}); it tries again in {} s",
                     fetch_name(&self.session, account),

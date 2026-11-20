@@ -3,6 +3,7 @@
 //! Mail down against the strict stand-in (#252, E6): the first download, a delta, a lost sync
 //! state, a busy server, hostile answers, a refused sign-in, and a message fetched whole.
 
+use std::future::Future;
 use std::sync::atomic::AtomicBool;
 
 use mailcraft_model::FolderKind;
@@ -26,12 +27,12 @@ fn run(standin: &StandIn, request: &EwsMailRequest) -> (Vec<EwsMailResult>, Vec<
     run_as(&client(), standin, request)
 }
 
-fn run_as(client: &Client, standin: &StandIn, request: &EwsMailRequest) -> (Vec<EwsMailResult>, Vec<u32>) {
+fn run_as<E: HttpExchange>(client: &Client, exchange: &E, request: &EwsMailRequest) -> (Vec<EwsMailResult>, Vec<u32>) {
     let (mut pieces, mut waits) = (Vec::new(), Vec::new());
     let cancel = AtomicBool::new(false);
     block_on(sync_mail(
         client,
-        standin,
+        exchange,
         request,
         &cancel,
         &mut |ms| {
@@ -514,6 +515,55 @@ fn a_refused_sign_in_ends_the_run_and_says_so() {
     assert_eq!(pieces.len(), 1);
     assert!(last(&pieces).auth_refused && !last(&pieces).whole && !last(&pieces).partial);
     assert!(standin.state().requests.iter().all(|r| r.status == 401));
+}
+
+/// A transport that never gets an answer, holding a few words of what the connection said.
+struct NoConnection {
+    /// The transport's own words for the trouble; `None` when it has none beyond its kind.
+    said: Option<&'static str>,
+}
+
+impl HttpExchange for NoConnection {
+    fn exchange(&self, _: &HttpRequest) -> impl Future<Output = Result<HttpResponse, TransportError>> {
+        std::future::ready(Err(TransportError::Unreachable))
+    }
+
+    fn trouble(&self) -> Option<String> {
+        self.said.map(|words| words.to_owned())
+    }
+}
+
+#[test]
+fn a_server_that_cannot_be_reached_is_named_by_its_address_and_what_the_connection_said() {
+    // Which of the owner's accounts is unreachable, and why, is told by the line a run writes: the
+    // server the owner named in Account Settings, and what the connection itself reported.
+    let stopped = NoConnection { said: Some("the server refused the connection") };
+    let (pieces, _) = run_as(&client(), &stopped, &request());
+    let lines = last(&pieces).errors.clone();
+    assert_eq!(lines, ["Couldn't reach the server at mail.example.org (the server refused the connection)"], "{lines:?}");
+
+    // A transport with no words of its own says the kind of trouble.
+    let (pieces, _) = run_as(&client(), &NoConnection { said: None }, &request());
+    let lines = last(&pieces).errors.clone();
+    assert_eq!(lines, ["Couldn't reach the server at mail.example.org (no connection could be made to it)"], "{lines:?}");
+
+    // The batch of messages a window downloads says the same, in the line the log reads.
+    let cancel = AtomicBool::new(false);
+    let got = block_on(fetch_messages(
+        &client(),
+        &stopped,
+        &EwsFetchRequest { account: 1, email: "ada@example.org".into(), url: URL.into(), ids: vec!["A".into()], ..Default::default() },
+        &cancel,
+        &mut |_| true,
+    ))
+    .unwrap_or_default();
+    let lines = got.errors.clone();
+    assert!(got.offline, "the batch knows the server is not there");
+    assert_eq!(
+        lines,
+        ["Couldn't download the messages from the server: Couldn't reach the server at mail.example.org (the server refused the connection)"],
+        "{lines:?}"
+    );
 }
 
 #[test]
