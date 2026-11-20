@@ -12305,6 +12305,11 @@ msgstr "Megnyitva {owner} bejelentkezéssel. Teljes hozzáférést igényel a po
 
 #. interface
 #: crates/ui-egui/src/attachment_open.rs
+msgid "Opened {name} in MailCraft"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/attachment_open.rs
 #, fuzzy
 msgid "Opening Mail Attachment"
 msgstr "A levél melléklet megnyitása"
@@ -18255,6 +18260,11 @@ msgstr "Az üzenetet nem sikerült beolvasni."
 #, fuzzy
 msgid "The message couldn't be downloaded. Try again in a few minutes."
 msgstr "Az üzenetet nem sikerült letölteni. Próbálja újra néhány perc múlva."
+
+#. interface
+#: crates/ui-egui/src/attachment_open.rs
+msgid "The message file is larger than {mb} MB: save it with Save As and open it from there"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt

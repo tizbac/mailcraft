@@ -1,0 +1,1 @@
+- A message file attached to a message (`.eml`, or a part the server calls `message/rfc822`) is opened by MailCraft itself, in a window of its own like a message file handed over by the system: read-only, in memory, nothing written anywhere, and Move to Folder files it when the owner says where it goes.
