@@ -28,6 +28,45 @@ fn ics(uid: &str, title: &str, organizer: &str) -> Vec<u8> {
 }
 
 #[test]
+fn an_outlook_msg_file_comes_in_as_one_message() {
+    let (mut s, _) = session();
+    let note = mailcraft_model::Message {
+        subject: "Quarter results".into(),
+        message_id: "q1@example.org".into(),
+        from: mailcraft_model::Address::new("Ada", "ada@example.org"),
+        to: vec![mailcraft_model::Address::new("Bob", "bob@example.org")],
+        date: now(),
+        body: mailcraft_model::Body { text: "See the numbers.".into(), html: None },
+        ..mailcraft_model::Message::default()
+    };
+    let bytes = mailcraft_mime_model::msg::write(&note).unwrap_or_else(|e| panic!("a note writes: {e}"));
+    // Named, or not: a compound file is an Outlook message whatever it is called.
+    assert_eq!(crate::io::Format::detect("note.msg", &bytes), Some(crate::io::Format::Msg));
+    assert_eq!(crate::io::Format::detect("note", &bytes), Some(crate::io::Format::Msg));
+    assert_eq!(crate::io::count_messages("note.msg", &bytes), Some(1));
+    let said = crate::io::import(&mut s, "note.msg", &bytes, None).unwrap_or_else(|e| panic!("a .msg imports: {e}"));
+    assert_eq!(said["messages"], 1, "{said}");
+    assert_eq!(said["format"], "msg");
+    let in_mailbox = s.mailbox.message(said["ids"][0].as_u64().unwrap_or(0)).unwrap_or_else(|| panic!("the note is not there"));
+    assert_eq!(in_mailbox.subject, "Quarter results");
+    assert_eq!(in_mailbox.from.email, "ada@example.org");
+    assert_eq!(in_mailbox.body.text, "See the numbers.");
+    // Read to be looked at and not kept: the mailbox is as it was.
+    let before = s.mailbox.messages.len();
+    let looked = crate::io::parse_unfiled("note.msg", &bytes).unwrap_or_else(|e| panic!("a .msg is read: {e}"));
+    assert_eq!(looked.subject, "Quarter results");
+    assert_eq!(s.mailbox.messages.len(), before, "looking at a file files nothing");
+    // A file named `.msg` that isn't a compound file at all is refused, not half-read.
+    assert!(crate::io::parse_unfiled("a.msg", b"From: a@example.org\r\nTo: b@example.org\r\n\r\nhello\r\n").is_err());
+    // `.msg822` is still an Internet message, as it has always been.
+    assert_eq!(crate::io::Format::detect("m.msg822", b"From: a@example.org\r\n\r\nhello\r\n"), Some(crate::io::Format::Eml));
+    for keep in 0..bytes.len() {
+        // Whatever is left of the file, the answer is an error or a message, never a crash.
+        let _ = crate::io::parse_unfiled("note.msg", &bytes[..keep]);
+    }
+}
+
+#[test]
 fn an_ics_file_replaces_a_meeting_only_for_the_same_organizer() {
     let (mut s, _) = session();
     crate::io::import(&mut s, "a.ics", &ics("uid-1", "Design review", "bo@example.org"), None).unwrap();

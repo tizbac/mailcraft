@@ -1,0 +1,1 @@
+| 2026-11-20 | major | `.msg` (Outlook message, [MS-OXMSG]) is read: the note's properties, recipients by type, attachments by value, an embedded message one level deep, compressed rich text, base64 or plain HTML, and the code page the file names for one-byte strings |
