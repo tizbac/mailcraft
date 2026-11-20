@@ -547,7 +547,7 @@ fn download_in_full(app: &mut MailApp, ui: &mut Ui, a: &mailcraft_model::Account
 fn open(app: &mut MailApp, ui: &mut Ui, t: &Tokens) {
     heading(ui, tl!("Open & Export"), t);
     section(ui, tl!("Bring in"), t);
-    if tile(ui, "import", tl!("Import"), tl!("Messages (.eml, .mbox), calendars (.ics) and contacts (.vcf)"), t) {
+    if tile(ui, "import", tl!("Import"), tl!("Messages (.eml, .msg, .mbox), calendars (.ics) and contacts (.vcf)"), t) {
         let _ = app.run("ui.import", json!({}));
     }
     if tile(ui, "import", tl!("Import a Folder of Mailboxes"), tl!("Every mbox file under a folder, keeping its subfolders, into one new folder"), t)
@@ -991,11 +991,11 @@ fn options(app: &mut MailApp, ui: &mut Ui, t: &Tokens) {
         egui::ComboBox::from_id_salt("opt_save_message")
             .selected_text(match choice {
                 mailcraft_engine::SaveMessageFormat::Eml => tl!("Internet message (.eml)"),
-                mailcraft_engine::SaveMessageFormat::Msg => tl!("Message file (.msg)"),
+                mailcraft_engine::SaveMessageFormat::Msg => tl!("Outlook message (.msg)"),
             })
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut choice, mailcraft_engine::SaveMessageFormat::Eml, tl!("Internet message (.eml)"));
-                ui.selectable_value(&mut choice, mailcraft_engine::SaveMessageFormat::Msg, tl!("Message file (.msg)"));
+                ui.selectable_value(&mut choice, mailcraft_engine::SaveMessageFormat::Msg, tl!("Outlook message (.msg)"));
             });
         if choice != prefs.save_message_format {
             set(

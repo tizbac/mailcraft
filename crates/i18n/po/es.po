@@ -8976,11 +8976,6 @@ msgstr ""
 msgid "Message Preview"
 msgstr "Vista previa del mensaje"
 
-#. interface
-#: crates/ui-egui/src/backstage.rs
-msgid "Message file (.msg)"
-msgstr ""
-
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ComposeHost.kt
 #, fuzzy
@@ -9001,9 +8996,8 @@ msgstr "Mensajes"
 
 #. interface
 #: crates/ui-egui/src/backstage.rs
-#, fuzzy
-msgid "Messages (.eml, .mbox), calendars (.ics) and contacts (.vcf)"
-msgstr "Mensajes (.eml, .mbox), calendarios (.ics) y contactos (.vcf)"
+msgid "Messages (.eml, .msg, .mbox), calendars (.ics) and contacts (.vcf)"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/files.rs
@@ -11633,6 +11627,11 @@ msgstr "Bandeja de salida"
 #, fuzzy
 msgid "Outgoing mail (SMTP)"
 msgstr "Correo saliente (SMTP)"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Outlook message (.msg)"
+msgstr ""
 
 #. command label
 #: crates/ui-egui/src/lib.rs
@@ -24384,6 +24383,11 @@ msgstr "{name}: no es un archivo de mensaje"
 msgid "{name}: not a message, calendar or contact file MailCraft reads"
 msgstr "{name}: no es un archivo de mensaje, calendario o contacto que MailCraft pueda leer"
 
+#. what a command says
+#: crates/engine/src/io.rs
+msgid "{name}: {why}"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
 #, fuzzy
@@ -25614,6 +25618,10 @@ msgstr "−Bin"
 #, fuzzy
 msgid "−Lines"
 msgstr "−Líneas"
+
+#, fuzzy
+#~ msgid "Messages (.eml, .mbox), calendars (.ics) and contacts (.vcf)"
+#~ msgstr "Mensajes (.eml, .mbox), calendarios (.ics) y contactos (.vcf)"
 
 #, fuzzy
 #~ msgid "Capitalize the first word of sentences"

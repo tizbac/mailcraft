@@ -101,7 +101,7 @@ against a pass/fail checklist, several at once. The shortfalls behind them are i
 12. Calendar overlay and the Schedule view
 13. Contact groups
 14. Search Folders
-15. `.msg` import
+15. ~~`.msg` import~~ (done: a `.msg` file reads and writes)
 16. Clean-up commands (Ignore, Clean Up Conversation, Recover Deleted)
 
 ## Features: where each area stands (2026-11-16)
@@ -118,7 +118,7 @@ Ready and hours left are estimated ([how](#methodology)); the hours come from [`
 | **Calendar** | 55% | 36–62 | Day, work week, week and month; recurrence; time zones; meetings through Microsoft 365 with invitations, updates, cancellations and answers, Propose New Time, forwarding and Teams meetings; Find a Time (everyone's free and busy time) for one day; shared mailboxes' calendars and a colleague's calendar opened by address (#70); reminders with desktop alerts. Missing: rooms, Find a Time over several days, sharing or publishing one's own calendar, alerts while MailCraft is closed (gaps 9–11, [calendar-parity.md](docs/calendar-parity.md)) |
 | **People** | 45% | 15–30 | Contacts with several addresses and phones, favourites, categories, `.vcf` in and out in every character set, a Microsoft account's contacts read. Missing: contact groups, photos, the organisation's directory beyond searching an Exchange server account's (Check Names and the Address Book, #1262; gap 17) |
 | **Tasks** | 50% | 10–20 | To-dos with dates, importance, categories, completion, links to flagged mail. Kept in step with Microsoft To Do for Microsoft accounts, both ways (#248). Missing: recurrence, assignment, My Day, the To-Do bar (gap 17) |
-| **Files** | 55% | 50–100 | `.eml`, `.mbox`, `.ics`, `.vcf` and MailCraft's own mailbox (a log of records, with message content in files beside it). `.pst` import (mail, contacts, calendar, tasks, notes, journal), and Save Message As writes an Outlook `.msg` file. Missing: reading a `.msg`, `.ost` and `.olm` (gap 12), printing (gap 15) |
+| **Files** | 58% | 44–88 | `.eml`, `.mbox`, `.ics`, `.vcf` and MailCraft's own mailbox (a log of records, with message content in files beside it). `.pst` import (mail, contacts, calendar, tasks, notes, journal), and an Outlook `.msg` file both ways: Save Message As writes one, and one dropped, double-clicked or imported is read (body, recipients, attachments, a message attached inside it). Missing: `.ost` and `.olm` (gap 12), printing (gap 15) |
 | **Platforms** | 60% | 49–98 | Built and tested in CI on Windows, macOS and Linux, FreeBSD and Windows ARM64 on a schedule, and the browser; releases carry MailCraft's own signature and update themselves, and are not signed for Windows or macOS (gap 18); on macOS an update is installed by the owner until the builds are notarized (#497) |
 | **Agents** | 100% | 0 | Ahead of Outlook: every action is a command with a documented id and parameters, reachable from a CLI, a keyed local control channel and MCP, with a headless mode; what an agent may do is the owner's to allow, an agent names the messages it acts on (#620, #553) and never changes a message the owner is writing (#577) |
 | **Privacy and safety** | 70% | 40–80 | Ahead of Outlook by default: nothing in a message runs or is fetched unless the owner asks for its pictures; passwords and sign-ins are kept only by the operating system's credential store; unencrypted connections to servers are refused. Missing: signing and encrypting mail (gap 16; an OpenPGP signature is already checked where a message is read) |
@@ -185,7 +185,7 @@ the first people MailCraft is for. Each is a shortfall in [`docs/gaps.md`](docs/
    through the system's browser, with the mailbox kept on the device and a layout for a small
    screen. Under way (`apps/mailcraft-android`, MB3: accounts and sign-in, the mail list, background
    Send/Receive with new-mail notifications); not in a release yet.
-3. Bringing an Outlook archive across: `.pst` files come in (#815); `.msg` files remain (gap 12).
+3. Bringing an Outlook archive across: `.pst` files come in (#815), and so do `.msg` files (gap 12); an Outlook OST file remains.
 4. Printing messages, calendars and contacts (gap 15).
 5. Warnings before sending (a recipient who looks like someone the owner writes to but isn't, many
    people outside the organisation who would see each other's addresses) and Report Phishing;

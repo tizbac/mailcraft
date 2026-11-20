@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: MailCraft contributors
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! A message file read without being filed (#515): `.eml` handed over by the system (a double
-//! click, a later start) opens in a window of its own that is read-only and holds the message in
-//! memory only. Nothing is added to the mailbox until the owner says where it goes (Move to
-//! Folder, which is `file.import` of the same bytes into the folder chosen); Save As writes the
-//! file's bytes. Closing the window leaves no trace.
+//! A message file read without being filed (#515): an `.eml` or an Outlook `.msg` handed over by
+//! the system (a double click, a later start) opens in a window of its own that is read-only and
+//! holds the message in memory only. Nothing is added to the mailbox until the owner says where it
+//! goes (Move to Folder, which is `file.import` of the same bytes into the folder chosen); Save As
+//! writes the file's bytes. Closing the window leaves no trace.
 //!
 //! The message goes through the display path of every message (`crates/html`, the same checks);
 //! its own pictures (`cid:`) are shown and pictures on the web are never fetched for it (it has no
@@ -61,11 +61,20 @@ fn read_capped(_: &std::path::Path) -> Result<Vec<u8>, String> {
     Err(tl!("The browser opens no files from the system").to_string())
 }
 
+/// The file format these bytes are in, as a name's extension: an Outlook message is a compound
+/// file, everything else opened this way is an Internet message.
+fn extension_of(bytes: &[u8]) -> &'static str {
+    match mailcraft_engine::io::Format::detect("", bytes) {
+        Some(mailcraft_engine::io::Format::Msg) => "msg",
+        _ => "eml",
+    }
+}
+
 /// File the message into `folder` (`file.import` of the same bytes, as File › Import does): the
 /// mailbox gains exactly one message. Answers its id.
 pub(crate) fn file_into(app: &mut MailApp, bytes: &[u8], folder: u64) -> Result<u64, String> {
     let data = mailcraft_engine::cmd::base64_encode(bytes);
-    let r = app.run("file.import", json!({"name": "message.eml", "data": data, "folder": folder}))?;
+    let r = app.run("file.import", json!({"name": format!("message.{}", extension_of(bytes)), "data": data, "folder": folder}))?;
     r.get("ids")
         .and_then(Value::as_array)
         .and_then(|ids| ids.first())

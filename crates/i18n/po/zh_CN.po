@@ -8968,11 +8968,6 @@ msgstr ""
 msgid "Message Preview"
 msgstr "邮件预览"
 
-#. interface
-#: crates/ui-egui/src/backstage.rs
-msgid "Message file (.msg)"
-msgstr ""
-
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ComposeHost.kt
 #, fuzzy
@@ -8993,9 +8988,8 @@ msgstr "邮件"
 
 #. interface
 #: crates/ui-egui/src/backstage.rs
-#, fuzzy
-msgid "Messages (.eml, .mbox), calendars (.ics) and contacts (.vcf)"
-msgstr "邮件（.eml、.mbox）、日历（.ics）和联系人（.vcf）"
+msgid "Messages (.eml, .msg, .mbox), calendars (.ics) and contacts (.vcf)"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/files.rs
@@ -11624,6 +11618,11 @@ msgstr "发件箱"
 #, fuzzy
 msgid "Outgoing mail (SMTP)"
 msgstr "外发邮件（SMTP）"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Outlook message (.msg)"
+msgstr ""
 
 #. command label
 #: crates/ui-egui/src/lib.rs
@@ -24371,6 +24370,11 @@ msgstr "{name}：不是邮件文件"
 msgid "{name}: not a message, calendar or contact file MailCraft reads"
 msgstr "{name}：不是 MailCraft 可读取的邮件、日历或联系人文件"
 
+#. what a command says
+#: crates/engine/src/io.rs
+msgid "{name}: {why}"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
 #, fuzzy
@@ -25487,6 +25491,10 @@ msgstr "−二进制"
 #, fuzzy
 msgid "−Lines"
 msgstr "−行"
+
+#, fuzzy
+#~ msgid "Messages (.eml, .mbox), calendars (.ics) and contacts (.vcf)"
+#~ msgstr "邮件（.eml、.mbox）、日历（.ics）和联系人（.vcf）"
 
 #, fuzzy
 #~ msgid "Capitalize the first word of sentences"
