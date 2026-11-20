@@ -7943,11 +7943,6 @@ msgstr ""
 msgid "Message Preview"
 msgstr ""
 
-#. interface
-#: crates/ui-egui/src/backstage.rs
-msgid "Message file (.msg)"
-msgstr ""
-
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ReadingToolbar.kt
 msgid "Message menu"
@@ -7970,7 +7965,7 @@ msgstr ""
 
 #. interface
 #: crates/ui-egui/src/backstage.rs
-msgid "Messages (.eml, .mbox), calendars (.ics) and contacts (.vcf)"
+msgid "Messages (.eml, .msg, .mbox), calendars (.ics) and contacts (.vcf)"
 msgstr ""
 
 #. interface
@@ -10385,6 +10380,11 @@ msgstr ""
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 msgid "Outgoing mail (SMTP)"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Outlook message (.msg)"
 msgstr ""
 
 #. command label
@@ -22058,6 +22058,11 @@ msgstr ""
 #. what a command says
 #: crates/engine/src/io.rs
 msgid "{name}: not a message, calendar or contact file MailCraft reads"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/io.rs
+msgid "{name}: {why}"
 msgstr ""
 
 #. android
