@@ -9169,11 +9169,6 @@ msgstr ""
 msgid "Message Preview"
 msgstr "Náhled zprávy"
 
-#. interface
-#: crates/ui-egui/src/backstage.rs
-msgid "Message file (.msg)"
-msgstr ""
-
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ComposeHost.kt
 #, fuzzy
@@ -9194,9 +9189,8 @@ msgstr "Zprávy"
 
 #. interface
 #: crates/ui-egui/src/backstage.rs
-#, fuzzy
-msgid "Messages (.eml, .mbox), calendars (.ics) and contacts (.vcf)"
-msgstr "Zprávy (.eml, .mbox), kalendáře (.ics) a kontakty (.vcf)"
+msgid "Messages (.eml, .msg, .mbox), calendars (.ics) and contacts (.vcf)"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/files.rs
@@ -11889,6 +11883,11 @@ msgstr "Pošta k odeslání"
 #, fuzzy
 msgid "Outgoing mail (SMTP)"
 msgstr "Odchozí pošta (SMTP)"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Outlook message (.msg)"
+msgstr ""
 
 #. command label
 #: crates/ui-egui/src/lib.rs
@@ -24923,6 +24922,11 @@ msgstr "{name}: není soubor zprávy"
 msgid "{name}: not a message, calendar or contact file MailCraft reads"
 msgstr "{name}: není soubor zprávy, kalendáře ani kontaktu, který MailCraft čte"
 
+#. what a command says
+#: crates/engine/src/io.rs
+msgid "{name}: {why}"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
 #, fuzzy
@@ -26270,6 +26274,10 @@ msgstr "−Binární"
 #, fuzzy
 msgid "−Lines"
 msgstr "−Řádky"
+
+#, fuzzy
+#~ msgid "Messages (.eml, .mbox), calendars (.ics) and contacts (.vcf)"
+#~ msgstr "Zprávy (.eml, .mbox), kalendáře (.ics) a kontakty (.vcf)"
 
 #, fuzzy
 #~ msgid "shared mailboxes open under an account kept in step through Microsoft Graph"
