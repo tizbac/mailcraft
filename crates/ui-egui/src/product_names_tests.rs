@@ -70,6 +70,10 @@ const ALLOWED_PHRASES: &[(&str, &str)] = &[
     ("Outlook's colours", "the 25 colours a category takes on the mailbox's server (#661)"),
     ("what you see in Outlook", "an account kept in step through Microsoft Graph shows the same mail"),
     ("Out of Office", "the plain phrase for being away, a show-as state, not a product"),
+    (
+        "Outlook message (.msg)",
+        "File › Options and the opened-message window name which kind of message file it is: the one Outlook keeps, beside the Internet message MailCraft also writes",
+    ),
 ];
 
 /// Every text the window shows through `tl!`, singular and plural, from the template.

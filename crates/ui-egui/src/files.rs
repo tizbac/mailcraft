@@ -566,10 +566,10 @@ pub(crate) fn dropped_path(app: &mut MailApp, path: &str) {
     let _ = opened_path(app, purpose, &path, crate::windows::compose_window::target(app));
 }
 
-/// Whether `path` names a file of mail (.eml or .mbox), by its extension.
+/// Whether `path` names a file of mail (.eml, .mbox or .msg), by its extension.
 fn is_mail_file(path: &str) -> bool {
     use mailcraft_engine::io::Format;
-    matches!(Format::from_extension(path), Some(Format::Eml | Format::Mbox))
+    matches!(Format::from_extension(path), Some(Format::Eml | Format::Mbox | Format::Msg))
 }
 
 /// `path` waits its turn to be asked about ([`ask_next`]): once, and no more than
@@ -594,7 +594,7 @@ pub(crate) fn from_system(app: &mut MailApp, what: &str) {
     }
     let path = local_path(what);
     match Format::from_extension(&path) {
-        Some(Format::Eml) => {
+        Some(Format::Eml | Format::Msg) => {
             // Read in a window of its own and filed nowhere (#515): the owner keeps it with Move
             // to Folder or Save As, and closing the window leaves nothing in the mailbox.
             app.ui.backstage = false;
@@ -611,7 +611,11 @@ pub(crate) fn from_system(app: &mut MailApp, what: &str) {
 /// Save As in the window of a message file ([`crate::opened_message`]): the file's own bytes,
 /// where the owner says (a download in the browser).
 pub(crate) fn save_opened(app: &mut MailApp, window: u64, m: &mailcraft_model::Message, bytes: &[u8]) {
-    let name = mailcraft_engine::cmd::file::eml_name(m);
+    // The bytes are the file's own, so the name says which format they are in.
+    let name = match mailcraft_engine::io::Format::detect("", bytes) {
+        Some(mailcraft_engine::io::Format::Msg) => mailcraft_engine::cmd::file::message_name(m, mailcraft_engine::SaveMessageFormat::Msg),
+        _ => mailcraft_engine::cmd::file::eml_name(m),
+    };
     if let Some(save) = &app.services.download {
         match save(&name, bytes) {
             Ok(()) => app.status(crate::i18n::fmt(tl!("Downloaded {name}"), &[("name", &name)])),

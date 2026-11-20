@@ -41,6 +41,10 @@ pub const FAMILY: &[u8] = b"MailCraft ";
 /// What the owner is told about a mailbox file of a form a newer MailCraft writes.
 pub const NEWER: &str = "this mailbox was written by a newer MailCraft";
 
+/// The bytes every compound file starts with ([MS-CFB] §2.1): how an Outlook message is known when
+/// the file has no name to go by.
+const CFB_MAGIC: [u8; 8] = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
+
 /// The message for a mailbox file that keeps its content in a folder beside it, read without it.
 const KEPT_BESIDE: &str = "this mailbox file keeps its messages' content in a folder beside it; open it where it is kept, or save it as one file first (File › Open & Export › Save Mailbox As)";
 
@@ -51,6 +55,8 @@ pub enum Format {
     Mailbox,
     /// One Internet message.
     Eml,
+    /// One Outlook message (`.msg`: the properties of a note in a compound file).
+    Msg,
     /// Many messages in one file.
     Mbox,
     /// iCalendar events and to-dos.
@@ -64,6 +70,7 @@ impl Format {
         match name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase()).as_deref() {
             Some("mailcraft" | "json") => Some(Format::Mailbox),
             Some("eml" | "msg822") => Some(Format::Eml),
+            Some("msg") => Some(Format::Msg),
             Some("mbox" | "mbx") => Some(Format::Mbox),
             Some("ics" | "ical" | "ifb" | "vcs") => Some(Format::Ics),
             Some("vcf" | "vcard") => Some(Format::Vcf),
@@ -79,6 +86,11 @@ impl Format {
         }
         if let Some(f) = Format::from_extension(name) {
             return Some(f);
+        }
+        // An Outlook message is a compound file ([MS-CFB] §2.1): its bytes are not text, so this
+        // is the only way to know one without a name to go by.
+        if bytes.starts_with(&CFB_MAGIC) {
+            return Some(Format::Msg);
         }
         let head = String::from_utf8_lossy(bytes.get(..bytes.len().min(512)).unwrap_or(&[]))
             .trim_start_matches('\u{feff}')
@@ -390,11 +402,14 @@ fn file_sha256(bytes: &[u8]) -> Option<String> {
 /// same message (by its Message-ID in that folder, else by the file's SHA-256) is the one there,
 /// and nothing is added. Says `opened` (the message) and `already`.
 pub fn import_opened(s: &mut Session, name: &str, bytes: &[u8]) -> Result<Value, CmdError> {
-    if Format::detect(name, bytes) != Some(Format::Eml) {
+    let Some(format) = Format::detect(name, bytes) else {
+        return Err(failed!("{name}: not a message file", name));
+    };
+    if !matches!(format, Format::Eml | Format::Msg) {
         return Err(failed!("{name}: not a message file", name));
     }
     let folder = s.mailbox.imported_folder(false)?;
-    let mut m = mailcraft_mime_model::parse_fetched(bytes);
+    let mut m = one_message(format, bytes).map_err(|e| failed!("{name}: {why}", name, why = e))?;
     m.remove_header(OPENED_FROM);
     let hash = file_sha256(bytes);
     // The same Message-ID (none for both, too), and, when the copy there keeps the SHA-256 of the
@@ -409,9 +424,10 @@ pub fn import_opened(s: &mut Session, name: &str, bytes: &[u8]) -> Result<Value,
             }
     };
     let there = s.mailbox.messages_in(folder).find(|x| !x.draft && same(x)).map(|x| x.id);
+    let format_name = if format == Format::Msg { "msg" } else { "eml" };
     if let Some(id) = there {
         show_opened(s, id);
-        return Ok(json!({"format": "eml", "messages": 0, "ids": [id], "folder": folder, "opened": id, "already": true}));
+        return Ok(json!({"format": format_name, "messages": 0, "ids": [id], "folder": folder, "opened": id, "already": true}));
     }
     if let Some(hash) = hash {
         m.headers.push((OPENED_FROM.to_string(), hash));
@@ -423,7 +439,16 @@ pub fn import_opened(s: &mut Session, name: &str, bytes: &[u8]) -> Result<Value,
     }
     let id = s.mailbox.add_message(m)?;
     show_opened(s, id);
-    Ok(json!({"format": "eml", "messages": 1, "ids": [id], "folder": folder, "opened": id, "already": false}))
+    Ok(json!({"format": format_name, "messages": 1, "ids": [id], "folder": folder, "opened": id, "already": false}))
+}
+
+/// The message of a file that holds one: an Internet message, or the note an Outlook `.msg` keeps.
+fn one_message(format: Format, bytes: &[u8]) -> Result<mailcraft_model::Message, mailcraft_mime_model::msg::MsgError> {
+    match format {
+        Format::Eml => Ok(mailcraft_mime_model::parse_fetched(bytes)),
+        Format::Msg => mailcraft_mime_model::msg::read(bytes),
+        _ => Err(mailcraft_mime_model::msg::MsgError::NotMessage),
+    }
 }
 
 /// A message file read to be looked at and not kept (#515): the message as `import_opened` would
@@ -431,10 +456,13 @@ pub fn import_opened(s: &mut Session, name: &str, bytes: &[u8]) -> Result<Value,
 /// and no hash of its own claimed), and nothing is added to the mailbox. Parsed as every message
 /// is; the caller caps the size of `bytes`.
 pub fn parse_unfiled(name: &str, bytes: &[u8]) -> Result<mailcraft_model::Message, CmdError> {
-    if Format::detect(name, bytes) != Some(Format::Eml) {
+    let Some(format) = Format::detect(name, bytes) else {
+        return Err(failed!("{name}: not a message file", name));
+    };
+    if !matches!(format, Format::Eml | Format::Msg) {
         return Err(failed!("{name}: not a message file", name));
     }
-    let mut m = mailcraft_mime_model::parse_fetched(bytes);
+    let mut m = one_message(format, bytes).map_err(|e| failed!("{name}: {why}", name, why = e))?;
     m.remove_header(OPENED_FROM);
     (m.id, m.uid, m.folder, m.draft, m.read) = (0, 0, 0, false, true);
     (m.server, m.synced) = (None, None);
@@ -457,7 +485,7 @@ fn show_opened(s: &mut Session, id: Id) {
 /// mbox file (at most [`MAX_IMPORT_MESSAGES`]); `None` for any other file.
 pub fn count_messages(name: &str, bytes: &[u8]) -> Option<usize> {
     match Format::detect(name, bytes)? {
-        Format::Eml => Some(1),
+        Format::Eml | Format::Msg => Some(1),
         Format::Mbox => Some(mailcraft_mime_model::count_mbox(bytes).min(MAX_IMPORT_MESSAGES)),
         _ => None,
     }
@@ -543,11 +571,11 @@ pub fn lands_in(mb: &mailcraft_model::Mailbox, aimed: Id) -> Lands {
 /// view, or the Inbox), events to a calendar on this computer (#1050), contacts and to-dos to their lists.
 pub fn import(s: &mut Session, name: &str, bytes: &[u8], folder: Option<Id>) -> Result<Value, CmdError> {
     let format = Format::detect(name, bytes).ok_or_else(|| failed!("{name}: not a message, calendar or contact file MailCraft reads", name))?;
-    let folder = mail_aimed_at(&s.mailbox, s.view.folder, folder, matches!(format, Format::Eml | Format::Mbox))?;
+    let folder = mail_aimed_at(&s.mailbox, s.view.folder, folder, matches!(format, Format::Eml | Format::Mbox | Format::Msg))?;
     let now = s.now();
     match format {
         Format::Mailbox => Err(bad(format!("{name} is a whole mailbox; open it with File › Open"))),
-        Format::Eml | Format::Mbox => {
+        Format::Eml | Format::Mbox | Format::Msg => {
             // The owner's limits (File › Options), kept in range whatever the settings file says.
             let max_bytes = s.prefs.import_file_bytes();
             if u64::try_from(bytes.len()).map_or(true, |n| n > max_bytes) {
@@ -556,10 +584,9 @@ pub fn import(s: &mut Session, name: &str, bytes: &[u8], folder: Option<Id>) -> 
             // At most the most messages the owner allows are taken from a file; the one after them
             // tells whether the file went on ("stopped after N").
             let max_messages = s.prefs.import_max_messages();
-            let mut messages: Vec<_> = if format == Format::Eml {
-                vec![mailcraft_mime_model::parse_fetched(bytes)]
-            } else {
-                mailcraft_mime_model::mbox_messages(bytes).take(max_messages.saturating_add(1)).collect()
+            let mut messages: Vec<_> = match format {
+                Format::Eml | Format::Msg => vec![one_message(format, bytes).map_err(|e| failed!("{name}: {why}", name, why = e))?],
+                _ => mailcraft_mime_model::mbox_messages(bytes).take(max_messages.saturating_add(1)).collect(),
             };
             let stopped = messages.len() > max_messages;
             messages.truncate(max_messages);
@@ -612,7 +639,11 @@ pub fn import(s: &mut Session, name: &str, bytes: &[u8], folder: Option<Id>) -> 
                 }
                 ids.push(s.mailbox.add_message(m)?);
             }
-            let format_name = if format == Format::Eml { "eml" } else { "mbox" };
+            let format_name = match format {
+                Format::Eml => "eml",
+                Format::Msg => "msg",
+                _ => "mbox",
+            };
             // What came in, for the log: never a name, an address or a subject.
             log::info!("import: {format_name}, {} imported, {already} already there, meant for a folder of {}", ids.len(), kind_name(kind));
             if let Some(last) = ids.last() {
