@@ -316,8 +316,6 @@ a made-up mailbox of 64,000 messages (ignored by `cargo test`).
 | 2026-11-19 | minor | `print` added to the layer table (L2): a crate that sets a message's pages from `html`'s display blocks — its heading, formatting, lists, tables and pictures — on A4 or Letter, with the caps on picture bytes, sides, pixels and sheets |
 | 2026-11-17 | patch | MB3.18: `host` holds the calendar's and the to-dos' jobs in flight (`calendar_job`, `tasks_job`), driven by the desktop and the phone alike |
 | 2026-11-17 | patch | MB3.15: the Android app row names its end-to-end run on an emulator against the Graph stand-in ([android.md](android.md)) |
-| 2026-11-17 | patch | MB3.18: `host` holds the calendar's and the to-dos' jobs in flight (`calendar_job`, `tasks_job`), driven by the desktop and the phone alike |
-| 2026-11-17 | patch | MB3.15: the Android app row names its end-to-end run on an emulator against the Graph stand-in ([android.md](android.md)) |
 | 2026-11-15 | patch | 29 crates and 4 apps; rows for `smime` and `mobile` |
 | 2026-11-15 | patch | 27 crates and 4 apps; rows for `smime` and `mobile` |
 | 2026-11-15 | patch | #209 D3: the `dav_discovery` fuzz target joins the list |
