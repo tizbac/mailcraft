@@ -11234,6 +11234,11 @@ msgstr ""
 
 #. interface
 #: crates/ui-egui/src/attachment_open.rs
+msgid "Opened {name} in MailCraft"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/attachment_open.rs
 #, fuzzy
 msgid "Opening Mail Attachment"
 msgstr "E-mailbijlage openen"
@@ -16784,6 +16789,11 @@ msgstr "Het bericht kon niet worden gelezen."
 #, fuzzy
 msgid "The message couldn't be downloaded. Try again in a few minutes."
 msgstr "Het bericht kon niet worden gedownload. Probeer het over een paar minuten opnieuw."
+
+#. interface
+#: crates/ui-egui/src/attachment_open.rs
+msgid "The message file is larger than {mb} MB: save it with Save As and open it from there"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
