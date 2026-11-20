@@ -56,6 +56,7 @@ pub async fn sync_directory<E: HttpExchange>(
         shape: crate::items::Shape::Full,
         flag_lacking: false,
         read_unsaid: false,
+        read_overflow: false,
         own: Default::default(),
         reread_folders: false,
         needs_change_key: false,

@@ -82,5 +82,15 @@ unshare -rm sh -c '
 - A `webcal`/Internet calendar subscription and shared mailboxes beyond the default folders are
   not covered by this test.
 
+## A flooded Inbox (#252)
+
+Grommunio answers a folder it is catching up on with the read-state changes it already sent, at the
+front of every page. Put twenty-odd thousand messages in the Inbox and mark them read, and one page
+of `SyncFolderItems` carries that whole list: at `MaxChangesReturned` 512 the largest page is about
+120,000 elements and 4 MB, whatever the page asked for. That is what the reader's ceiling of
+elements in an answer is set for, and what the run does with such a page (keeps the newest of the
+read states, takes the state the server gave, says once in the log what was left out) is covered by
+`crates/ews/src/mail_tests.rs` against the stand-in server, which repeats the flags the same way.
+
 The full table of what works and what does not, for mail as well as calendars and contacts, is in
 [`exchange-servers.md`](exchange-servers.md#grommunio).
