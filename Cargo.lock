@@ -4263,9 +4263,11 @@ name = "mailcraft-mime-model"
 version = "0.14.1-rc.1"
 dependencies = [
  "cfb",
+ "mailcraft-charset",
  "mailcraft-html",
  "mailcraft-mime",
  "mailcraft-model",
+ "mailcraft-pst",
  "mailcraft-time",
  "proptest",
  "serde_json",

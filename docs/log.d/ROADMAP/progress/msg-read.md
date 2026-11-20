@@ -1,0 +1,1 @@
+| 2026-11-20 | Outlook `.msg` files are read as well as written: dropped, double-clicked or imported, they bring their subject, sender, recipients, body (text, HTML or rich text), dates, flags, attachments and any message attached inside them; one-byte strings are decoded by the code page the file names |
