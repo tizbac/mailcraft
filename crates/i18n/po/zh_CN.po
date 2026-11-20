@@ -12243,6 +12243,11 @@ msgstr "使用 {owner} 的登录信息打开。此操作需要组织管理员授
 
 #. interface
 #: crates/ui-egui/src/attachment_open.rs
+msgid "Opened {name} in MailCraft"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/attachment_open.rs
 #, fuzzy
 msgid "Opening Mail Attachment"
 msgstr "正在打开邮件附件"
@@ -18185,6 +18190,11 @@ msgstr "无法读取该邮件。"
 #, fuzzy
 msgid "The message couldn't be downloaded. Try again in a few minutes."
 msgstr "无法下载该邮件。请几分钟后重试。"
+
+#. interface
+#: crates/ui-egui/src/attachment_open.rs
+msgid "The message file is larger than {mb} MB: save it with Save As and open it from there"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt

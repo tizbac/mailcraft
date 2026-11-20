@@ -12290,6 +12290,11 @@ msgstr "Otwarto przy użyciu logowania użytkownika {owner}. Wymaga to pełnego 
 
 #. interface
 #: crates/ui-egui/src/attachment_open.rs
+msgid "Opened {name} in MailCraft"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/attachment_open.rs
 #, fuzzy
 msgid "Opening Mail Attachment"
 msgstr "Otwieranie załącznika wiadomości"
@@ -18252,6 +18257,11 @@ msgstr "Nie udało się odczytać wiadomości."
 #, fuzzy
 msgid "The message couldn't be downloaded. Try again in a few minutes."
 msgstr "Nie udało się pobrać wiadomości. Spróbuj ponownie za kilka minut."
+
+#. interface
+#: crates/ui-egui/src/attachment_open.rs
+msgid "The message file is larger than {mb} MB: save it with Save As and open it from there"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
