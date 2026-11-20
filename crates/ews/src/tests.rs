@@ -16,6 +16,22 @@ fn client() -> Client {
     Client::new(URL, secret()).unwrap()
 }
 
+#[test]
+fn an_address_names_its_server_for_the_line_about_a_connection_that_failed() {
+    let host = |url: &str| Client::new(url, secret()).ok().map(|client| client.host());
+    assert_eq!(host("https://mail.example.org/EWS/Exchange.asmx"), Some("mail.example.org".to_owned()));
+    assert_eq!(host("https://Mail.Example.org:444/EWS/Exchange.asmx"), Some("mail.example.org:444".to_owned()), "as written, lower case");
+    assert_eq!(host("http://127.0.0.1:1/EWS/Exchange.asmx"), Some("127.0.0.1:1".to_owned()), "a port is part of which server it is");
+    assert_eq!(host("https://[::1]:28443/EWS/Exchange.asmx"), Some("[::1]:28443".to_owned()), "an IPv6 address in brackets");
+    // Nothing beyond the host and its port: no path, no query, no name in front of it.
+    assert_eq!(host("https://mail.example.org/adam@example.org/EWS"), Some("mail.example.org".to_owned()));
+    assert_eq!(host("https://mail.example.org?what=adam@example.org"), Some("mail.example.org".to_owned()));
+    // A host is held short: a line says which server, not every byte of an address.
+    let long = host(&format!("https://{}a.example.org/EWS", "x".repeat(300))).unwrap_or_default();
+    assert_eq!(long.len(), 100, "held to a length, never the whole address: {long}");
+    assert!(long.chars().all(|c| c == 'x'), "the first hundred characters of it: {long}");
+}
+
 fn check(standin: &StandIn) -> Result<FolderInfo, Error> {
     block_on(client().check(standin)).unwrap()
 }
