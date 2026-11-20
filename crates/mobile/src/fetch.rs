@@ -705,7 +705,17 @@ impl SyncHost {
             && let Some(stopped) = session.driver.fetch.background_came(account, false, &result, self.now_ms())
             && stopped.first
         {
-            log::warn!("fetch: the background download stopped; it tries again in {} s", (stopped.wait_ms / 1_000.0) as u64);
+            // What stopped it, in the up to three lines the run kept: which server, and what the
+            // connection said about it.
+            let why = if result.errors.is_empty() {
+                "no answer came".to_owned()
+            } else {
+                result.errors.iter().take(3).map(String::as_str).collect::<Vec<_>>().join("; ")
+            };
+            log::warn!(
+                "fetch, account {account}: the background download stopped ({why}); it tries again in {} s",
+                (stopped.wait_ms / 1_000.0) as u64
+            );
         }
         let (too_large, missing, failed) = (result.too_large.clone(), result.missing.clone(), result.failed.clone());
         let (offline, busy) = (result.offline, result.busy_for.is_some());

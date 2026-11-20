@@ -93,12 +93,26 @@ fn a_calendar_read_that_cannot_begin_ends_with_a_line() {
 fn a_failed_exchange_is_told_by_its_kind_and_a_certificate_is_kept_apart() {
     let transport = Transport::new(" ");
     assert_eq!(transport.problem(), None);
-    assert_eq!(transport.judged(NetError::Connect { host: "mail.example.org".into(), reason: "refused".into() }), TransportError::Unreachable);
+    assert_eq!(transport.trouble(), None, "nothing has failed yet");
+    assert_eq!(
+        transport.judged(NetError::Connect { host: "mail.example.org".into(), reason: "the server refused the connection".into() }),
+        TransportError::Unreachable
+    );
+    assert_eq!(transport.trouble(), Some("the server refused the connection".into()), "the line naming the server says what the connection said");
     assert_eq!(transport.judged(NetError::Config("x".into())), TransportError::Other);
-    assert_eq!(transport.judged(NetError::Tls { host: "mail.example.org".into(), reason: "alert".into() }), TransportError::Tls);
+    assert_eq!(transport.judged(NetError::Tls { host: "mail.example.org".into(), reason: "the handshake failed".into() }), TransportError::Tls);
+    assert_eq!(transport.trouble(), Some("the handshake failed".into()), "a secure connection that failed says so too");
     assert_eq!(transport.problem(), None, "a plain TLS failure is no certificate question");
     assert_eq!(transport.judged(NetError::Certificate(Box::new(CertificateProblem::Changed(info())))), TransportError::Tls);
-    assert!(matches!(transport.problem(), Some(CertificateProblem::Changed(_))));
+    assert!(matches!(transport.problem(), Some(CertificateProblem::Changed(_))), "a certificate question keeps its own record");
+    assert_eq!(transport.trouble(), Some("the handshake failed".into()), "the certificate is told apart from the words about the connection");
+    // Words only, of a length the line can carry: what a connection says is never let through whole.
+    transport.note_trouble("the server\x01 refused\x07 the connection");
+    assert_eq!(transport.trouble(), Some("the server refused the connection".into()), "no control character gets in");
+    transport.note_trouble(&"a".repeat(500));
+    assert_eq!(transport.trouble().map_or(0, |said| said.len()), 200, "held short");
+    transport.forget_trouble();
+    assert_eq!(transport.trouble(), None, "the next request starts clean");
 }
 
 #[test]

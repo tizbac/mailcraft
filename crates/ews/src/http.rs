@@ -350,6 +350,23 @@ pub enum TransportError {
     Other,
 }
 
+impl TransportError {
+    /// A few words for the line that says which server could not be had: what the connection did,
+    /// without the advice that [`Display`](Self) adds to it.
+    pub fn words(&self) -> &'static str {
+        match self {
+            Self::TimedOut => "it did not answer in time",
+            Self::Unreachable => "no connection could be made to it",
+            Self::Tls => "no secure connection could be set up",
+            Self::BodyTooLarge => "its answer was longer than the size this request may read",
+            Self::RedirectRefused => "it sent the request elsewhere, and the redirect was not followed",
+            Self::Aborted => "the request was called off before it finished",
+            Self::Lost => "the connection failed after the request went out",
+            Self::Other => "the connection failed in a way the transport did not classify",
+        }
+    }
+}
+
 impl fmt::Display for TransportError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
@@ -373,4 +390,13 @@ impl std::error::Error for TransportError {}
 pub trait HttpExchange {
     /// Sends `request` and describes the response.
     fn exchange(&self, request: &HttpRequest) -> impl Future<Output = Result<HttpResponse, TransportError>>;
+
+    /// In a few words, why the last exchange that failed failed — "the server refused the
+    /// connection", say — beyond the kind of trouble [`TransportError`](self) names. `None` when
+    /// the transport has nothing more to say. A run uses it for the line that says which server
+    /// could not be had, so only what the connection itself said goes in it: never a credential,
+    /// never a body.
+    fn trouble(&self) -> Option<String> {
+        None
+    }
 }
