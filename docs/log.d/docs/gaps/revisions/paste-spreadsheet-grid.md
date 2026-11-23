@@ -1,0 +1,1 @@
+| 2026-11-23 | patch | Gap 7: a spreadsheet's Copy keeps its grid when pasted — Excel's HTML writes the `<table>` outside the clipboard's fragment markers, and text alone that is rows of lines with cells between tabs becomes a table in an HTML message |

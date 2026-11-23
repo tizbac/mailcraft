@@ -19,6 +19,21 @@ fn spreadsheet_paste_keeps_cells_and_styles_when_a_draft_reopens() {
 }
 
 #[test]
+fn a_spreadsheet_copy_keeps_the_grid_its_rows_are_written_in() {
+    use mailcraft_model::rich::PastedTable;
+
+    // Excel's "HTML Format" writes the `<table>` and its `<col>` tags outside the clipboard's
+    // fragment markers, which hold only the rows; the paste hands over the whole table.
+    let html = "<table border=0 cellpadding=0 cellspacing=0 width=138><col width=69 span=2><tr><td>Part</td><td>12,30</td></tr><tr><td>Gasket</td><td>4,00</td></tr></table>";
+    let pasted = from_html_for_compose(html);
+    let table: &PastedTable = pasted.paragraphs()[0].runs[0].table.as_deref().unwrap();
+    assert_eq!((table.columns(), table.rows().len()), (2, 2), "{pasted:?}");
+    assert_eq!(table.plain(), "Part\t12,30\nGasket\t4,00");
+    let saved = to_html(&pasted);
+    assert_eq!(to_html(&from_html_with_pictures(&saved, &mut |_| None)), saved);
+}
+
+#[test]
 fn header_weight_background_and_link_targets_survive_the_round_trip() {
     let html = r##"<table bgcolor="#ff0000"><tr><th style="font-weight:normal">Normal <b>Bold</b></th><td bgcolor="#0000ff"><a href="https://example.org/manual">Manual</a></td></tr></table>"##;
     let pasted = from_html_for_compose(html);
@@ -247,4 +262,31 @@ fn deeply_nested_tables_and_giant_spans_remain_bounded() {
     assert!(!saved.contains("danger()"));
     assert!(!saved.contains("9999999"));
     assert!(saved.matches("<table").count() <= 2);
+}
+
+#[test]
+fn probe_excel_fragment_without_table_tag() {
+    for html in [
+        "<tr><td>Part</td><td>Price</td></tr><tr><td>Washer</td><td>12,30</td></tr>",
+        "<col width=69 span=2><tr><td>Part</td><td>Price</td></tr><tr><td>Washer</td><td>12,30</td></tr>",
+        "<table><tr><td>Part</td><td>Price</td></tr><tr><td>Washer</td><td>12,30</td></tr></table>",
+    ] {
+        let p = from_html_for_compose(html);
+        println!(
+            "in {:?} -> plain {:?} paras {} table {:?}",
+            html,
+            p.to_plain(),
+            p.paragraphs().len(),
+            p.paragraphs().first().and_then(|q| q.runs.first().and_then(|r| r.table.as_ref()).map(|t| (t.columns(), t.rows().len())))
+        );
+    }
+    let excel = "<col width= 69 span= 2 style= 'width:52pt' ><tr height= 49 style= 'mso-height-source:userset;height:36.5pt' ><td rowspan= 2 height= 98 class= xl65 width= 69 style= 'height:73.0pt;width:52pt' >Part</td><td height= 49 class= xl65 width= 69 style= 'height:36.5pt;width:52pt' >12,30</td></tr><tr height= 49 style= 'mso-height-source:userset;height:36.5pt' ><td height= 49 class= xl65 width= 69 style= 'height:36.5pt;width:52pt' >Gasket</td><td height= 49 class= xl65 width= 69 style= 'height:36.5pt;width:52pt' >4,00</td></tr>";
+    let pasted = from_html_for_compose(excel);
+    println!("plain: {:?}", pasted.to_plain());
+    println!("html: {}", to_html(&pasted));
+    println!("paragraphs: {}", pasted.paragraphs().len());
+    println!(
+        "table: {:?}",
+        pasted.paragraphs().first().and_then(|p| p.runs.first().and_then(|r| r.table.as_ref()).map(|t| (t.columns(), t.rows().len())))
+    );
 }

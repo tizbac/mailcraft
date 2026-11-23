@@ -224,6 +224,7 @@ const SAFE: &[&str] = &[
     "compose.attachItem",
     "insert.businessCard",
     "insert.picture",
+    "insert.table",
     "compose.picture.set",
     "compose.removeAttachment",
     "compose.signature",
