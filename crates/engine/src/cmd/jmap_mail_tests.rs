@@ -600,6 +600,26 @@ fn a_message_beyond_its_cap_is_passed_over_and_not_asked_for_again() {
 }
 
 #[test]
+fn a_message_of_a_hundred_megabytes_fetched_whole_is_here_whole() {
+    // The whole path, not just the sizes around it: a message of 100 MB that the server gives is
+    // parsed, kept, and read as a message rather than passed over for being big.
+    let (mut s, account) = session();
+    run(&mut s, account, vec![window("M1", vec![email("E1", "Huge log", 1)], true)], true);
+    let body = "x".repeat(100 * 1024 * 1024);
+    let mime = format!("From: Zoe Park <zoe@example.org>\r\nSubject: Huge log\r\nContent-Type: text/plain\r\n\r\n{body}\r\n").into_bytes();
+    let answer = apply_jmap_fetch(
+        &mut s,
+        GraphFetchResult { account, email: ME.into(), fetched: vec![GraphFetched { id: "E1".into(), mime }], ..Default::default() },
+    )
+    .unwrap();
+    assert_eq!(answer["fetched"].as_u64(), Some(1), "not passed over as too large");
+    let m = here(&s, account, "E1").unwrap();
+    assert!(!m.unfetched, "the whole message is here");
+    assert_eq!(m.body.text.len(), body.len(), "its text, as the server sent it");
+    assert!(jmap_fetch_request(&s, account, Some(m.id), 10).unwrap().ids.is_empty(), "nothing more to fetch");
+}
+
+#[test]
 fn a_draft_here_whole_stays_when_the_servers_copy_goes() {
     let (mut s, account) = session();
     let mut draft = email("D1", "Plan", 1);
