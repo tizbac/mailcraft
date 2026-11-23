@@ -589,7 +589,7 @@ fn a_message_beyond_its_cap_is_passed_over_and_not_asked_for_again() {
     let (mut s, account) = session();
     run(&mut s, account, vec![window("M1", vec![email("E1", "One", 1), email("E2", "Two", 2)], true)], true);
     let fetched = vec![
-        GraphFetched { id: "E1".into(), mime: vec![b'x'; (50 << 20) + 1] },
+        GraphFetched { id: "E1".into(), mime: vec![b'x'; (200 << 20) + 1] },
         GraphFetched { id: "E2".into(), mime: Vec::new() },
         GraphFetched { id: "not an id".into(), mime: b"Subject: x\r\n\r\nx".to_vec() },
     ];
@@ -790,13 +790,25 @@ fn a_mailbox_that_turns_up_twice_in_a_run_is_read_in_part() {
 
 #[test]
 fn a_batch_fetched_whole_is_held_to_its_size_in_all() {
-    let big = |id: &str| GraphFetched { id: id.into(), mime: vec![b'x'; 25 << 20] };
+    let big = |id: &str| GraphFetched { id: id.into(), mime: vec![b'x'; jmap_down::MAX_MESSAGE] };
     let fetched = vec![big("E1"), big("E2"), big("E3"), GraphFetched { id: "E4".into(), mime: b"Subject: x\r\n\r\nx".to_vec() }];
     let held = jmap_down::bounded_fetch(GraphFetchResult { fetched, ..Default::default() });
-    // From the one that would take it past 64 MB, the rest waits for the next batch: neither taken
-    // nor refused. (The first is taken whatever its size, up to 50 MB.)
+    // Each is at the ceiling a message may have (200 MB). From the one that would take the batch
+    // past 512 MB, the rest wait for the next batch: neither taken nor refused.
     assert_eq!(held.fetched.iter().map(|f| f.id.as_str()).collect::<Vec<_>>(), ["E1", "E2"]);
-    assert!(held.failed.is_empty());
+    assert!(held.failed.is_empty(), "past the batch's room is not a refusal: it is asked for again");
+}
+
+#[test]
+fn a_message_of_a_hundred_megabytes_is_taken_whole() {
+    // What "Download messages in full: Everything" means in practice: a message of 100 MB is
+    // brought in, not passed over for being bigger than an old cap.
+    let held = jmap_down::bounded_fetch(GraphFetchResult {
+        fetched: vec![GraphFetched { id: "E1".into(), mime: vec![b'x'; 100 << 20] }],
+        ..Default::default()
+    });
+    assert_eq!(held.fetched.iter().map(|f| f.id.as_str()).collect::<Vec<_>>(), ["E1"]);
+    assert!(held.failed.is_empty() && held.missing.is_empty(), "{held:?}");
 }
 
 #[test]

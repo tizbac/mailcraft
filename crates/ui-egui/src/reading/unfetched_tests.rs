@@ -55,6 +55,16 @@ fn a_message_within_the_limit_is_simply_not_here_yet() {
 }
 
 #[test]
+fn a_message_past_what_any_account_downloads_says_so() {
+    // An account set to "Everything" still has an end: 200 MB. Past it the line says what the
+    // ceiling is rather than telling the owner to raise a setting that is already at its top.
+    let app = one_message(300 << 20, DownloadInFull::Everything);
+    let said = said(&app);
+    assert!(said.starts_with("This message is 300 MB on the server, more than MailCraft downloads whole (200 MB)"), "{said}");
+    assert!(said.contains("Open it to read it on the server"), "{said}");
+}
+
+#[test]
 fn the_offline_line_comes_before_the_size_line() {
     let mut app = one_message(60 << 20, DownloadInFull::UpTo10Mb);
     app.session.driver.fetch.offline = true;

@@ -21,9 +21,9 @@ use std::future::Future;
 /// than this; one message fetched whole is the exception, [`WHOLE_MESSAGE_LIMIT].)
 pub const RESPONSE_LIMIT: usize = 16 * 1024 * 1024;
 /// The most an answer may weigh when the request asks for one message whole: its text comes as
-/// base64 inside the SOAP envelope, so a message of the largest the mailbox takes (50 MB, the
-/// engine's own cap) needs about two thirds more than that.
-pub const WHOLE_MESSAGE_LIMIT: usize = 72 * 1024 * 1024;
+/// base64 inside the SOAP envelope, so a message at the ceiling every account has
+/// ([`mailcraft_model::MAX_WHOLE_MESSAGE], 200 MB) needs about a third more than that.
+pub const WHOLE_MESSAGE_LIMIT: usize = 272 * 1024 * 1024;
 /// The longest address a request goes to.
 const MAX_ADDRESS: usize = 2_048;
 /// The longest header field value the response keeps; longer ones are dropped.

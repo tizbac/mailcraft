@@ -477,7 +477,7 @@ fn oversized_literals_are_refused_unread() {
     for size in [(MAX_LITERAL + 1).to_string(), "99999999999999999999999999".to_string(), u64::MAX.to_string()] {
         let mut s = Script::new(format!("* 1 FETCH (UID 3 BODY[] {{{size}}}\r\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"));
         let err = Imap::resume(&mut s).uid_fetch_message(3).unwrap_err();
-        assert!(matches!(&err, ProtoError::Protocol(text) if text.to_string().contains("64 MB")), "{err:?}");
+        assert!(matches!(&err, ProtoError::Protocol(text) if text.to_string().contains(&format!("{} MB", MAX_LITERAL / 1024 / 1024))), "{err:?}");
         // The x's were not read as if they were the message.
         assert!(!s.finished());
     }
