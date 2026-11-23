@@ -311,6 +311,7 @@ impl<E: HttpExchange> Run<'_, E> {
                 self.reread_folders |= matches!(change, FolderChange::Delete { .. });
                 Ok(Some(ChangeOutcome::Refused { why: "the server's answer couldn't be used".to_owned() }))
             }
+            Err(Asked::TooLarge) => Ok(None),
             Err(Asked::Lost) => Ok(None),
             Err(stop @ Asked::Stop(_)) => Err(stop),
         }
@@ -817,6 +818,9 @@ fn settle(error: Asked) -> Result<Option<MessageOutcome>, Asked> {
         Asked::Code(code) => Ok(Some(MessageOutcome::Refused { status: refused_status(&code) })),
         Asked::Bad | Asked::Unreadable(_) => Ok(Some(MessageOutcome::Refused { status: 400 })),
         Asked::Lost => Ok(None),
+        // The change went out and the answer was more than this program reads: nothing is known of
+        // it, and it is asked again later.
+        Asked::TooLarge => Ok(None),
         stop @ Asked::Stop(_) => Err(stop),
     }
 }

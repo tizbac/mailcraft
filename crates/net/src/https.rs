@@ -215,6 +215,27 @@ pub fn is_closed(error: &NetError) -> bool {
     http::is_closed(error)
 }
 
+/// Whether `error` says the server took longer than the connection allows.
+pub fn is_timed_out(error: &NetError) -> bool {
+    http::is_too_slow(error)
+}
+
+/// Whether `error` says the answer was longer than the request asked to read.
+pub fn is_too_long(error: &NetError) -> bool {
+    http::is_too_long(error)
+}
+
+/// The connection's own words for an error of [`send`]: what happened, without the kind of trouble
+/// in front of it. A few of them go in the line naming which server could not be had; nothing of
+/// the owner's mail or of a credential is in them (docs/mail-privacy-rules.md).
+pub fn connection_words(error: &NetError) -> Option<String> {
+    match error {
+        NetError::Connect { reason, .. } | NetError::Tls { reason, .. } | NetError::Config(reason) => Some(reason.to_string()),
+        NetError::Proto(problem) => Some(problem.reason().to_string()),
+        _ => None,
+    }
+}
+
 /// Eight random bytes from the system's generator: the client challenge of an NTLM sign-in.
 pub fn client_challenge() -> Result<[u8; 8], NetError> {
     use ring::rand::SecureRandom;

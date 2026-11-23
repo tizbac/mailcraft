@@ -368,9 +368,10 @@ fn a_flood_of_elements_with_a_wide_namespace_costs_a_small_multiple_of_the_body(
     let flood = format!("<a xmlns=\"{}\">{}</a>", "n".repeat(2_000), "<b/>".repeat(399_000));
     assert!(flood.len() > 1_500_000);
     assert_eq!(xml::parse(flood.as_bytes()).unwrap_err(), xml::Malformed);
-    // The budget is a small multiple of the body, and has an end.
+    // The budget is a small multiple of the body, and has an end: room for a message fetched
+    // whole, whose base64 text is one element ([`MAX_MIME_TEXT]).
     assert!(xml::budget(flood.len()) < 30 * 1024 * 1024);
-    assert_eq!(xml::budget(usize::MAX), 64 * 1024 * 1024);
+    assert_eq!(xml::budget(usize::MAX), 128 * 1024 * 1024);
     // What fits holds the namespace once: the nodes point to the one copy.
     let fits = format!("<a xmlns=\"{}\">{}</a>", "n".repeat(2_000), "<b>x</b>".repeat(1_000));
     let tree = xml::parse(fits.as_bytes()).unwrap();
@@ -764,4 +765,30 @@ fn a_get_item_answer_with_ten_megabytes_of_mime_fits() {
     // ... and the room for a message has an end.
     let huge = format!("<a><MimeContent>{}</MimeContent></a>", "x".repeat(xml::MAX_MIME_TEXT + 1));
     assert_eq!(xml::parse(huge.as_bytes()).unwrap().children[0].text, "");
+}
+
+#[test]
+fn a_message_whole_of_more_than_an_ordinary_answer_is_read() {
+    // A 40 MB message comes as about 53 MB of base64 inside the envelope: more than any other
+    // request's answer may weigh, and within what a request for one message whole is allowed.
+    let mime = "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5".repeat(40 * 1024 * 1024 / 48);
+    let body = format!(
+        "{ENVELOPE_OPEN}<m:GetItemResponse xmlns:m=\"http://schemas.microsoft.com/exchange/services/2006/messages\" xmlns:t=\"http://schemas.microsoft.com/exchange/services/2006/types\">\
+         <m:ResponseMessages><m:GetItemResponseMessage ResponseClass=\"Success\"><m:ResponseCode>NoError</m:ResponseCode><m:Items><t:Message>\
+         <t:MimeContent CharacterSet=\"UTF-8\">{mime}</t:MimeContent><t:ItemId Id=\"{}\" ChangeKey=\"{}\"/></t:Message></m:Items>\
+         </m:GetItemResponseMessage></m:ResponseMessages></m:GetItemResponse>{ENVELOPE_CLOSE}",
+        id("item", 1, 152),
+        id("key", 1, 44)
+    );
+    assert!(body.len() > http::RESPONSE_LIMIT && body.len() < http::WHOLE_MESSAGE_LIMIT, "{} bytes", body.len());
+    let (tree, cost) = xml::parse_with_cost(body.as_bytes()).unwrap_or_else(|e| panic!("a whole message of 40 MB is read, not refused: {e}"));
+    assert!(cost <= xml::budget(body.len()), "{cost} of {}", xml::budget(body.len()));
+    let message = tree.find(&["Body", "GetItemResponse", "ResponseMessages", "GetItemResponseMessage", "Items", "Message"]).unwrap();
+    assert_eq!(message.child("MimeContent").unwrap().text.len(), mime.len());
+    // Only the request that asks for a message whole is allowed that much; the rest keep the
+    // ordinary limit, and lowering it still works.
+    let asked = HttpRequest::soap(URL, &secret(), body.clone()).unwrap();
+    assert_eq!(asked.max_response_bytes(), http::RESPONSE_LIMIT);
+    assert_eq!(asked.clone().for_whole_message().max_response_bytes(), http::WHOLE_MESSAGE_LIMIT);
+    assert_eq!(asked.for_whole_message().with_response_limit(1 << 20).max_response_bytes(), 1 << 20);
 }

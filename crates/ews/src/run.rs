@@ -82,6 +82,10 @@ pub(crate) enum Asked {
     Code(ResponseCode),
     /// The answer wasn't one that could be read.
     Bad,
+    /// The server's answer is larger than this program reads: one message more of than a request
+    /// may take. It is the message's own, not the run's: the rest of a batch goes on, and the
+    /// message waits for the owner to open it.
+    TooLarge,
     /// A request that makes or sends something went out and its answer was lost (or was none the
     /// server's service would give): it may have happened, and it was not sent again.
     Lost,
@@ -101,6 +105,12 @@ pub(crate) enum Stop {
         host: String,
         why: String,
     },
+    /// Nothing went out because the account's own settings name a server that is not one: the
+    /// address it tried, and what was wrong with it.
+    Config {
+        host: String,
+        why: String,
+    },
     Line(&'static str),
 }
 
@@ -114,6 +124,18 @@ pub(crate) fn unreachable_line(host: &str, why: &str) -> String {
         ("", why) => format!("Couldn't reach the server ({why})"),
         (host, "") => format!("Couldn't reach the server at {host}"),
         (host, why) => format!("Couldn't reach the server at {host} ({why})"),
+    }
+}
+
+/// A line for a server the account's settings name wrongly: the address they give, and what is
+/// wrong with it. Like [`unreachable_line`], it holds nothing but the address the owner typed and
+/// the program's own words about it.
+pub(crate) fn config_line(host: &str, why: &str) -> String {
+    match (host, why) {
+        ("", "") => "The account's settings name no server that can be used".to_owned(),
+        ("", why) => format!("The account's settings name no server that can be used ({why})"),
+        (host, "") => format!("The account's settings name a server that can't be used: {host}"),
+        (host, why) => format!("The account's settings name a server that can't be used: {host} ({why})"),
     }
 }
 
@@ -151,6 +173,7 @@ impl Outcome {
             Stop::Busy(seconds) => self.busy_for = Some(seconds),
             Stop::Tls => self.line("Couldn't set up a secure connection with the server"),
             Stop::Unreachable { host, why } => self.line(&unreachable_line(&host, &why)),
+            Stop::Config { host, why } => self.line(&config_line(&host, &why)),
             Stop::Line(text) => self.line(text),
         }
     }
@@ -213,24 +236,42 @@ impl<E: HttpExchange> Run<'_, E> {
         Stop::Unreachable { host: self.client.host(), why: self.exchange.trouble().unwrap_or_else(|| error.words().to_owned()) }
     }
 
+    /// A run's end for a transport that could not even make the server's address into a request:
+    /// the account's settings are the thing to check, not the network, and asking again changes
+    /// nothing.
+    fn misconfigured(&self, error: TransportError) -> Stop {
+        Stop::Config { host: self.client.host(), why: self.exchange.trouble().unwrap_or_else(|| error.words().to_owned()) }
+    }
+
     /// Sends `operation` and reads the answer with `read`, again after a busy server's wait.
     pub(crate) async fn ask<T>(&mut self, operation: &Element, read: &dyn Fn(&Reply) -> Result<T, Error>) -> Result<T, Asked> {
-        self.ask_with(operation, read, false).await
+        self.ask_with(operation, read, false, false).await
     }
 
     /// [`Run::ask`] for an operation that makes or sends something: never sent twice, and an answer
     /// that was lost, or that is none the service gives, is [`Asked::Lost`].
     pub(crate) async fn ask_once<T>(&mut self, operation: &Element, read: &dyn Fn(&Reply) -> Result<T, Error>) -> Result<T, Asked> {
-        self.ask_with(operation, read, true).await
+        self.ask_with(operation, read, true, false).await
     }
 
-    async fn ask_with<T>(&mut self, operation: &Element, read: &dyn Fn(&Reply) -> Result<T, Error>, once: bool) -> Result<T, Asked> {
+    /// [`Run::ask`] for a request that asks for one message whole: its answer is read as far as
+    /// [`HttpRequest::for_whole_message`] allows, so that a message bigger than an ordinary answer
+    /// still comes.
+    pub(crate) async fn ask_whole<T>(&mut self, operation: &Element, read: &dyn Fn(&Reply) -> Result<T, Error>) -> Result<T, Asked> {
+        self.ask_with(operation, read, false, true).await
+    }
+
+    async fn ask_with<T>(&mut self, operation: &Element, read: &dyn Fn(&Reply) -> Result<T, Error>, once: bool, whole: bool) -> Result<T, Asked> {
         let mut tries = 0u32;
         loop {
             if self.cancel.load(Ordering::Relaxed) {
                 return Err(Asked::Stop(Stop::Cancelled));
             }
-            let called = if once { self.client.call_once(self.exchange, operation).await } else { self.client.call(self.exchange, operation).await };
+            let called = match (once, whole) {
+                (true, _) => self.client.call_once(self.exchange, operation).await,
+                (_, true) => self.client.call_whole(self.exchange, operation).await,
+                _ => self.client.call(self.exchange, operation).await,
+            };
             let outcome = match called {
                 Ok(reply) => read(&reply),
                 Err(error) => Err(error),
@@ -256,14 +297,21 @@ impl<E: HttpExchange> Run<'_, E> {
                 Error::Endpoint(_) => return Err(Asked::Stop(Stop::Line("The server's address can't be used"))),
                 Error::Transport(TransportError::Aborted) => return Err(Asked::Stop(Stop::Cancelled)),
                 Error::Transport(TransportError::Tls) => return Err(Asked::Stop(Stop::Tls)),
+                // The account's settings name a server that is not one: nothing went out, and the
+                // run stops with the address and what is wrong with it rather than a network trouble.
+                Error::Transport(error) if error == TransportError::Config => return Err(Asked::Stop(self.misconfigured(error))),
                 // Nothing went out at all, so the request may be made again: the run stops, and
                 // says which server and what the connection said about it.
                 Error::Transport(error) if error == TransportError::Unreachable => return Err(Asked::Stop(self.unreachable(error))),
                 Error::Transport(_) if once => return Err(Asked::Lost),
+                // An answer longer than the request may read is one message's own: the batch goes
+                // on, and that message waits for the owner to open it.
+                Error::Transport(TransportError::BodyTooLarge) => return Err(Asked::TooLarge),
                 Error::Transport(error) => return Err(Asked::Stop(self.unreachable(error))),
                 Error::Server(code) => return Err(Asked::Code(code)),
                 // (An answer that is none the service gives, to a request that may have been done.)
                 Error::Status(_) | Error::Malformed | Error::TooLarge | Error::Unexpected if once => return Err(Asked::Lost),
+                Error::TooLarge => return Err(Asked::TooLarge),
                 Error::Unreadable(why) => return Err(Asked::Unreadable(why)),
                 _ => return Err(Asked::Bad),
             }
@@ -521,6 +569,10 @@ pub async fn sync_mail<E: HttpExchange>(
             Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable(_) => {
                 out.incomplete = true;
                 out.line("The server's answer couldn't be used");
+            }
+            Asked::TooLarge => {
+                out.incomplete = true;
+                out.line("The server's answer was larger than MailCraft reads");
             }
         }
     }
@@ -868,9 +920,16 @@ pub async fn fetch_messages<E: HttpExchange>(
     let mut outcome = Outcome::default();
     for id in request.ids.iter().take(MAX_FETCH) {
         let op = GetItemMime::new(id);
-        match run.ask(&op.element(), &|reply| op.answer(reply)).await {
+        match run.ask_whole(&op.element(), &|reply| op.answer(reply)).await {
             Ok(mime) => out.fetched.push(GraphFetched { id: id.clone(), mime }),
             Err(Asked::Code(ResponseCode::ItemNotFound)) => out.missing.push(id.clone()),
+            // A message more of than this program reads: passed over, and the batch goes on. It is
+            // asked for again when the owner opens it.
+            Err(Asked::TooLarge) => {
+                log::info!("ews mail: a message is larger than MailCraft reads whole; it waits until it is opened");
+                out.failed.push(id.clone());
+                out.too_large.push(id.clone());
+            }
             Err(Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable(_)) => out.failed.push(id.clone()),
             Err(Asked::Stop(stop)) => {
                 if let Stop::Busy(seconds) = stop {
@@ -880,6 +939,7 @@ pub async fn fetch_messages<E: HttpExchange>(
                 let line = match stop {
                     Stop::Cancelled => None,
                     Stop::Unreachable { host, why } => Some(unreachable_line(&host, &why)),
+                    Stop::Config { host, why } => Some(config_line(&host, &why)),
                     Stop::Auth => Some("The server turned down the sign-in".to_owned()),
                     Stop::Busy(_) => Some("The server is busy".to_owned()),
                     Stop::Tls => Some("Couldn't set up a secure connection with the server".to_owned()),

@@ -366,19 +366,31 @@ impl Transport {
     /// told by its kind. A connection that could not be made at all keeps a few of its own words,
     /// so that the line naming the server can say what went wrong ([`HttpExchange::trouble`](crate::http::HttpExchange)).
     fn judged(&self, error: NetError) -> TransportError {
+        // What the connection itself said is kept for the line naming the server, whatever its kind.
+        if let Some(said) = mailcraft_net::https::connection_words(&error) {
+            self.note_trouble(&said);
+        }
+        // A server that took too long, or answered more than the request may read, or hung up, is
+        // its own kind of trouble, not one the transport has no words for.
+        if mailcraft_net::https::is_timed_out(&error) {
+            return TransportError::TimedOut;
+        }
+        if mailcraft_net::https::is_too_long(&error) {
+            return TransportError::BodyTooLarge;
+        }
+        if mailcraft_net::https::is_closed(&error) {
+            return TransportError::Unreachable;
+        }
         match error {
             NetError::Certificate(problem) => {
                 *self.stopped_at.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(*problem);
                 TransportError::Tls
             }
-            NetError::Tls { reason, .. } => {
-                self.note_trouble(&reason.to_string());
-                TransportError::Tls
-            }
-            NetError::Connect { reason, .. } => {
-                self.note_trouble(&reason.to_string());
-                TransportError::Unreachable
-            }
+            NetError::Tls { .. } => TransportError::Tls,
+            NetError::Connect { .. } => TransportError::Unreachable,
+            // The account's own settings name a server that is not one: nothing went out, the
+            // network is not the thing to blame, and asking again changes nothing.
+            NetError::Config(_) => TransportError::Config,
             _ => TransportError::Other,
         }
     }

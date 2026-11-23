@@ -30,7 +30,11 @@ What is changed here goes up before the mail is read: plain marks a hundred to a
 put on a large selection is not a request for each message), and Send/Receive Progress says how
 many of them the server has taken on. A change a folder's page holds that can't be taken in leaves
 that folder where it was and is tried again next time; the line names the message by its subject
-when the server sent one.
+when the server sent one. A message is fetched whole in one answer, up to 50 MB of text — the
+largest the mailbox takes a message to be — which the base64 in the envelope makes about two thirds
+bigger. A message bigger than that is passed over by a batch of fetches rather than stopping it: the
+rest of the batch comes, the reading pane says the message is bigger than the account downloads in
+full and names both sizes, and it is asked for again when the owner opens it.
 
 ## Grommunio
 
