@@ -3,7 +3,7 @@
 //! Mail down against the strict stand-in (#252, E6): the first download, a delta, a lost sync
 //! state, a busy server, hostile answers, a refused sign-in, and a message fetched whole.
 
-use std::future::Future;
+use std::future::{Future, ready};
 use std::sync::atomic::AtomicBool;
 
 use mailcraft_model::FolderKind;
@@ -564,6 +564,90 @@ fn a_server_that_cannot_be_reached_is_named_by_its_address_and_what_the_connecti
         ["Couldn't download the messages from the server: Couldn't reach the server at mail.example.org (the server refused the connection)"],
         "{lines:?}"
     );
+}
+
+/// A transport that could not even make the account's server address into a request.
+struct BadSettings;
+
+impl HttpExchange for BadSettings {
+    fn exchange(&self, _: &HttpRequest) -> impl Future<Output = Result<HttpResponse, TransportError>> {
+        std::future::ready(Err(TransportError::Config))
+    }
+}
+
+#[test]
+fn a_server_the_settings_name_wrong_is_told_as_that_and_not_as_a_network_failure() {
+    // Nothing about the network is to blame, so the line says what to look at and the run does not
+    // call the account offline.
+    let (pieces, _) = run_as(&client(), &BadSettings, &request());
+    let lines = last(&pieces).errors.clone();
+    assert_eq!(
+        lines,
+        ["The account's settings name a server that can't be used: mail.example.org (the address is not one a request can go to)"],
+        "{lines:?}"
+    );
+    assert!(!last(&pieces).whole, "the run did not get anywhere with the server");
+
+    // Where the transport has its own words for the address, they are the ones said.
+    struct BadAddress {
+        said: String,
+    }
+    impl HttpExchange for BadAddress {
+        fn exchange(&self, _: &HttpRequest) -> impl Future<Output = Result<HttpResponse, TransportError>> {
+            std::future::ready(Err(TransportError::Config))
+        }
+
+        fn trouble(&self) -> Option<String> {
+            Some(self.said.clone())
+        }
+    }
+    let (pieces, _) = run_as(&client(), &BadAddress { said: "the server's address is not a web address".into() }, &request());
+    let lines = last(&pieces).errors.clone();
+    assert_eq!(
+        lines,
+        ["The account's settings name a server that can't be used: mail.example.org (the server's address is not a web address)"],
+        "{lines:?}"
+    );
+}
+
+/// A stand-in that answers everything, except the MIME of `id`, whose answer is longer than the
+/// request may read.
+struct OneHuge {
+    standin: StandIn,
+    id: String,
+}
+
+impl HttpExchange for OneHuge {
+    fn exchange(&self, request: &HttpRequest) -> impl Future<Output = Result<HttpResponse, TransportError>> {
+        let asked = String::from_utf8_lossy(request.body());
+        let huge = asked.contains("m:GetItem") && asked.contains(&self.id);
+        ready(if huge {
+            Err(TransportError::BodyTooLarge)
+        } else {
+            block_on(self.standin.exchange(request)).unwrap_or(Err(TransportError::Unreachable))
+        })
+    }
+}
+
+#[test]
+fn a_message_larger_than_the_program_reads_is_passed_over_and_the_batch_goes_on() {
+    let standin = StandIn::new();
+    let big = standin.state().deliver("inbox", "Huge log", false);
+    let small = standin.state().deliver("inbox", "Short note", false);
+    let exchange = OneHuge { standin, id: big.clone() };
+    let got = block_on(fetch_messages(
+        &client(),
+        &exchange,
+        &EwsFetchRequest { account: 1, email: "ada@example.org".into(), url: URL.into(), ids: vec![big.clone(), small], ..Default::default() },
+        &AtomicBool::new(false),
+        &mut |_| true,
+    ))
+    .unwrap_or_default();
+    assert_eq!(got.fetched.len(), 1, "the rest of the batch came whole");
+    assert_eq!(got.too_large, [big.as_str()], "the big one waits until it is opened");
+    assert_eq!(got.failed, [big], "and isn't asked for again this session");
+    assert!(got.errors.is_empty(), "one message too large is not a run that stopped: {:?}", got.errors);
+    assert!(!got.offline && got.busy_for.is_none(), "the server was there and answered the rest");
 }
 
 #[test]

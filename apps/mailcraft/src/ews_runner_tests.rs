@@ -99,7 +99,24 @@ fn a_failed_exchange_is_told_by_its_kind_and_a_certificate_is_kept_apart() {
         TransportError::Unreachable
     );
     assert_eq!(transport.trouble(), Some("the server refused the connection".into()), "the line naming the server says what the connection said");
-    assert_eq!(transport.judged(NetError::Config("x".into())), TransportError::Other);
+    assert_eq!(transport.judged(NetError::Config("the server's address is not a web address".into())), TransportError::Config);
+    assert_eq!(transport.trouble(), Some("the server's address is not a web address".into()), "the settings' own words are the ones said");
+    // A connection that took too long, or got an answer longer than the request may read, or hung up
+    // is its own kind, with its own words, rather than one the transport has no name for.
+    assert_eq!(
+        transport.judged(NetError::Proto(mailcraft_proto::ProtoError::Io("the server took too long to answer".into()))),
+        TransportError::TimedOut
+    );
+    assert_eq!(
+        transport.judged(NetError::Proto(mailcraft_proto::ProtoError::Protocol("the server's answer is longer than 16384 KB".into()))),
+        TransportError::BodyTooLarge
+    );
+    assert_eq!(
+        transport.judged(NetError::Proto(mailcraft_proto::ProtoError::Io("the server closed the connection".into()))),
+        TransportError::Unreachable
+    );
+    assert_eq!(transport.trouble(), Some("the server closed the connection".into()), "a connection that hung up says so");
+    assert_eq!(transport.judged(NetError::SignInCancelled), TransportError::Other, "what the transport cannot name stays unnamed");
     assert_eq!(transport.judged(NetError::Tls { host: "mail.example.org".into(), reason: "the handshake failed".into() }), TransportError::Tls);
     assert_eq!(transport.trouble(), Some("the handshake failed".into()), "a secure connection that failed says so too");
     assert_eq!(transport.problem(), None, "a plain TLS failure is no certificate question");

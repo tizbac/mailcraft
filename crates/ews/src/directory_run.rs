@@ -31,7 +31,7 @@ use crate::directory::{self, Answer, Item, ItemUp, Kind};
 use crate::error::{Error, ResponseCode};
 use crate::folder::{DistinguishedFolder, FindFolder, FolderInfo, GetFolder};
 use crate::http::HttpExchange;
-use crate::run::{Asked, Run, Stop, unreachable_line};
+use crate::run::{Asked, Run, Stop, config_line, unreachable_line};
 use crate::soap::Element;
 
 /// How many pages of one listing are followed, and how many items one run takes in.
@@ -75,6 +75,9 @@ pub async fn sync_directory<E: HttpExchange>(
             Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable(_) => {
                 out.errors.push("The server's answer for the calendar, contacts or to-dos couldn't be used".to_owned());
             }
+            Asked::TooLarge => {
+                out.errors.push("The server's answer for the calendar, contacts or to-dos was larger than MailCraft reads".to_owned());
+            }
         }
     }
     out.errors.truncate(mailcraft_model::sync::MAX_EWS_ERRORS);
@@ -90,6 +93,7 @@ fn stop_line(stop: Stop, out: &mut mailcraft_model::sync::EwsDirectoryResult) {
         Stop::Busy(seconds) => out.busy_for = Some(seconds.max(1)),
         Stop::Tls => out.errors.push("Couldn't set up a secure connection with the server".to_owned()),
         Stop::Unreachable { host, why } => out.errors.push(unreachable_line(&host, &why)),
+        Stop::Config { host, why } => out.errors.push(config_line(&host, &why)),
         Stop::Line(text) => out.errors.push(text.to_owned()),
     }
 }

@@ -78,23 +78,34 @@ impl Client {
 
     /// Sends `operation` and judges the answer to the point of its response messages.
     pub async fn call<E: HttpExchange>(&self, exchange: &E, operation: &Element) -> Result<Reply, Error> {
-        self.negotiated(exchange, operation, false).await
+        self.negotiated(exchange, operation, false, false).await
     }
 
     /// [`Client::call`] for an operation that makes or sends something (`CreateItem`, `SendItem`,
     /// a move): the request is marked so that the program never sends it twice
     /// ([`HttpRequest::once`]), and an answer lost after it went out is [`TransportError::Lost`].
     pub async fn call_once<E: HttpExchange>(&self, exchange: &E, operation: &Element) -> Result<Reply, Error> {
-        self.negotiated(exchange, operation, true).await
+        self.negotiated(exchange, operation, true, false).await
+    }
+
+    /// [`Client::call`] for the request that asks for one message whole: its answer may be as large
+    /// as [`HttpRequest::for_whole_message`] says, since the message's text comes as base64 inside
+    /// the envelope.
+    pub async fn call_whole<E: HttpExchange>(&self, exchange: &E, operation: &Element) -> Result<Reply, Error> {
+        self.negotiated(exchange, operation, false, true).await
     }
 
     /// Sends `operation` in the version asked for now, and once more in [`Version::FALLBACK`] when
     /// the server says it doesn't know that version. (Making it again is safe even for a request
     /// that is never sent twice: a server judges the version in the header before it reads the
     /// operation, so nothing of it was done.)
-    async fn negotiated<E: HttpExchange>(&self, exchange: &E, operation: &Element, once: bool) -> Result<Reply, Error> {
+    async fn negotiated<E: HttpExchange>(&self, exchange: &E, operation: &Element, once: bool, whole: bool) -> Result<Reply, Error> {
         let asked = self.version();
-        let request = |version| self.request_in(version, operation).map(|r| if once { r.once() } else { r });
+        let request = |version| -> Result<HttpRequest, Error> {
+            let r = self.request_in(version, operation)?;
+            let r = if whole { r.for_whole_message() } else { r };
+            Ok(if once { r.once() } else { r })
+        };
         match self.send(exchange, request(asked)?).await {
             Err(Error::Server(ResponseCode::InvalidServerVersion)) if asked > Version::FALLBACK => {
                 // (Another request of the same client may have lowered it already: either way it is the fallback.)
