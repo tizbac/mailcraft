@@ -70,7 +70,14 @@ Before every commit: `cargo xtask ci` (fmt, clippy -D warnings, tests, assets, s
 - CLI: `mailcraft-cli run --sample --cmd mail.markAllRead --save out.mailcraft`, `mailcraft-cli list out.mailcraft --query "is:flagged"`, `mailcraft-cli commands`, `mailcraft-cli parity`.
 - MCP: `mailcraft-cli mcp` (headless) or `mailcraft-cli mcp --connect 127.0.0.1:7991` (drives the running app). See `docs/mcp.md`.
 - Web: `cd apps/mailcraft-web && trunk serve`, then http://127.0.0.1:8772/?sample.
-- Parallel agents: separate `CARGO_TARGET_DIR` per agent; edit only the crates (or files) you own; format only your own files; delete your target dir when done (disk).
+- Parallel agents: separate `CARGO_TARGET_DIR` per agent; edit only the crates (or files) you own; format only your own files; delete your target dir when done (see [Disk](#disk)).
+
+## Disk
+A build tree is big and only grows: one `cargo xtask ci` in one target dir is **20–30 GB** here (`target/debug` ~27 GB — `incremental` ~12 GB, `build` ~16 GB — plus `wasm32-unknown-unknown` ~8 GB and `release` ~3 GB), and a parallel agent gets a whole tree of its own. Four finished agent trees once held 105 GB.
+- **Look before you build:** `df -h .` and `du -sh target/* | sort -h`. Under ~30 GB free, clean finished work first; a full disk stops the build halfway and leaves it unusable until cleaned.
+- **Reclaiming:** `rm -rf target/debug/incremental` (only rebuild speed is lost — the cheapest first move), `cargo clean` (the whole tree), `cargo clean -p <crate>` (one crate's artifacts), and delete a finished agent's `CARGO_TARGET_DIR` and worktree together. `~/.cargo/registry` is shared and small next to these; leave it.
+- **Don't pay for incremental when you won't rebuild:** `CARGO_INCREMENTAL=0 cargo xtask ci` skips `target/debug/incremental` for a one-shot run (and is what a throwaway check wants); keep incremental on when you are iterating.
+- Never delete another agent's live target dir or a cache you didn't create; delete your own when its work is pushed, and say in the final message that you did.
 
 ## Contributor credits (About window)
 - About ▸ Contributors is compiled into the binary from `contributors/contributors.json` (commit stats; generated, never hand-edit) and `contributors/people.toml` (names people chose for themselves). See `docs/contributors.md`. There is no About ▸ Models: commits and PRs carry no `Co-Authored-By` trailer for an AI; they end with the line `Human-reviewed, AI-assisted, nobody's mailbox harmed.`
