@@ -380,7 +380,6 @@ fn reaction_part(message: &Message) -> Option<Part> {
 /// Most bytes a reaction's emoji may have (the longest sequences of Unicode TR51 are 35).
 const MAX_REACTION: usize = 64;
 
-fn text_part(subtype: &str, text: &str) -> Part {
 fn text_part(subtype: &str, text: &str, signing: bool) -> Part {
     let mut text = charset::unix_lines(text);
     if signing {
