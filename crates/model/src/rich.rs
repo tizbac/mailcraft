@@ -618,6 +618,44 @@ impl PastedTable {
         Some(Self { columns, rows, size })
     }
 
+    /// A grid out of plain text as a spreadsheet's Copy has it: one row per line, the cells of a
+    /// row between tabs. Nothing when the text is not shaped that way — fewer than two rows, a row
+    /// with no tab, rows of different widths — so ordinary text stays text.
+    pub fn from_text(text: &str) -> Option<Self> {
+        if text.is_empty() || text.len() > MAX_CHARS {
+            return None;
+        }
+        // (A copied range ends with a line break; the empty line it leaves is not a row.)
+        let mut lines = lines(text);
+        while lines.last().is_some_and(|line| line.is_empty()) {
+            lines.pop();
+        }
+        if !(2..=MAX_PASTED_ROWS).contains(&lines.len()) {
+            return None;
+        }
+        let rows: Vec<Vec<&str>> = lines.iter().map(|line| line.split('\t').collect()).collect();
+        let width = rows.first().map_or(0, |row| row.len());
+        if !(2..=MAX_PASTED_COLUMNS).contains(&width) || rows.iter().any(|row| row.len() != width) {
+            return None;
+        }
+        let cells = rows
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|cell| TableCell {
+                        lines: vec![vec![CellText { text: cell.to_string(), style: Style::default() }]],
+                        header: false,
+                        colspan: 1,
+                        rowspan: 1,
+                        background: None,
+                        alignment: CellAlignment::Left,
+                    })
+                    .collect()
+            })
+            .collect();
+        PastedTable::new(u16::try_from(width).ok()?, cells)
+    }
+
     pub fn columns(&self) -> u16 {
         self.columns
     }
@@ -1524,3 +1562,5 @@ mod tests;
 
 #[cfg(test)]
 mod find_tests;
+#[cfg(test)]
+mod table_text_tests;

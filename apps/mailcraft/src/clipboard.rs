@@ -158,12 +158,44 @@ fn fragment(html: &str) -> &str {
     }
     const START: &str = "<!--StartFragment-->";
     const END: &str = "<!--EndFragment-->";
-    if let Some(from) = html.find(START).map(|i| i + START.len())
-        && let Some(to) = html.get(from..).and_then(|rest| rest.find(END)).map(|i| from + i)
-    {
-        return html.get(from..to).unwrap_or_default();
+    let Some(start) = html.find(START) else {
+        return html.find('<').and_then(|i| html.get(i..)).unwrap_or_default();
+    };
+    let from = start + START.len();
+    let Some(to) = html.get(from..).and_then(|rest| rest.find(END)).map(|i| from + i) else {
+        return html.find('<').and_then(|i| html.get(i..)).unwrap_or_default();
+    };
+    let inner = html.get(from..to).unwrap_or_default();
+    // A spreadsheet's Copy is the one case where the fragment is not a whole thing of its own:
+    // Excel writes the `<table>` tag (and its `<colgroup>`) before `<!--StartFragment-->` and
+    // `</table>` after `<!--EndFragment-->`, so the fragment is a run of loose rows. When that is
+    // what it is, the table the rows sit in is taken in with them, so the paste keeps the grid.
+    if !tagged(inner, "table") && (tagged(inner, "tr") || tagged(inner, "td") || tagged(inner, "th")) {
+        // The last `<table>` opened before the fragment and not closed before it is the one the
+        // rows belong to; its `</table>` is the first one after the fragment. Only a short way
+        // back is looked at: a clipboard's HTML is capped, and the tag sits just before the marker.
+        const LOOKING_BACK: usize = 2_048;
+        let from_back = from.saturating_sub(LOOKING_BACK);
+        if let Some(open) =
+            (from_back..from).rev().find(|&i| tag_at(html, i, "table") && !tagged(html.get(i + 6..from).unwrap_or_default(), "/table"))
+        {
+            let close = (to..html.len()).find(|&i| tag_at(html, i, "/table")).map_or(to, |i| i + 8);
+            return html.get(open..close).unwrap_or(inner);
+        }
     }
-    html.find('<').and_then(|i| html.get(i..)).unwrap_or_default()
+    inner
+}
+
+/// Whether `haystack` holds a `<name>` tag, in any case.
+fn tagged(haystack: &str, name: &str) -> bool {
+    (0..haystack.len()).any(|i| tag_at(haystack, i, name))
+}
+
+/// Whether `haystack` has a `<name>` tag starting at `at`, in any case.
+fn tag_at(haystack: &str, at: usize, name: &str) -> bool {
+    let bytes = haystack.as_bytes();
+    let name = name.as_bytes();
+    bytes.get(at).is_some_and(|b| *b == b'<') && bytes.get(at + 1..at + 1 + name.len()).is_some_and(|s| s.eq_ignore_ascii_case(name))
 }
 
 #[cfg(test)]
@@ -188,6 +220,31 @@ mod tests {
         assert_eq!(fragment("Version:0.9\r\nStartHTML:1\r\n<p>y</p>"), "<p>y</p>");
         assert_eq!(fragment("Version:0.9\r\n<!--StartFragment-->no end"), "<!--StartFragment-->no end");
         assert_eq!(fragment("Version:"), "");
+    }
+
+    #[test]
+    fn a_spreadsheet_copy_keeps_the_table_its_rows_sit_in() {
+        // Excel's "HTML Format" for a copied range: the `<table>` and its `<colgroup>` are outside
+        // the markers, which hold only the rows. Word puts the element inside them, and nothing is
+        // added then.
+        let excel = "Version:1.0\r\nStartHTML:0000000105\r\nEndHTML:0000002603\r\nStartFragment:0000002174\r\nEndFragment:0000002551\r\n\
+             <html><body><table border=0 cellpadding=0 cellspacing=0 width=138><!--StartFragment-->\
+             <col width=69 span=2><tr><td>Part</td><td>12,30</td></tr><tr><td>Gasket</td><td>4,00</td></tr><!--EndFragment-->\
+             </table></body></html>";
+        let said = fragment(excel);
+        assert!(said.starts_with("<table border=0"), "{said}");
+        assert!(said.ends_with("</table>"), "{said}");
+        assert!(said.contains("<col width=69 span=2><tr><td>Part</td>"), "{said}");
+        assert_eq!(fragment("Version:1.0\r\n<!--StartFragment--><p>Hello</p><!--EndFragment-->"), "<p>Hello</p>");
+        // Rows with no table round them at all stay as they were.
+        assert_eq!(fragment("Version:1.0\r\n<!--StartFragment--><tr><td>a</td></tr><!--EndFragment-->"), "<tr><td>a</td></tr>");
+        // A table closed before the fragment is not the rows' own.
+        assert_eq!(
+            fragment("Version:1.0\r\n<table><tr><td>x</td></tr></table><!--StartFragment--><tr><td>a</td></tr><!--EndFragment-->"),
+            "<tr><td>a</td></tr>"
+        );
+        // In any case the tags are read, and the scan stops at the end of the fragment.
+        assert_eq!(fragment("Version:1.0\r\n<TABLE><tr><td>x</td></TABLE><!--StartFragment--><TD>a</TD><!--EndFragment-->"), "<TD>a</TD>");
     }
 
     /// The real clipboard of the machine the test runs on: HTML put there comes back, and its

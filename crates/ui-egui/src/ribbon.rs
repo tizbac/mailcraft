@@ -1093,7 +1093,7 @@ fn insert() -> Tab {
                 Item::big_menu("signature", "signature", "Signature", "Signature", Menu::Signature).at(0, 3),
             ],
         ),
-        g("Tables", vec![Item::pending("insert.table", "Table", 1)]),
+        g("Tables", vec![Item::small("table", "Table", "Insert Table", "insert.table", no()).at(1, 5)]),
         g(
             "Illustrations",
             vec![

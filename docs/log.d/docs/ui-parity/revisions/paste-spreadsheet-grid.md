@@ -1,0 +1,1 @@
+| 2026-11-23 | patch | Composer: a spreadsheet's Copy keeps its grid when pasted (Excel's table outside the clipboard's markers, and text alone that is rows of tab-separated cells), and Insert › Table puts an empty grid at the caret |
