@@ -22,7 +22,7 @@ use mailcraft_model::sync::{
     FolderDelta, FolderState, GmailLabels, GmailSorted, MAX_GMAIL_MOVES, MAX_TRIES, RemoteFlags, RemoteOp, SyncPhase, SyncRequest, SyncResult,
     SyncStage, SyncStep,
 };
-use mailcraft_model::{Account, Body, FlagStatus, FolderKind, GmailCategory, Id, Message, OAuthProvider, Security, Server};
+use mailcraft_model::{Account, Body, DownloadInFull, FlagStatus, FolderKind, GmailCategory, Id, Message, OAuthProvider, Security, Server};
 use mailcraft_proto::ProtoError;
 use mailcraft_proto::imap::{Fetched, FolderStatus, Imap, Mailbox, uid_sets};
 use mailcraft_time::{Date, DateTime, Timestamp};
@@ -41,8 +41,8 @@ const MAX_FOLDERS: usize = mailcraft_model::sync::MAX_LISTED_FOLDERS;
 const MAX_RUN_BYTES: usize = 256 * 1024 * 1024;
 /// Most messages downloaded in such a run, however small.
 const MAX_RUN_MESSAGES: usize = 100_000;
-/// The largest message that is downloaded whole. Of a larger one only the header is, and a note
-/// takes the place of its text ([`too_large`]).
+/// The largest message that is downloaded whole when the account says nothing of its own. An
+/// account's own "Download messages in full" wins over it ([`Limits::for_account`]).
 const MAX_MESSAGE: u64 = 25 * 1024 * 1024;
 /// Most messages of a Gmail account's Inbox whose Gmail category is read in one run, the newest
 /// (#911); older ones keep what they had.
@@ -101,6 +101,17 @@ impl Limits {
     pub(crate) fn kept_whole() -> Limits {
         Limits { bytes: MAX_RUN_BYTES, messages: MAX_RUN_MESSAGES, ..Limits::in_pieces() }
     }
+
+    /// `limits` with the largest message taken whole set by the account: its own "Download
+    /// messages in full", and for an account that downloads everything the ceiling every account
+    /// has ([`mailcraft_model::MAX_WHOLE_MESSAGE]). An IMAP run that was never given one keeps the
+    /// size it has always kept ([`MAX_MESSAGE]), which is more than the default choice names. Of a
+    /// message bigger than the limit only the header is, and a note takes the place of its text
+    /// ([`too_large`]).
+    pub(crate) fn for_account(mut self, account: &Account) -> Limits {
+        self.largest = if account.download_in_full == DownloadInFull::default() { MAX_MESSAGE } else { account.download_in_full.whole_limit() };
+        self
+    }
 }
 
 /// Send the outbox, push the changes made here ([`SyncRequest::ops`]), then download new mail
@@ -117,7 +128,7 @@ impl Limits {
 /// run downloads only so much, and the rest comes with the next. A host that shows mail as it
 /// arrives, says how far the run has got, and may call it off uses [`sync_with`].
 pub fn sync(request: &SyncRequest) -> SyncResult {
-    sync_within(request, Limits::kept_whole())
+    sync_within(request, Limits::kept_whole().for_account(&request.account))
 }
 
 /// [`sync`], with the answer handed to `emit` in pieces as the run goes, in the order things are
@@ -140,7 +151,8 @@ pub fn sync(request: &SyncRequest) -> SyncResult {
 /// Blocks until the run is over; `emit` is called on this thread, and a slow `emit` holds the
 /// run up rather than letting pieces pile up.
 pub fn sync_with(request: &SyncRequest, cancel: &AtomicBool, emit: &mut dyn FnMut(SyncResult)) {
-    sync_as(request, Limits::in_pieces(), Host::of(&request.account), cancel, emit);
+    // How large a message is taken whole is the account's own "Download messages in full" (#300).
+    sync_as(request, Limits::in_pieces().for_account(&request.account), Host::of(&request.account), cancel, emit);
 }
 
 /// [`sync`], going only as far as `limits` allow.

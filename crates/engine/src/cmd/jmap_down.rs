@@ -11,7 +11,8 @@
 //!   messages, a listing to [`MAX_LISTED_FOLDERS`] mailboxes, a subject and a `Message-ID` to a
 //!   line of RFC 5322 (998 characters, §2.1.1), a preview to 256 characters (RFC 8621 §4.1.4), an
 //!   address to 320 (a local part of 64 octets and a domain of 255, RFC 5321 §4.5.3.1), a message
-//!   fetched whole to 50 MB. Text is put on one line.
+//!   fetched whole to 200 MB, the ceiling "Download messages in full: Everything" has. Text is put
+//!   on one line.
 //! - **What only a Graph delta says** (where a folder's mail goes on from, what left it, what was
 //!   read there, categories, importance, a follow-up's dates, a change key, a folder's own Outbox)
 //!   is none of a JMAP server's: it is taken out. A JMAP server's marks are its keywords, `$seen`,
@@ -50,11 +51,12 @@ const MAX_ADDRESS: usize = 320;
 pub(crate) const MAX_PEOPLE: usize = 500;
 /// Longest a busy server is waited for, in seconds: a day.
 pub(crate) const MAX_BUSY: u32 = 86_400;
-/// Most messages of a batch fetched whole, the largest taken (Download messages in full goes up to
-/// 50 MB), and the most a batch brings in all, the one message past it taken still.
+/// Most messages of a batch fetched whole, the largest taken ([`mailcraft_model::MAX_WHOLE_MESSAGE],
+/// which is what "Download messages in full: Everything" means), and the most a batch brings in
+/// all, the one message past it taken still.
 pub(crate) const MAX_FETCHED: usize = 100;
-pub(crate) const MAX_MESSAGE: usize = 50 << 20;
-pub(crate) const MAX_BATCH: usize = 64 << 20;
+pub(crate) const MAX_MESSAGE: usize = mailcraft_model::MAX_WHOLE_MESSAGE as usize;
+pub(crate) const MAX_BATCH: usize = 512 << 20;
 /// How many of the Inbox's newest messages the background fetches whole; any other is fetched when
 /// it is opened, so that what a browser tab holds stays small.
 pub(crate) const BACKGROUND_NEWEST: usize = 40;
@@ -271,9 +273,9 @@ pub(crate) fn bounded(mut result: JmapMailResult) -> JmapMailResult {
 }
 
 /// What a batch of messages fetched whole brought, held to its sizes: a hundred messages, each
-/// 50 MB at the most (a larger one, or an empty one, is one the server wouldn't give), 64 MB in all
-/// but for the first (from the one that would take it past that, the rest waits for the next batch,
-/// which names it again), and ids that are ids.
+/// 200 MB at the most (a larger one, or an empty one, is one the server wouldn't give), 512 MB in
+/// all but for the first (from the one that would take it past that, the rest waits for the next
+/// batch, which names it again), and ids that are ids.
 pub(crate) fn bounded_fetch(mut result: GraphFetchResult) -> GraphFetchResult {
     let mut refused = Vec::new();
     let (mut brought, mut full) = (0usize, false);

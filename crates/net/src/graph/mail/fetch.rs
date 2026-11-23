@@ -26,7 +26,8 @@ use super::id_of;
 use crate::NetError;
 use crate::http;
 
-/// Largest message taken (Microsoft's own limit is 150 MB).
+/// Largest message taken from Graph: the service's own limit is 150 MB, so this is as much as it
+/// can give of a message at the ceiling every account has ([`mailcraft_model::MAX_WHOLE_MESSAGE]).
 const MAX_MIME: usize = 160 * 1024 * 1024;
 // What is asked for is what comes: a body is never cut to less than this (#175).
 const _: () = assert!(MAX_MIME <= http::MAX_LARGE_BODY);

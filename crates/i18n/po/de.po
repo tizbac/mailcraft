@@ -18612,6 +18612,11 @@ msgstr "Diese Nachricht ist im Ordner Junk-E-Mail: löschen Sie sie, statt sich 
 
 #. interface
 #: crates/ui-egui/src/reading.rs
+msgid "This message is {size} on the server, more than MailCraft downloads whole ({limit}). Open it to read it on the server."
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/reading.rs
 msgid "This message is {size} on the server, more than this account downloads in full ({limit}). Change that in Account Settings › Download messages in full, or read it on the server."
 msgstr ""
 

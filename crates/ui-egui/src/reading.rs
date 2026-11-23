@@ -333,6 +333,13 @@ pub(crate) fn unfetched_said(app: &MailApp, m: &Message) -> String {
     if let Some((size, limit)) = bigger_than_the_account_takes(app, m) {
         // Its server has more of it than this account downloads in full (#300): the owner's setting
         // is the thing to change, or the message to read on the server.
+        if limit == mailcraft_model::MAX_WHOLE_MESSAGE {
+            // The account asks for everything, and this is past the end any account has.
+            return crate::i18n::fmt(
+                tl!("This message is {size} on the server, more than MailCraft downloads whole ({limit}). Open it to read it on the server."),
+                &[("size", &megabytes(size)), ("limit", &megabytes(limit))],
+            );
+        }
         return crate::i18n::fmt(
             tl!(
                 "This message is {size} on the server, more than this account downloads in full ({limit}). Change that in Account Settings › Download messages in full, or read it on the server."
@@ -347,12 +354,12 @@ pub(crate) fn unfetched_said(app: &MailApp, m: &Message) -> String {
     }
 }
 
-/// The size `m` has on its server and the largest its account downloads in full, when the message
-/// is bigger than that limit (R3.2, #300). Nothing when the server said no size, or the account
-/// takes everything.
+/// The size `m` has on its server and the largest its account downloads whole, when the message is
+/// bigger than that (R3.2, #300). An account set to "Everything" has the ceiling every account has.
+/// Nothing when the server said no size.
 fn bigger_than_the_account_takes(app: &MailApp, m: &Message) -> Option<(u64, u64)> {
     let size = m.server.as_ref().map(|s| s.size).filter(|size| *size > 0)?;
-    let limit = app.session.mailbox.owner_of(m.account).or(app.session.mailbox.account(m.account)).and_then(|a| a.download_in_full.limit())?;
+    let limit = app.session.mailbox.owner_of(m.account).or(app.session.mailbox.account(m.account)).map(|a| a.download_in_full.whole_limit())?;
     (size > limit).then_some((size, limit))
 }
 

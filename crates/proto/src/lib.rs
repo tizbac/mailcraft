@@ -26,7 +26,9 @@ mod script;
 /// Longest line a server may send.
 pub const MAX_LINE: usize = 64 * 1024;
 /// Largest counted block (an IMAP literal, so: the largest message) a server may send.
-pub const MAX_LITERAL: usize = 64 * 1024 * 1024;
+/// The longest literal a server may hand over: room for a message of 200 MB, the largest any
+/// account downloads whole, and the framing around it.
+pub const MAX_LITERAL: usize = 256 * 1024 * 1024;
 /// Longest user name and access token, together, that one sign-in may carry.
 const MAX_XOAUTH2: usize = 32 * 1024;
 
