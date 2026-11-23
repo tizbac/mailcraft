@@ -3684,7 +3684,6 @@ fn contact_key(id: &str) -> &str {
     resource_key(id)
 }
 
-
 /// The contacts made here that `account`'s CardDAV server is yet to receive: those given an
 /// address book, which no download has given a URL of their own yet. None when there are none.
 pub fn book_contact_upload(s: &Session, account: Id) -> Option<ContactsUpload> {

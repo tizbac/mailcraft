@@ -167,9 +167,10 @@ fn preset(_: &mut Session, v: &Value) -> CmdResult {
                 .or_else(|| provider::linchange_for_domain(&domain));
             Some(found.ok_or_else(|| bad("`mx` names no Linchange server"))?)
         }
-        Some(name) => {
-            Some(provider::by_name(name).ok_or_else(|| bad("`service` is microsoft365, outlook.com, google, yahoo, icloud, fastmail, aol, zoho or linchange"))?)
-        }
+        Some(name) => Some(
+            provider::by_name(name)
+                .ok_or_else(|| bad("`service` is microsoft365, outlook.com, google, yahoo, icloud, fastmail, aol, zoho or linchange"))?,
+        ),
         None => None,
     };
     let own = provider::by_domain(&domain);
