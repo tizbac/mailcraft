@@ -3175,6 +3175,8 @@ pub fn show(app: &mut MailApp, ctx: &egui::Context) {
         Dialog::NameChoice(dialog) => {
             let mut done = false;
             let open = window(ctx, tl!("Check Names"), crate::check_names::WIDTH, |ui| done = dialog.show(app, ui, enter));
+            close |= !open || done;
+        }
         Dialog::DigitalSignatures(dialog) => {
             let mut done = false;
             let open = window(ctx, tl!("Digital Signatures"), crate::digital_signatures::WIDTH, |ui| done = dialog.show(app, ui, enter));
