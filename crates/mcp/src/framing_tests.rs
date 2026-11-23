@@ -935,6 +935,7 @@ const WRITTEN_PARAMS: &[&str] = &[
     "lastModified",
     "contactHomes",
     "calendarHomes",
+    "key",
     // What an answer says back, written in the same doc as the params.
     "messages",
     "reasons",
