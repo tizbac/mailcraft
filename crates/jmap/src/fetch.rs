@@ -38,13 +38,15 @@ use crate::mail::{arguments, get, said, secrets_of};
 use crate::{ApiRequest, CAPABILITY_MAIL, Connection, Error, Failure, HttpExchange, Id, Redactor, TransportError, Unusable};
 
 /// Largest message taken, in octets: what a caller may ask for is held to it. A bigger message is
-/// refused ([`Unusable::BodyTooLarge`]), not cut.
-pub const MAX_MESSAGE: usize = 50 << 20;
+/// refused ([`Unusable::BodyTooLarge`]), not cut. The same ceiling every kind of account has
+/// ([`mailcraft_model::MAX_WHOLE_MESSAGE]), which is what "Download messages in full: Everything"
+/// means.
+pub const MAX_MESSAGE: usize = mailcraft_model::MAX_WHOLE_MESSAGE as usize;
 /// Most messages one batch fetches, whatever its request names.
 const MAX_BATCH: usize = 100;
 /// Most octets one batch brings, give or take the one message whose size the server didn't state: past
 /// this, the messages it still has to fetch wait for the next batch.
-pub const MAX_BATCH_OCTETS: usize = 64 << 20;
+pub const MAX_BATCH_OCTETS: usize = 512 << 20;
 // A batch has room for the largest message there is, so that the usual run of messages is never held up by it.
 const _: () = assert!(MAX_BATCH_OCTETS >= MAX_MESSAGE);
 // And the core lets a download be as large as that: a request's limit can only lower the kind's.

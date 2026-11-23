@@ -651,6 +651,54 @@ fn a_message_larger_than_the_program_reads_is_passed_over_and_the_batch_goes_on(
 }
 
 #[test]
+fn a_message_of_a_hundred_megabytes_comes_whole() {
+    // A server's `MimeContent` for a message of over 100 MB: base64 is a third bigger than the
+    // message, so the answer weighs about 140 MB — more than an ordinary request may read, and
+    // within what a request for one message whole is allowed.
+    let standin = StandIn::new();
+    let id = standin.state().deliver("inbox", "Huge log", false);
+    let mime = "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5".repeat((100 * 1024 * 1024) / 36 + 1);
+    let body = crate::standin::response(
+        "GetItem",
+        &format!(
+            "<m:GetItemResponseMessage ResponseClass=\"Success\"><m:ResponseCode>NoError</m:ResponseCode><m:Items><t:Message>\
+             <t:MimeContent CharacterSet=\"UTF-8\">{mime}</t:MimeContent><t:ItemId Id=\"{id}\" ChangeKey=\"CQAAABYAAAAx\"/></t:Message></m:Items>\
+             </m:GetItemResponseMessage>"
+        ),
+    )
+    .into_bytes();
+    assert!(body.len() > http::RESPONSE_LIMIT && body.len() < http::WHOLE_MESSAGE_LIMIT, "{} bytes", body.len());
+
+    struct Hundred {
+        standin: StandIn,
+        id: String,
+        body: Vec<u8>,
+    }
+    impl HttpExchange for Hundred {
+        fn exchange(&self, request: &HttpRequest) -> impl Future<Output = Result<HttpResponse, TransportError>> {
+            let asked = String::from_utf8_lossy(request.body());
+            ready(if asked.contains("m:GetItem") && asked.contains(&self.id) {
+                Ok(HttpResponse::new(200, self.body.clone()))
+            } else {
+                block_on(self.standin.exchange(request)).unwrap_or(Err(TransportError::Unreachable))
+            })
+        }
+    }
+
+    let got = block_on(fetch_messages(
+        &client(),
+        &Hundred { standin, id: id.clone(), body },
+        &EwsFetchRequest { account: 1, email: "ada@example.org".into(), url: URL.into(), ids: vec![id], ..Default::default() },
+        &AtomicBool::new(false),
+        &mut |_| true,
+    ))
+    .unwrap_or_default();
+    assert_eq!(got.fetched.len(), 1, "the big message came, not passed over");
+    assert!(got.fetched[0].mime.len() >= 100 * 1024 * 1024, "{} bytes of message", got.fetched[0].mime.len());
+    assert!(got.failed.is_empty() && got.too_large.is_empty() && got.errors.is_empty(), "{got:?}");
+}
+
+#[test]
 fn the_inbox_pass_reads_the_inbox_alone() {
     let standin = StandIn::new();
     standin.state().deliver("inbox", "Kickoff", false);

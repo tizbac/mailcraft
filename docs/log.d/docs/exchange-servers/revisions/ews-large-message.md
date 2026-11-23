@@ -1,1 +1,0 @@
-| 2026-11-23 | patch | A message is fetched whole up to 50 MB, the limit every other kind of account has; one bigger is passed over by a batch of fetches rather than stopping it, and the reading pane names both sizes |

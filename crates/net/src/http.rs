@@ -22,9 +22,11 @@ use crate::transport::{self, Service};
 
 /// Largest answer body taken, unless the one who asks says otherwise ([`Request::max_body`]).
 pub(crate) const MAX_BODY: usize = 64 * 1024;
-/// Largest answer body anyone may ask for: a whole message of a Microsoft account (Microsoft's
-/// own limit is 150 MB). Each caller asks for no more than its own answers need (#175).
-pub(crate) const MAX_LARGE_BODY: usize = 160 * 1024 * 1024;
+/// Largest answer body anyone may ask for: a message fetched whole, the largest thing any account
+/// downloads — the ceiling "Download messages in full: Everything" has
+/// ([`mailcraft_model::MAX_WHOLE_MESSAGE], 200 MB), as base64 inside an Exchange envelope about a
+/// third bigger. Each caller asks for no more than its own answers need (#175).
+pub(crate) const MAX_LARGE_BODY: usize = 288 * 1024 * 1024;
 /// Most bytes the answer's status line and headers may take, and most lines.
 const MAX_HEAD: usize = 48 * 1024;
 const MAX_HEAD_LINES: usize = 200;

@@ -46,10 +46,10 @@ const MAX_TAG_ATTRIBUTES: usize = 64;
 /// Longest text kept of one element (bytes): an id, a name, a property in base64.
 pub const MAX_TEXT: usize = 8_192;
 /// Longest text kept of a `MimeContent` (bytes): a whole message in base64, which the answer to
-/// `GetItem` carries in one element. Enough for the largest message the mailbox takes (50 MB, the
-/// engine's cap), which base64 makes about two thirds bigger. (Charged at its real size, like any
-/// text.)
-pub const MAX_MIME_TEXT: usize = 68 * 1024 * 1024;
+/// `GetItem` carries in one element. Enough for a message at the ceiling every account has
+/// ([`mailcraft_model::MAX_WHOLE_MESSAGE], 200 MB), which base64 makes about a third bigger.
+/// (Charged at its real size, like any text.)
+pub const MAX_MIME_TEXT: usize = 272 * 1024 * 1024;
 /// Longest text kept of a `SyncState` (bytes): the server's own record of what a folder's client
 /// has, which grows with the folder (a compressed list of the items it has told of): a large
 /// folder's runs to some tens of kilobytes.
@@ -61,10 +61,10 @@ const NODE_COST: usize = std::mem::size_of::<Node>() + 48;
 /// What the whole tree may cost, whatever the body weighs (bytes). A message fetched whole is one
 /// element holding its base64 ([`MAX_MIME_TEXT]), which is charged at its real size, so this has to
 /// be roomier than the answers to the other requests.
-const MAX_BUDGET: usize = 128 * 1024 * 1024;
+const MAX_BUDGET: usize = 512 * 1024 * 1024;
 
 /// What a tree of a document of `body_len` bytes may cost: sixteen times the document and a
-/// little more, never above 128 MiB. Every element costs a fixed amount and what it holds; a
+/// little more, never above 512 MiB. Every element costs a fixed amount and what it holds; a
 /// namespace costs once however many elements it is declared on.
 pub fn budget(body_len: usize) -> usize {
     body_len.saturating_mul(16).saturating_add(256 * 1024).min(MAX_BUDGET)

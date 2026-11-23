@@ -28,3 +28,20 @@ fn a_message_downloaded_whole_has_no_size_from_the_server_whatever_its_header_sa
     assert!(m.headers.iter().any(|(name, _)| name.eq_ignore_ascii_case(NOT_DOWNLOADED)));
     assert_eq!(m.list_size(), None, "a sender's header is not believed");
 }
+
+#[test]
+fn the_account_says_how_large_a_message_it_wants_whole() {
+    let mut a = mailcraft_model::Account::default();
+    // An IMAP run that was never given a setting keeps the size it has always kept.
+    assert_eq!(Limits::in_pieces().for_account(&a).largest, MAX_MESSAGE);
+    // A setting of its own wins, whatever it is.
+    a.download_in_full = mailcraft_model::DownloadInFull::UpTo50Mb;
+    assert_eq!(Limits::in_pieces().for_account(&a).largest, 50 << 20);
+    // "Everything" is not without an end: it is the ceiling every account has.
+    a.download_in_full = mailcraft_model::DownloadInFull::Everything;
+    assert_eq!(Limits::in_pieces().for_account(&a).largest, mailcraft_model::MAX_WHOLE_MESSAGE);
+    // A message past it keeps its size on the server and a note in place of its text.
+    let m = too_large(Fetched { uid: 9, body: Some(HEADER.to_vec()), ..Default::default() }, 300 * 1024 * 1024, mailcraft_model::MAX_WHOLE_MESSAGE);
+    assert_eq!(m.not_downloaded, 300 * 1024 * 1024);
+    assert!(m.list_size().is_some());
+}

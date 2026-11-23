@@ -371,7 +371,7 @@ fn a_flood_of_elements_with_a_wide_namespace_costs_a_small_multiple_of_the_body(
     // The budget is a small multiple of the body, and has an end: room for a message fetched
     // whole, whose base64 text is one element ([`MAX_MIME_TEXT]).
     assert!(xml::budget(flood.len()) < 30 * 1024 * 1024);
-    assert_eq!(xml::budget(usize::MAX), 128 * 1024 * 1024);
+    assert_eq!(xml::budget(usize::MAX), 512 * 1024 * 1024);
     // What fits holds the namespace once: the nodes point to the one copy.
     let fits = format!("<a xmlns=\"{}\">{}</a>", "n".repeat(2_000), "<b>x</b>".repeat(1_000));
     let tree = xml::parse(fits.as_bytes()).unwrap();
@@ -769,9 +769,9 @@ fn a_get_item_answer_with_ten_megabytes_of_mime_fits() {
 
 #[test]
 fn a_message_whole_of_more_than_an_ordinary_answer_is_read() {
-    // A 40 MB message comes as about 53 MB of base64 inside the envelope: more than any other
+    // A 100 MB message comes as about 133 MB of base64 inside the envelope: more than any other
     // request's answer may weigh, and within what a request for one message whole is allowed.
-    let mime = "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5".repeat(40 * 1024 * 1024 / 48);
+    let mime = "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5".repeat(100 * 1024 * 1024 / 48);
     let body = format!(
         "{ENVELOPE_OPEN}<m:GetItemResponse xmlns:m=\"http://schemas.microsoft.com/exchange/services/2006/messages\" xmlns:t=\"http://schemas.microsoft.com/exchange/services/2006/types\">\
          <m:ResponseMessages><m:GetItemResponseMessage ResponseClass=\"Success\"><m:ResponseCode>NoError</m:ResponseCode><m:Items><t:Message>\
@@ -781,7 +781,7 @@ fn a_message_whole_of_more_than_an_ordinary_answer_is_read() {
         id("key", 1, 44)
     );
     assert!(body.len() > http::RESPONSE_LIMIT && body.len() < http::WHOLE_MESSAGE_LIMIT, "{} bytes", body.len());
-    let (tree, cost) = xml::parse_with_cost(body.as_bytes()).unwrap_or_else(|e| panic!("a whole message of 40 MB is read, not refused: {e}"));
+    let (tree, cost) = xml::parse_with_cost(body.as_bytes()).unwrap_or_else(|e| panic!("a whole message of 100 MB is read, not refused: {e}"));
     assert!(cost <= xml::budget(body.len()), "{cost} of {}", xml::budget(body.len()));
     let message = tree.find(&["Body", "GetItemResponse", "ResponseMessages", "GetItemResponseMessage", "Items", "Message"]).unwrap();
     assert_eq!(message.child("MimeContent").unwrap().text.len(), mime.len());

@@ -767,9 +767,14 @@ impl GraphSwitch {
     }
 }
 
-/// Which messages of a Microsoft account are **fetched** in the background ("Download messages in
-/// full", per account; R3 spec S12). A larger one is fetched when it is opened, replied to,
-/// forwarded or saved.
+/// The largest message any account downloads whole, in bytes. Nothing a server sends is read
+/// without an end, so "Download messages in full: Everything" means up to this rather than
+/// without bound ([`DownloadInFull::whole_limit`]).
+pub const MAX_WHOLE_MESSAGE: u64 = 200 << 20;
+
+/// Which messages of an account are **fetched** in the background ("Download messages in full",
+/// per account; R3 spec S12). A larger one is fetched when it is opened, replied to, forwarded or
+/// saved.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DownloadInFull {
@@ -796,6 +801,13 @@ impl DownloadInFull {
             DownloadInFull::UpTo50Mb => Some(50 << 20),
             DownloadInFull::Everything => None,
         }
+    }
+
+    /// The largest message fetched whole, in bytes: the setting's own limit, or
+    /// [`MAX_WHOLE_MESSAGE]` when the account downloads everything. A server's answer is never
+    /// read past an end, so "Everything" has one, and it is the same for every kind of account.
+    pub fn whole_limit(self) -> u64 {
+        self.limit().unwrap_or(MAX_WHOLE_MESSAGE)
     }
 }
 
