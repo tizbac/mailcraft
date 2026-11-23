@@ -7754,6 +7754,11 @@ msgstr "Link beszúrása"
 msgid "Insert Picture"
 msgstr "Kép beszúrása"
 
+#. ribbon
+#: crates/ui-egui/src/ribbon.rs
+msgid "Insert Table"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ComposerScreen.kt
 #, fuzzy
@@ -16889,14 +16894,14 @@ msgstr "Rendszer"
 msgid "System default"
 msgstr "Rendszer alapértelmezése"
 
-#. interface, ribbon
-#: crates/ui-egui/src/credits.rs crates/ui-egui/src/ribbon.rs
+#. command label, interface, ribbon
+#: crates/engine/src/cmd/format.rs crates/ui-egui/src/credits.rs crates/ui-egui/src/ribbon.rs
 #, fuzzy
 msgid "Table"
 msgstr "Táblázat"
 
-#. ribbon
-#: crates/ui-egui/src/ribbon.rs
+#. ribbon, ribbon location
+#: crates/engine/src/cmd/format.rs crates/ui-egui/src/ribbon.rs
 #, fuzzy
 msgid "Tables"
 msgstr "Táblázatok"
@@ -20016,6 +20021,11 @@ msgstr "Ennek az üzenetnek lejárt az ideje, és a következő Küldés/Fogadá
 #, fuzzy
 msgid "This message is in Junk E-mail: delete it rather than unsubscribing."
 msgstr "Ez az üzenet a Levélszemét mappában van: leiratkozás helyett törölje."
+
+#. interface
+#: crates/ui-egui/src/reading.rs
+msgid "This message is {size} on the server, more than this account downloads in full ({limit}). Change that in Account Settings › Download messages in full, or read it on the server."
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/calendar/invitation.rs

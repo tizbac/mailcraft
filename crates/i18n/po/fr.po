@@ -7724,6 +7724,11 @@ msgstr "Insérer un lien"
 msgid "Insert Picture"
 msgstr "Insérer une image"
 
+#. ribbon
+#: crates/ui-egui/src/ribbon.rs
+msgid "Insert Table"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ComposerScreen.kt
 #, fuzzy
@@ -16823,14 +16828,14 @@ msgstr "Système"
 msgid "System default"
 msgstr "Par défaut du système"
 
-#. interface, ribbon
-#: crates/ui-egui/src/credits.rs crates/ui-egui/src/ribbon.rs
+#. command label, interface, ribbon
+#: crates/engine/src/cmd/format.rs crates/ui-egui/src/credits.rs crates/ui-egui/src/ribbon.rs
 #, fuzzy
 msgid "Table"
 msgstr "Tableau"
 
-#. ribbon
-#: crates/ui-egui/src/ribbon.rs
+#. ribbon, ribbon location
+#: crates/engine/src/cmd/format.rs crates/ui-egui/src/ribbon.rs
 msgid "Tables"
 msgstr "Tableaux"
 
@@ -19943,6 +19948,11 @@ msgstr "Ce message est dû et part au prochain Envoi/Réception."
 #, fuzzy
 msgid "This message is in Junk E-mail: delete it rather than unsubscribing."
 msgstr "Ce message est dans Courrier indésirable : supprimez-le plutôt que de vous désabonner."
+
+#. interface
+#: crates/ui-egui/src/reading.rs
+msgid "This message is {size} on the server, more than this account downloads in full ({limit}). Change that in Account Settings › Download messages in full, or read it on the server."
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/calendar/invitation.rs
