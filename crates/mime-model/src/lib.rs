@@ -67,7 +67,6 @@ pub fn writes_original(message: &Message) -> bool {
     mime::writes_original(&from_model(message))
 }
 
-
 /// The body of `message` as the entity a Digital signature is made over (#30,
 /// [`mailcraft_mime::signable`]).
 pub fn signable(message: &Message) -> Vec<u8> {
@@ -88,7 +87,6 @@ pub fn signature_missing(message: &Message) -> bool {
     };
     mime::signed_kind(&from_model(message)) != Some(wanted)
 }
-
 
 /// Write messages as an mbox file ([`mailcraft_mime::write_mbox`]).
 pub fn write_mbox(messages: &[&Message], opts: &WriteOptions) -> Vec<u8> {

@@ -196,6 +196,9 @@ pub mod shared;
 pub mod signature;
 #[cfg(test)]
 mod signature_tests;
+pub mod signing;
+#[cfg(test)]
+mod signing_tests;
 pub mod snooze;
 #[cfg(test)]
 mod snooze_review_tests;
@@ -203,9 +206,6 @@ mod snooze_review_tests;
 mod snooze_servers_tests;
 #[cfg(test)]
 mod snooze_tests;
-pub mod signing;
-#[cfg(test)]
-mod signing_tests;
 pub mod sync_progress;
 pub mod tasks;
 pub mod tasks_remote;
