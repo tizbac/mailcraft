@@ -262,6 +262,7 @@ pub(crate) const NAMING_PARAMS: &[&str] = &[
     "group",
     "label",
     "secondLabel",
+    "addressBook",
     // People, addresses and the lists they are on.
     "to",
     "cc",
