@@ -215,3 +215,23 @@ proptest::proptest! {
         }
     }
 }
+
+#[test]
+fn rows_alone_are_not_a_grid_the_composer_can_hold() {
+    // A spreadsheet's Copy puts the rows between its fragment markers and the `<table>` they sit in
+    // outside them; read on their own, the loose rows are a table the reader makes up, not one the
+    // composer keeps. The clipboard takes the enclosing `<table>` in with them (apps/mailcraft/src/
+    // clipboard.rs) so that the grid survives the paste.
+    let grids = |html: &str| {
+        crate::parse_text_with_tables(html, None)
+            .iter()
+            .filter_map(|b| match &b.kind {
+                crate::BlockKind::Table(table) => Some(table.compose_grid),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    let rows = "<tr><td>Part</td><td>Price</td></tr><tr><td>Washer</td><td>12,30</td></tr>";
+    assert_eq!(grids(rows), [false], "rows with nothing rounding them are no grid");
+    assert_eq!(grids(&format!("<table border=0>{rows}</table>")), [true], "rows in a table are one");
+}

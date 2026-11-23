@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: MailCraft contributors
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! Insert › Date & Time and Review › Word Count in the window (#507): the tabs while a message is
-//! being written, the dialogs they open, and what those do.
+//! Insert › Date & Time and Table, and Review › Word Count in the window (#507): the tabs while a
+//! message is being written, the dialogs they open, and what those do.
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
@@ -103,7 +103,7 @@ fn ctrl_shift_g_counts_the_words() {
 #[test]
 fn the_rest_of_insert_and_review_is_pending() {
     let mut app = writing();
-    let tabs: [(&str, &[&str]); 2] = [("Insert", &["Table", "Diagram", "Saved Text", "Chart"]), ("Review", &["Thesaurus", "Translate", "Language"])];
+    let tabs: [(&str, &[&str]); 2] = [("Insert", &["Diagram", "Saved Text", "Chart"]), ("Review", &["Thesaurus", "Translate", "Language"])];
     for (tab, pending) in tabs {
         app.execute("ui.tab", json!({"tab": tab})).unwrap();
         let described = crate::ribbon::describe(&app);
@@ -130,6 +130,45 @@ fn the_rest_of_insert_and_review_is_pending() {
     h.run_steps(3);
     assert!(h.state().dialog.is_none());
     assert_eq!(body(h.state()), before);
+}
+
+/// Insert › Table puts an empty grid at the caret, as the command does.
+#[test]
+fn the_table_button_inserts_a_grid() {
+    let mut app = writing();
+    app.execute("ui.tab", json!({"tab": "Insert"})).unwrap();
+    assert!(app.enabled("insert.table"), "the command is enabled while a message is being written");
+    let described = crate::ribbon::describe(&app);
+    let item = described.items().find(|item| item.label == "Table").unwrap_or_else(|| panic!("no Table in Insert"));
+    assert_eq!(item.command, Some(("insert.table", json!({}))), "the button runs the command, not a dialog");
+    let mut h = window(app);
+    crate::reminders::dismiss(h.state_mut(), None);
+    h.state_mut().run("ui.tab", json!({"tab": "Insert"})).unwrap();
+    h.state_mut().run("ui.ribbonMode", json!({"value": "classic"})).unwrap();
+    h.run_steps(3);
+    let rect = h.state().hit.rect("ribbon", crate::ribbon::hit_id("insert.table")).unwrap_or_else(|| panic!("Table isn't drawn in the ribbon"));
+    click_at(&mut h, rect.center());
+    let state = h.state();
+    let compose = state.session.compose.as_ref().unwrap_or_else(|| panic!("the message is still being written"));
+    let grid = compose
+        .body
+        .text()
+        .paragraphs()
+        .iter()
+        .find_map(|p| p.runs.iter().find_map(|r| r.table.as_ref()))
+        .unwrap_or_else(|| panic!("no grid in {:?}", compose.body.plain()));
+    assert_eq!((grid.columns(), grid.rows().len()), (3, 3));
+    assert_eq!(grid.plain(), "\t\t\n\t\t\n\t\t");
+}
+
+fn click_at(harness: &mut Harness<'static, MailApp>, pos: egui::Pos2) {
+    harness.event(egui::Event::PointerMoved(pos));
+    harness.step();
+    for pressed in [true, false] {
+        harness.event(egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE });
+        harness.step();
+    }
+    harness.run_steps(3);
 }
 
 #[test]

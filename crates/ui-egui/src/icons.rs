@@ -1296,6 +1296,14 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
             pen.line(&[(3.5, 10.0), (16.5, 10.0)]);
             pen.line(&[(3.5, 14.5), (11.5, 14.5)]);
         }
+        // Insert › Table: a grid, its first row a little heavier.
+        "table" => {
+            pen.rect(2.5, 4.5, 17.5, 15.5, c);
+            pen.line(&[(2.5, 8.0), (17.5, 8.0)]);
+            pen.line(&[(2.5, 11.5), (17.5, 11.5)]);
+            pen.line(&[(7.5, 4.5), (7.5, 15.5)]);
+            pen.line(&[(12.5, 4.5), (12.5, 15.5)]);
+        }
         // A password's eye (#438): open, a click shows the password; struck through, it hides
         // it again.
         "showPassword" | "hidePassword" => {
@@ -1515,6 +1523,7 @@ pub const NAMES: &[&str] = &[
     "bullets",
     "numbering",
     "insertLink",
+    "table",
     "clearFormatting",
     "formatHtml",
     "formatPlain",

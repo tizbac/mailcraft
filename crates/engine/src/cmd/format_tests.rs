@@ -22,6 +22,11 @@ fn compose(s: &Session) -> &Compose {
     s.compose.as_ref().unwrap()
 }
 
+/// The first table in the message being written, if it has one.
+fn first_table(s: &Session) -> Option<&std::sync::Arc<mailcraft_model::rich::PastedTable>> {
+    compose(s).body.text().paragraphs().iter().find_map(|p| p.runs.iter().find_map(|r| r.table.as_ref()))
+}
+
 /// What was written above the signature the sample account adds.
 fn mine(s: &Session) -> String {
     let text = compose(s).body.plain();
@@ -292,6 +297,70 @@ fn a_text_that_comes_to_nothing_once_cleaned_changes_nothing() {
             "{params}"
         );
     }
+}
+
+#[test]
+fn a_spreadsheet_copy_pasted_as_text_keeps_its_grid() {
+    let mut s = session();
+    run(&mut s, "mail.new", json!({}));
+    run(&mut s, "compose.set", json!({"body": "Parts:"}));
+    run(&mut s, "compose.select", json!({"from": 6}));
+    run(&mut s, "edit.paste", json!({"text": "Part\tPrice\nWasher\t12,30\nGasket\t4,00\n"}));
+    let body = &compose(&s).body;
+    let grid = body.text().paragraphs().iter().find_map(|p| p.runs.iter().find_map(|r| r.table.as_ref())).unwrap();
+    assert_eq!((grid.columns(), grid.rows().len()), (2, 3), "the copied range is a grid");
+    assert_eq!(grid.plain(), "Part\tPrice\nWasher\t12,30\nGasket\t4,00");
+    assert_eq!(body.text().text(), "Parts:￼", "the grid is one object in the text, as a picture is");
+    // Text that isn't a range is pasted as it came.
+    run(&mut s, "compose.discard", json!({}));
+    run(&mut s, "mail.new", json!({}));
+    run(&mut s, "compose.set", json!({"body": "Plan"}));
+    run(&mut s, "compose.select", json!({"from": 4}));
+    run(&mut s, "edit.paste", json!({"text": "one line with a tab\tand another cell"}));
+    assert!(compose(&s).body.text().paragraphs().iter().all(|p| p.runs.iter().all(|r| r.table.is_none())), "a single line is not a table");
+    // Into a plain-text message, the grid is text, as tables are there.
+    run(&mut s, "compose.discard", json!({}));
+    run(&mut s, "mail.new", json!({}));
+    run(&mut s, "compose.formatPlain", json!({}));
+    run(&mut s, "compose.select", json!({"from": 0}));
+    run(&mut s, "edit.paste", json!({"text": "Part\tPrice\nWasher\t12,30"}));
+    let plain = compose(&s).body.plain();
+    assert!(plain.starts_with("Part\tPrice\nWasher\t12,30"), "{plain:?}");
+    assert!(
+        compose(&s).body.text().paragraphs().iter().all(|p| p.runs.iter().all(|r| r.table.is_none())),
+        "a plain message keeps the grid as lines of text"
+    );
+}
+
+#[test]
+fn insert_table_puts_an_empty_grid_at_the_caret() {
+    let mut s = session();
+    run(&mut s, "mail.new", json!({}));
+    run(&mut s, "compose.set", json!({"body": "Parts:"}));
+    run(&mut s, "compose.select", json!({"from": 6}));
+    run(&mut s, "insert.table", json!({"rows": 2, "columns": 3}));
+    let grid = first_table(&s).unwrap_or_else(|| panic!("the grid is there"));
+    assert_eq!((grid.columns(), grid.rows().len()), (3, 2));
+    assert_eq!(grid.plain(), "\t\t\n\t\t", "every cell is empty");
+    assert!(grid.rows().iter().all(|row| row.iter().all(|cell| !cell.header && cell.colspan == 1 && cell.rowspan == 1)));
+    // The default is three by three; a size a message can't hold, or a parameter that isn't a
+    // number, is refused with nothing changed.
+    run(&mut s, "compose.discard", json!({}));
+    run(&mut s, "mail.new", json!({}));
+    run(&mut s, "insert.table", json!({}));
+    let grid = first_table(&s).unwrap_or_else(|| panic!("the default grid is there"));
+    assert_eq!((grid.columns(), grid.rows().len()), (3, 3));
+    for params in [json!({"rows": 300}), json!({"columns": 40}), json!({"rows": 0}), json!({"rows": "three"}), json!({"rows": -1})] {
+        assert!(s.run("insert.table", &params).is_err(), "{params} is refused");
+    }
+    let grid = first_table(&s).unwrap_or_else(|| panic!("a refused insert changed nothing"));
+    assert_eq!((grid.columns(), grid.rows().len()), (3, 3));
+    // A plain-text message says what to do first.
+    run(&mut s, "compose.discard", json!({}));
+    run(&mut s, "mail.new", json!({}));
+    run(&mut s, "compose.formatPlain", json!({}));
+    let why = s.run("insert.table", &json!({})).unwrap_err().to_string();
+    assert!(why.contains("plain text"), "{why}");
 }
 
 #[test]

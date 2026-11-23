@@ -8,7 +8,10 @@
 //! signature is open in File › Signatures they work on it instead ([`Session::doc`]).
 //! Positions count characters of the body's text, a paragraph break being one.
 
-use mailcraft_model::rich::{Align, Font, Format, ListKind, MAX_SIZE, MIN_SIZE, safe_color};
+use mailcraft_model::rich::{
+    Align, CellAlignment, CellText, Font, Format, ListKind, MAX_PASTED_COLUMNS, MAX_PASTED_ROWS, MAX_SIZE, MIN_SIZE, Paragraph, PastedTable, Run,
+    Style, TableCell, safe_color,
+};
 use mailcraft_model::{ModelError, RichBody, RichText};
 use serde_json::{Value, json};
 
@@ -96,8 +99,12 @@ pub fn specs() -> Vec<CommandSpec> {
             .when_writing(needs_doc),
         CommandSpec::new("edit.paste", "Paste", "Message › Clipboard", paste)
             .pure()
-            .params(r#"{"html"?: string, "text"?: string} — over the selection; supported HTML formatting includes bold, italic, underline, font, size, colours, links, lists and a paragraph's indent and alignment. The HTML composer keeps bounded tables as selectable objects. Tables flatten to text in plain-text messages and signatures. HTML that comes to no text gives way to `text`, and nothing to paste changes nothing"#)
+            .params(r#"{"html"?: string, "text"?: string} — over the selection; supported HTML formatting includes bold, italic, underline, font, size, colours, links, lists and a paragraph's indent and alignment. The HTML composer keeps bounded tables as selectable objects. Tables flatten to text in plain-text messages and signatures. HTML that comes to no text gives way to `text`; text alone that is a spreadsheet's Copy (two or more rows of lines with the same number of tab-separated cells) becomes a table in an HTML message. Nothing to paste changes nothing"#)
             .when_writing(needs_doc),
+        CommandSpec::new("insert.table", "Table", "Insert › Tables", insert_table)
+            .pure()
+            .params(r#"{"rows"?: number, "columns"?: number} (default: 3 rows, 3 columns) — an empty grid at the caret, in an HTML message"#)
+            .when_writing(needs_html),
         CommandSpec::new("compose.formatHtml", "HTML", "Format Text › Format", format_html).pure().when_writing(needs_compose),
         CommandSpec::new("compose.formatPlain", "Plain Text", "Format Text › Format", format_plain).pure().when_writing(needs_compose),
     ]
@@ -488,7 +495,7 @@ fn paste(s: &mut Session, v: &Value) -> CmdResult {
     let fragment = match (from_html, text) {
         (Some(rich), _) => rich,
         (None, Some(text)) if text.len() > MAX_PASTE => return Err(too_much()),
-        (None, Some(text)) => RichText::from_plain(text),
+        (None, Some(text)) => pasted_text(text, plain, s.signature_edit.is_some()),
         (None, None) => return Ok(state(s)),
     };
     if fragment.is_empty() {
@@ -506,6 +513,55 @@ fn paste(s: &mut Session, v: &Value) -> CmdResult {
         o.insert("note".into(), json!("pictures in what was pasted were left out: save each one and add it with Insert Picture"));
     }
     Ok(out)
+}
+
+/// Text with no HTML beside it: a spreadsheet's Copy — rows of lines, the cells of a row between
+/// tabs — becomes a table in an HTML message, so the grid the owner copied stays a grid. Anything
+/// else, and anything into plain text or a signature, is the text as it came.
+fn pasted_text(text: &str, plain: bool, signature: bool) -> RichText {
+    if plain || signature {
+        return RichText::from_plain(text);
+    }
+    match PastedTable::from_text(text) {
+        Some(table) => RichText::from_paragraphs(vec![Paragraph::new(vec![Run::table(std::sync::Arc::new(table))], ListKind::None)]),
+        None => RichText::from_plain(text),
+    }
+}
+
+/// Insert › Table: an empty grid at the caret, as a pasted one is.
+fn insert_table(s: &mut Session, v: &Value) -> CmdResult {
+    let (rows, columns) = (cells(v, "rows")?, cells(v, "columns")?);
+    if !(1..=MAX_PASTED_ROWS).contains(&rows) || !(1..=MAX_PASTED_COLUMNS).contains(&columns) {
+        return Err(bad(format!("a table of {rows} rows and {columns} columns is more than a message holds")));
+    }
+    let Some(table) = PastedTable::new(
+        u16::try_from(columns).unwrap_or(MAX_PASTED_COLUMNS as u16),
+        (0..rows).map(|_| (0..columns).map(|_| empty_cell()).collect()).collect(),
+    ) else {
+        return Err(bad(format!("a table of {rows} rows and {columns} columns is more than a message holds")));
+    };
+    edit(s, &json!({}), |b| b.paste(&RichText::from_paragraphs(vec![Paragraph::new(vec![Run::table(std::sync::Arc::new(table))], ListKind::None)])))?;
+    Ok(state(s))
+}
+
+/// A row or column count from the params: 3 when it isn't given.
+fn cells(v: &Value, key: &str) -> Result<usize, CmdError> {
+    match v.get(key) {
+        None | Some(Value::Null) => Ok(3),
+        Some(_) => p::u64(v, key).and_then(|n| usize::try_from(n).ok()).ok_or_else(|| bad(format!("`{key}` is a number of cells"))),
+    }
+}
+
+/// A cell of a table just inserted: one empty line.
+fn empty_cell() -> TableCell {
+    TableCell {
+        lines: vec![vec![CellText { text: String::new(), style: Style::default() }]],
+        header: false,
+        colspan: 1,
+        rowspan: 1,
+        background: None,
+        alignment: CellAlignment::Left,
+    }
 }
 
 fn set_format(s: &mut Session, format: BodyFormat) -> CmdResult {
