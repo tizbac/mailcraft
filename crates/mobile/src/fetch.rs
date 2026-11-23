@@ -713,7 +713,7 @@ impl SyncHost {
                 result.errors.iter().take(3).map(String::as_str).collect::<Vec<_>>().join("; ")
             };
             log::warn!(
-                "fetch, account {account}: the background download stopped ({why}); it tries again in {} s",
+                "fetch, account {account}: the background download stopped; it tries again in {} s. {why}",
                 (stopped.wait_ms / 1_000.0) as u64
             );
         }

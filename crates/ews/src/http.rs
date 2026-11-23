@@ -17,9 +17,13 @@
 use std::fmt;
 use std::future::Future;
 
-/// The most an answer may weigh, in octets. (Messages come down in pieces, never as one
-/// answer of this size.)
+/// The most an answer may weigh, in octets. (Folders, changes and names are answered in far less
+/// than this; one message fetched whole is the exception, [`WHOLE_MESSAGE_LIMIT].)
 pub const RESPONSE_LIMIT: usize = 16 * 1024 * 1024;
+/// The most an answer may weigh when the request asks for one message whole: its text comes as
+/// base64 inside the SOAP envelope, so a message of the largest the mailbox takes (50 MB, the
+/// engine's own cap) needs about two thirds more than that.
+pub const WHOLE_MESSAGE_LIMIT: usize = 72 * 1024 * 1024;
 /// The longest address a request goes to.
 const MAX_ADDRESS: usize = 2_048;
 /// The longest header field value the response keeps; longer ones are dropped.
@@ -189,6 +193,15 @@ impl HttpRequest {
         self
     }
 
+    /// Raises it to [`WHOLE_MESSAGE_LIMIT]`, for the one request that asks for a message whole:
+    /// its text is base64 inside the envelope, so a message the mailbox takes is more than an
+    /// ordinary answer.
+    #[must_use]
+    pub fn for_whole_message(mut self) -> Self {
+        self.max_response = self.max_response.max(WHOLE_MESSAGE_LIMIT);
+        self
+    }
+
     /// Marks the request as one that is never sent twice: when its answer is lost after it went
     /// out, the program must not send it again ([`TransportError::Lost`]).
     #[must_use]
@@ -346,6 +359,10 @@ pub enum TransportError {
     /// The request went out (or may have) and its answer was lost; the request is not
     /// [repeatable](HttpRequest::is_repeatable), so it was not sent again and may have happened.
     Lost,
+    /// Nothing of the request could go out, and nothing about the network is to blame: the account's
+    /// own settings name a server that is not one (an address that is no web address, a certificate
+    /// fingerprint that is no fingerprint). Asking again changes nothing until they are changed.
+    Config,
     /// Anything else.
     Other,
 }
@@ -362,6 +379,7 @@ impl TransportError {
             Self::RedirectRefused => "it sent the request elsewhere, and the redirect was not followed",
             Self::Aborted => "the request was called off before it finished",
             Self::Lost => "the connection failed after the request went out",
+            Self::Config => "the address is not one a request can go to",
             Self::Other => "the connection failed in a way the transport did not classify",
         }
     }
@@ -377,6 +395,7 @@ impl fmt::Display for TransportError {
             Self::RedirectRefused => "the server redirected the request elsewhere and the redirect was not followed",
             Self::Aborted => "the request was cancelled before it completed",
             Self::Lost => "the connection failed after the request went out, so it may have been done",
+            Self::Config => "the account's settings name a server that is not one; check the server's address in Account Settings",
             Self::Other => "the connection failed in a way the transport did not classify",
         })
     }

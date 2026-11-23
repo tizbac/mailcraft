@@ -73,9 +73,20 @@ pub(crate) struct Real;
 
 /// The window's kind for a failed exchange of the search.
 fn transport_failure(error: NetError) -> TransportError {
+    if mailcraft_net::https::is_timed_out(&error) {
+        return TransportError::TimedOut;
+    }
+    if mailcraft_net::https::is_too_long(&error) {
+        return TransportError::BodyTooLarge;
+    }
+    if mailcraft_net::https::is_closed(&error) {
+        return TransportError::Unreachable;
+    }
     match error {
         NetError::Certificate(_) | NetError::Tls { .. } => TransportError::Tls,
         NetError::Connect { .. } => TransportError::Unreachable,
+        // The address or the fingerprint the owner gave is not one: no network trouble to wait out.
+        NetError::Config(_) => TransportError::Config,
         _ => TransportError::Other,
     }
 }
