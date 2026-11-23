@@ -22539,21 +22539,10 @@ msgid "category is {words}"
 msgstr "la catégorie est {words}"
 
 #. what a command says
-<<<<<<< HEAD
 #: crates/engine/src/cmd/send_later.rs
 #, fuzzy
 msgid "choose a time within a year"
 msgstr "choisissez une heure dans l'année"
-=======
-#: crates/engine/src/cmd/signing.rs
-msgid "choose the certificate or key to sign with before turning Always on"
-msgstr ""
-
-#. what a command says
-#: crates/engine/src/cmd/signing.rs
-msgid "choose the certificate or key to sign with first (File › Account Settings › Digital Signatures), or turn Sign off"
-msgstr ""
->>>>>>> a5e0a77c1 (#30 part 5: fixes from review)
 
 #. interface
 #: crates/ui-egui/src/forms.rs
