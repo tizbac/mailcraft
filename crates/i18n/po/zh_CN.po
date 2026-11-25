@@ -16433,6 +16433,11 @@ msgstr "社交"
 msgid "Some characters in this message couldn't be read: the sender's program didn't say properly how they were written."
 msgstr "此邮件中的部分字符无法读取：发件人的程序未正确说明其编码。"
 
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "Some folders couldn't be read from the server"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/data_removal.rs
 #, fuzzy
@@ -26038,6 +26043,21 @@ msgstr "{folder} 及其子文件夹"
 #, fuzzy
 msgid "{folder} couldn't be read from the server"
 msgstr "{folder} 无法从服务器读取"
+
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder} couldn't be read from the server ({code})"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder}: the server's answer couldn't be used"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder}: the server's answer was larger than MailCraft reads"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/ews_mail.rs

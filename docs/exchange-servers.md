@@ -34,7 +34,11 @@ when the server sent one. A message is fetched whole in one answer, up to 200 MB
 ceiling every kind of account has — which the base64 in the envelope makes about a third bigger.
 A message bigger than that is passed over by a batch of fetches rather than stopping it: the
 rest of the batch comes, the reading pane says the message is bigger than the account downloads in
-full and names both sizes, and it is asked for again when the owner opens it.
+full and names both sizes, and it is asked for again when the owner opens it. A folder the server
+won't read at all is named in Send/Receive problems, with the server's response code when it gave
+one (`ErrorAccessDenied`, say) or, when it gave none, that its answer couldn't be used or was
+larger than MailCraft reads; the other folders are read all the same, and the log keeps its place
+in the run rather than its name. Three folders in a row that can't be read end the run there.
 
 ## Grommunio
 

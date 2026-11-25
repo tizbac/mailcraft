@@ -1,0 +1,1 @@
+| 2026-11-25 | Exchange server folders that can't be read are named with the server's response code, or why it gave none, in Send/Receive problems and the log, rather than "Some folders couldn't be read from the server" |
