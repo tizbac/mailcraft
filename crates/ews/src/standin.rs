@@ -226,6 +226,9 @@ pub struct State {
     pub lists_no_recipients: bool,
     /// Every `GetItem` is refused as a whole: a fault of `ErrorInternalServerError`, HTTP 500.
     pub refuses_get_item: bool,
+    /// Every `SyncFolderItems` for these folders (their ids) is refused with
+    /// `ErrorInternalServerError`, as a folder whose mail the server won't read.
+    pub refuse_sync: Vec<String>,
     /// `GetItem` answers these items with `ErrorItemNotFound`, as when they went between the
     /// listing and the question.
     pub gone_from_get_item: Vec<String>,
@@ -330,6 +333,7 @@ impl Default for State {
             takes_any_version: false,
             lists_no_recipients: false,
             refuses_get_item: false,
+            refuse_sync: Vec::new(),
             gone_from_get_item: Vec::new(),
             omits_recipients: false,
             versions: Vec::new(),

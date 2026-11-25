@@ -167,7 +167,12 @@ pub(crate) fn bounded(mut result: EwsMailResult) -> (EwsMailResult, bool) {
     if let Some(progress) = result.progress.as_mut().filter(|progress| !is_id(&progress.folder)) {
         progress.folder.clear();
     }
-    let trouble = !result.errors.is_empty() || result.stopped || result.auth_refused || result.busy_for.is_some() || !result.untrusted.is_empty();
+    let trouble = !result.errors.is_empty()
+        || result.stopped
+        || result.auth_refused
+        || result.busy_for.is_some()
+        || !result.untrusted.is_empty()
+        || !result.unread.is_empty();
     result.whole &= !cut && !trouble && !result.partial;
     (result, cut)
 }

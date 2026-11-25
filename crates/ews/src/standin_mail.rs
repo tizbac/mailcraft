@@ -569,6 +569,15 @@ impl State {
         let shape = Check::required(operation, parts.first().copied().flatten(), "ItemShape")?;
         let (base, _, extra) = Self::item_shape(shape, false)?;
         let folder = self.sync_folder(Check::required(operation, parts.get(1).copied().flatten(), "SyncFolderId")?)?;
+        // A folder whose mail the server won't read at all: a fault of its own, so the run
+        // names it and the other folders still go on.
+        if self.refuse_sync.iter().any(|id| id == &folder.id) {
+            return Ok((
+                200,
+                "ErrorInternalServerError".into(),
+                response("SyncFolderItems", &error_message("SyncFolderItems", "ErrorInternalServerError")),
+            ));
+        }
         let max = Check::required(operation, parts.get(4).copied().flatten(), "MaxChangesReturned")?;
         Check::is(max, MESSAGES, "MaxChangesReturned", &[])?;
         Check::no_children(max)?;

@@ -16188,6 +16188,11 @@ msgstr "Közösségi"
 msgid "Some characters in this message couldn't be read: the sender's program didn't say properly how they were written."
 msgstr "Néhány karakter ebben az üzenetben nem olvasható: a küldő programja nem mondta meg megfelelően, hogyan írták."
 
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "Some folders couldn't be read from the server"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/data_removal.rs
 #, fuzzy
@@ -25694,6 +25699,21 @@ msgstr "{folder} és albumai"
 #, fuzzy
 msgid "{folder} couldn't be read from the server"
 msgstr "{folder} nem volt olvasható a szerverről."
+
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder} couldn't be read from the server ({code})"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder}: the server's answer couldn't be used"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder}: the server's answer was larger than MailCraft reads"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/ews_mail.rs

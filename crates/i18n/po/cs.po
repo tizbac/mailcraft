@@ -16218,6 +16218,11 @@ msgstr "Sociální sítě"
 msgid "Some characters in this message couldn't be read: the sender's program didn't say properly how they were written."
 msgstr "Některé znaky v této zprávě nešlo přečíst: program odesílatele správně neuvedl, jak jsou zapsány."
 
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "Some folders couldn't be read from the server"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/data_removal.rs
 #, fuzzy
@@ -25755,6 +25760,21 @@ msgstr "{folder} a její podsložky"
 #, fuzzy
 msgid "{folder} couldn't be read from the server"
 msgstr "{folder} nešlo načíst ze serveru"
+
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder} couldn't be read from the server ({code})"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder}: the server's answer couldn't be used"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder}: the server's answer was larger than MailCraft reads"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/ews_mail.rs
