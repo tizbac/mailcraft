@@ -471,7 +471,7 @@ fn microsoft_loopback_allowed() -> bool {
 /// read. The mailbox here was told to expect the copies when the messages went; a copy that
 /// didn't get there is said (`unfiled`). A server without a mailbox for sent mail gets none: the
 /// copy here is the one there is. Returns whether the connection is still good.
-fn file_sent(imap: &mut Imap<Stream<'_>>, plan: &[(&Mailbox, FolderKind)], sent: &[Message], result: &mut SyncResult) -> bool {
+fn file_sent(imap: &mut Imap<Stream<'_>>, plan: &[(&Mailbox, FolderKind)], sent: &[Message], sent_unread: bool, result: &mut SyncResult) -> bool {
     let Some((mailbox, _)) = plan.iter().find(|(_, kind)| *kind == FolderKind::Sent) else {
         result.unfiled.extend(sent.iter().map(|m| m.id));
         return true;
@@ -479,7 +479,9 @@ fn file_sent(imap: &mut Imap<Stream<'_>>, plan: &[(&Mailbox, FolderKind)], sent:
     for (at, message) in sent.iter().enumerate() {
         // The sender's own copy says who got a blind copy.
         let options = WriteOptions { include_bcc: true, offset_minutes: mailcraft_time::local_offset_minutes(message.date) };
-        if let Err(e) = imap.append(&mailbox.raw, &["\\Seen"], &mailcraft_mime_model::write(message, &options)) {
+        // The owner's choice (#sentUnread): the copy is read as Outlook's is, or unread.
+        let flags: &[&str] = if sent_unread { &[] } else { &["\\Seen"] };
+        if let Err(e) = imap.append(&mailbox.raw, flags, &mailcraft_mime_model::write(message, &options)) {
             let e = NetError::from(e);
             result.problem(said!(
                 "Couldn't keep a copy of \"{subject}\" on the server: {error}",
@@ -722,7 +724,7 @@ fn exchange<'a>(run: &mut Run<'a>, sent: &[Message], host: Host) -> Option<Imap<
     imap.get_mut().watch(None);
     if !owed.is_empty() {
         run.hand_over_in(&imap, SyncStep::new(SyncStage::Filing, "", 0, 0));
-        if !file_sent(&mut imap, &plan, sent, &mut run.out) {
+        if !file_sent(&mut imap, &plan, sent, request.sent_unread, &mut run.out) {
             return None;
         }
     }

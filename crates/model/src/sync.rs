@@ -127,6 +127,11 @@ pub struct SyncRequest {
     pub folders: Vec<FolderState>,
     /// Messages waiting in the Outbox, to send first.
     pub outbox: Vec<Message>,
+    /// The copy of each message that is sent is put in the server's Sent Items unread
+    /// (`file.options` `sentUnread`): its `\Seen` flag is left off the `APPEND`. Off: marked
+    /// read, as Outlook does.
+    #[serde(skip_serializing_if = "is_false")]
+    pub sent_unread: bool,
     /// How many of each folder's newest messages to have here (older ones come down when this
     /// grows); 0 means no limit.
     pub max_per_folder: u32,

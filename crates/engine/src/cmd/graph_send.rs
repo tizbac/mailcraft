@@ -66,27 +66,50 @@ pub fn sends(s: &Session, account: Id) -> Vec<SendUp> {
             }
         })
         .map(|m| super::signing::decided(mb, m.as_ref().clone()))
-        .map(|m| match m.server_draft.as_ref().and(super::graph_drafts::draft_up_whole(&m)) {
-            // A Digitally signed message goes as its own bytes (#30 R19): sending the draft the
-            // server has would have Microsoft build the message again, and the signature break.
-            // The draft it was saved as is taken away once it has gone.
-            Some(draft) if m.sign_with.is_some() && !exchange => {
-                SendUp { message: m.id, draft: None, mime: Some(Box::new(m.clone())), discard: draft.id }
+        .map(|m| {
+            // The folder the owner chose for what is sent from this address (`sentFolders`): an
+            // Exchange server account can file it in one of its own folders (a shared mailbox's,
+            // say). Other kinds are filed by their server in its own Sent Items.
+            let sent_folder = if exchange {
+                s.prefs
+                    .sent_folder(&m.from.email)
+                    .and_then(|id| mb.folder(id))
+                    .filter(|f| f.account == account)
+                    .and_then(|f| f.server.as_ref())
+                    .map(|server| server.id.clone())
+                    .unwrap_or_default()
+            } else {
+                String::new()
+            };
+            match m.server_draft.as_ref().and(super::graph_drafts::draft_up_whole(&m)) {
+                // A Digitally signed message goes as its own bytes (#30 R19): sending the draft the
+                // server has would have Microsoft build the message again, and the signature break.
+                // The draft it was saved as is taken away once it has gone.
+                Some(draft) if m.sign_with.is_some() && !exchange => {
+                    SendUp { message: m.id, draft: None, mime: Some(Box::new(m.clone())), discard: draft.id, sent_folder: sent_folder.clone() }
+                }
+                // An Exchange server account's message always goes as its MIME, with the server filing
+                // the copy in Sent Items (not every server files one when a saved draft is sent); the
+                // draft it was saved as is named so that the run takes it away once the send is clear
+                // (E8).
+                Some(draft) if exchange => SendUp {
+                    message: m.id,
+                    draft: Some(draft),
+                    mime: Some(Box::new(m.clone())),
+                    discard: String::new(),
+                    sent_folder: sent_folder.clone(),
+                },
+                // Sent as it is here, every field and attachment written over what the server has:
+                // whatever was changed on the server meanwhile is the owner's to lose (AU2-14).
+                Some(draft) if !jmap => SendUp {
+                    message: m.id,
+                    draft: Some(mailcraft_model::sync::DraftUp { change_key: String::new(), ..draft }),
+                    mime: None,
+                    discard: String::new(),
+                    sent_folder: sent_folder.clone(),
+                },
+                _ => SendUp { message: m.id, draft: None, mime: Some(Box::new(m.clone())), discard: String::new(), sent_folder },
             }
-            // An Exchange server account's message always goes as its MIME, with the server filing
-            // the copy in Sent Items (not every server files one when a saved draft is sent); the
-            // draft it was saved as is named so that the run takes it away once the send is clear
-            // (E8).
-            Some(draft) if exchange => SendUp { message: m.id, draft: Some(draft), mime: Some(Box::new(m.clone())), discard: String::new() },
-            // Sent as it is here, every field and attachment written over what the server has:
-            // whatever was changed on the server meanwhile is the owner's to lose (AU2-14).
-            Some(draft) if !jmap => SendUp {
-                message: m.id,
-                draft: Some(mailcraft_model::sync::DraftUp { change_key: String::new(), ..draft }),
-                mime: None,
-                discard: String::new(),
-            },
-            _ => SendUp { message: m.id, draft: None, mime: Some(Box::new(m.clone())), discard: String::new() },
         })
         .collect()
 }
@@ -120,12 +143,20 @@ pub fn waiting_at(mb: &Mailbox, now: i64, account: Id) -> usize {
 /// Take in what became of one message sent. Whether anything changed; a line for the owner when
 /// it is held.
 pub fn send_done(mb: &mut Mailbox, account: Id, done: &SendDone, lang: mailcraft_i18n::Lang, said: &mut Vec<String>) -> bool {
-    send_done_at(mb, account, done, lang, said, None)
+    send_done_at(mb, account, done, lang, said, false, None)
 }
 
 /// [`send_done`] at `now`: a message's follow-up reminder set as "after so many days" counts them
 /// from the moment it went (#948), and one whose copy the server files in Sent Items waits for it.
-pub fn send_done_at(mb: &mut Mailbox, account: Id, done: &SendDone, lang: mailcraft_i18n::Lang, said: &mut Vec<String>, now: Option<i64>) -> bool {
+pub fn send_done_at(
+    mb: &mut Mailbox,
+    account: Id,
+    done: &SendDone,
+    lang: mailcraft_i18n::Lang,
+    said: &mut Vec<String>,
+    sent_unread: bool,
+    now: Option<i64>,
+) -> bool {
     let mut changed = false;
     // Whether the owner queued it here, as it stood before the answer: `draft_done` may take away
     // the pending change that alone says so of a draft begun elsewhere without a marker (#738).
@@ -199,8 +230,10 @@ pub fn send_done_at(mb: &mut Mailbox, account: Id, done: &SendDone, lang: mailcr
                 m.sent_here = true;
                 return true;
             }
-            // The server's copy comes down as a message of its own: it takes the reminder.
+            // The server's copy comes down as a message of its own: it takes the reminder, and
+            // the read state the owner chose (`file.options` `sentUnread`).
             mb.keep_follow_up_for_copy(done.message, now.unwrap_or_default());
+            mb.keep_sent_read_for_copy(done.message, !sent_unread, now.unwrap_or_default());
             mb.forget_message(done.message).is_ok() || changed
         }
         // Exchange won't let the owner send as the shared mailbox nor on its behalf (#70): said

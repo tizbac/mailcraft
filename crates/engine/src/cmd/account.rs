@@ -985,7 +985,17 @@ pub fn sync_request(s: &Session, account: Id) -> Result<SyncRequest, CmdError> {
     // What is sent goes whole: the files a message keeps on disk are read for it.
     let outbox = s.loaded_outbox(outbox).into_iter().map(|m| super::signing::decided(&s.mailbox, m)).collect();
     let gmail_moves = gmail_moves(s, account);
-    Ok(SyncRequest { account: a.clone(), folders, outbox, max_per_folder: s.prefs.sync_limit, ops, places, gmail_moves, ..Default::default() })
+    Ok(SyncRequest {
+        account: a.clone(),
+        folders,
+        outbox,
+        max_per_folder: s.prefs.sync_limit,
+        sent_unread: s.prefs.sent_unread,
+        ops,
+        places,
+        gmail_moves,
+        ..Default::default()
+    })
 }
 
 /// The moves between Gmail's categories made in `account` that Gmail hasn't heard of (#911), for
@@ -1522,8 +1532,9 @@ fn take_in_news(s: &mut Session, account: Id, result: &mut SyncResult) -> (Count
     let clock = s.rule_clock();
     // What the account had before the run's new mail, as an earlier piece of it found it.
     let had = s.run_had.remove(&account);
+    let sent_unread = s.prefs.sent_unread;
     let mb = &mut s.mailbox;
-    let sent = file_sent(mb, account, result, clock.now);
+    let sent = file_sent(mb, account, result, sent_unread, clock.now);
     // Handed to the outgoing server, and the answer lost: it may have gone (AU3-26). (The run
     // said already that it couldn't send it.)
     let mut said = Vec::new();
@@ -1644,7 +1655,7 @@ impl OnServer {
 /// each): a message of the account's that is in Sent Items and not on the server yet is marked
 /// all the same. One whose copy didn't get to the server after all (`unfiled`) is no longer
 /// expected there. Returns how many were sent.
-pub(super) fn file_sent(mb: &mut Mailbox, account: Id, result: &SyncResult, now: i64) -> usize {
+pub(super) fn file_sent(mb: &mut Mailbox, account: Id, result: &SyncResult, sent_unread: bool, now: i64) -> usize {
     let (Some(outbox), Some(sent_items)) = (mb.folder_of_kind(account, FolderKind::Outbox), mb.folder_of_kind(account, FolderKind::Sent)) else {
         return 0;
     };
@@ -1666,9 +1677,11 @@ pub(super) fn file_sent(mb: &mut Mailbox, account: Id, result: &SyncResult, now:
             }
             // A reminder "after so many days" counts them from now that it has gone (#948).
             mb.follow_up_sent(*id, now);
-            // Sent: it isn't to be signed again (its signed copy is the server's, #30).
+            // Sent: it isn't to be signed again (its signed copy is the server's, #30), and the
+            // owner chose whether the copy in Sent Items is read or unread.
             if let Ok(m) = mb.message_mut(*id) {
                 m.sign_with = None;
+                m.read = !sent_unread;
             }
             // Moved or copied into the Outbox from elsewhere and sent with Send Again (#704): the
             // send files it in Sent Items, so it is no longer to be put on the server as a

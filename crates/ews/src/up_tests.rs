@@ -475,8 +475,12 @@ fn message(to: &str, bcc: &str) -> Box<Message> {
 fn a_shared_mailboxs_drafts_and_sent_copy_are_filed_in_it() {
     use crate::compose::{CreateDraft, DraftContent, FindDraft, SendMessage};
     let address = "<t:EmailAddress>team@example.org</t:EmailAddress>";
-    let sent = SendMessage::new(&message("zoe@example.org", ""), "team@example.org").unwrap().element().write();
+    let sent = SendMessage::new(&message("zoe@example.org", ""), "team@example.org", "").unwrap().element().write();
     assert!(sent.contains(address), "{sent}");
+    // A folder the owner chose for this address keeps the copy; empty keeps the account's own.
+    let filed = SendMessage::new(&message("zoe@example.org", ""), "team@example.org", "F-ARCHIVE").unwrap().element().write();
+    assert!(filed.contains("<t:FolderId Id=\"F-ARCHIVE\""), "{filed}");
+    assert!(!filed.contains("t:DistinguishedFolderId"), "{filed}");
     let draft = CreateDraft::new(None, DraftContent::default()).in_mailbox("team@example.org").element().write();
     assert!(draft.contains(address), "{draft}");
     let find = FindDraft::new(None, "mark").in_mailbox("team@example.org").element().write();
@@ -486,7 +490,8 @@ fn a_shared_mailboxs_drafts_and_sent_copy_are_filed_in_it() {
 #[test]
 fn a_message_never_saved_goes_as_mime_with_its_bcc_and_a_copy_is_filed_in_sent_items() {
     let standin = StandIn::new();
-    let send = SendUp { message: 3, draft: None, mime: Some(message("zoe@example.org", "kit@example.org")), discard: String::new() };
+    let send =
+        SendUp { message: 3, draft: None, mime: Some(message("zoe@example.org", "kit@example.org")), discard: String::new(), ..Default::default() };
     let result = run(&standin, &EwsMailRequest { sends: vec![send], ..base() });
     assert_eq!(result.sent[0].outcome, SendOutcome::Sent);
     let state = standin.state();
@@ -500,8 +505,14 @@ fn a_message_never_saved_goes_as_mime_with_its_bcc_and_a_copy_is_filed_in_sent_i
 fn a_message_that_cannot_go_is_held_with_why() {
     let standin = StandIn::new();
     let sends = vec![
-        SendUp { message: 1, draft: None, mime: Some(message("not an address", "")), discard: String::new() },
-        SendUp { message: 2, draft: None, mime: Some(Box::new(Message { to: vec![], ..*message("a@example.org", "") })), discard: String::new() },
+        SendUp { message: 1, draft: None, mime: Some(message("not an address", "")), discard: String::new(), ..Default::default() },
+        SendUp {
+            message: 2,
+            draft: None,
+            mime: Some(Box::new(Message { to: vec![], ..*message("a@example.org", "") })),
+            discard: String::new(),
+            ..Default::default()
+        },
     ];
     let result = run(&standin, &EwsMailRequest { sends, ..base() });
     assert!(matches!(&result.sent[0].outcome, SendOutcome::Held { lost: false, why } if !why.is_empty()));
@@ -520,6 +531,7 @@ fn saved_draft_to_send(standin: &StandIn) -> SendUp {
         draft: Some(DraftUp { id, ..draft("mark-4", "Hello") }),
         mime: Some(message("zoe@example.org", "kit@example.org")),
         discard: String::new(),
+        sent_folder: String::new(),
     }
 }
 
@@ -550,7 +562,13 @@ fn draft_made_but_unknown(standin: &StandIn) -> SendUp {
     let drafts = state.folder_id("drafts").unwrap();
     assert_eq!(state.items.iter().filter(|i| i.folder == drafts).count(), 1, "but it is there");
     drop(state);
-    SendUp { message: 5, draft: Some(draft("mark-9", "Hello")), mime: Some(message("zoe@example.org", "kit@example.org")), discard: String::new() }
+    SendUp {
+        message: 5,
+        draft: Some(draft("mark-9", "Hello")),
+        mime: Some(message("zoe@example.org", "kit@example.org")),
+        discard: String::new(),
+        ..Default::default()
+    }
 }
 
 #[test]
@@ -651,8 +669,10 @@ impl HttpExchange for Refusing<'_> {
 #[test]
 fn a_send_whose_answer_was_lost_is_held_and_never_sent_twice() {
     {
-        let (operation, send) =
-            ("CreateItem", SendUp { message: 3, draft: None, mime: Some(message("zoe@example.org", "")), discard: String::new() });
+        let (operation, send) = (
+            "CreateItem",
+            SendUp { message: 3, draft: None, mime: Some(message("zoe@example.org", "")), discard: String::new(), ..Default::default() },
+        );
         let standin = StandIn::new();
         let losing = Losing { inner: &standin, operation, lost: Cell::new(1) };
         let (pieces, _) = run_with(&losing, &EwsMailRequest { sends: vec![send], ..base() });
@@ -724,7 +744,9 @@ fn fault_answer(operation: &str, code: &str) -> HttpResponse {
 
 #[test]
 fn a_word_that_may_follow_the_send_holds_it_as_maybe_sent_and_only_a_refusal_before_it_does_not() {
-    let sends = || [("CreateItem", SendUp { message: 3, draft: None, mime: Some(message("zoe@example.org", "")), discard: String::new() })];
+    let sends = || {
+        [("CreateItem", SendUp { message: 3, draft: None, mime: Some(message("zoe@example.org", "")), discard: String::new(), ..Default::default() })]
+    };
     let may_have_gone = |answer: HttpResponse| {
         for (operation, send) in sends() {
             let standin = StandIn::new();
@@ -762,7 +784,8 @@ fn a_word_that_may_follow_the_send_holds_it_as_maybe_sent_and_only_a_refusal_bef
 
 #[test]
 fn a_bare_503_to_a_send_is_lost_and_only_a_soap_busy_is_waited_out() {
-    let (operation, send) = ("CreateItem", SendUp { message: 3, draft: None, mime: Some(message("zoe@example.org", "")), discard: String::new() });
+    let (operation, send) =
+        ("CreateItem", SendUp { message: 3, draft: None, mime: Some(message("zoe@example.org", "")), discard: String::new(), ..Default::default() });
     let standin = StandIn::new();
     let replacing = Replacing { inner: &standin, operation, answer: HttpResponse::new(503, Vec::new()) };
     let (pieces, waits) = run_with(&replacing, &EwsMailRequest { sends: vec![send.clone()], ..base() });

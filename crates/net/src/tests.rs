@@ -2182,6 +2182,20 @@ fn a_run_that_is_called_off_stops_before_the_next_command_and_says_goodbye() {
 }
 
 #[test]
+fn a_sent_copy_is_unread_when_the_owner_chose_it() {
+    let imap = two_way(true, true);
+    let smtp = Fake::smtp(smtp_world());
+    let folders = synced_folders(&imap);
+    let result = sync(&SyncRequest { outbox: vec![hello()], sent_unread: true, ..request(account(Some(&imap), Some(&smtp)), folders) });
+    assert_eq!((result.sent.len(), result.filed.len()), (1, 1));
+    // The copy on the server is there, with no \Seen flag: the owner chose it unread.
+    let copy = on_server(&imap, "Sent Items").pop().expect("a copy in Sent Items");
+    assert_eq!(copy.1, "");
+    let append = changes(&imap).into_iter().find(|c| c.starts_with("APPEND \"Sent Items\"")).expect("an APPEND");
+    assert!(!append.contains("\\Seen"), "{append}");
+}
+
+#[test]
 fn a_run_called_off_in_the_middle_of_a_download_does_not_wait_for_it() {
     let imap = Fake::imap(imap_world());
     // A server that takes six seconds or so over a message.

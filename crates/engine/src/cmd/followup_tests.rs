@@ -618,7 +618,7 @@ fn a_reminder_follows_a_sent_message_whose_copy_the_server_files_itself() {
         // Sent a day later: counted from then, not from the click.
         let sent_at = NOON + DAY;
         let done = SendDone { message: id, outcome: SendOutcome::Sent, draft: None, draft_left: String::new() };
-        super::graph_send::send_done_at(&mut w.s.mailbox, w.account, &done, mailcraft_i18n::Lang::default(), &mut Vec::new(), Some(sent_at));
+        super::graph_send::send_done_at(&mut w.s.mailbox, w.account, &done, mailcraft_i18n::Lang::default(), &mut Vec::new(), false, Some(sent_at));
         assert!(w.s.mailbox.message(id).is_none(), "{kind:?}: forgotten, the server's copy comes down");
         // The copy comes down under an id of its own.
         let down = Message { id: 0, folder: w.sent, follow_up: None, ..m };
@@ -637,7 +637,7 @@ fn a_reminder_of_an_imap_message_counts_from_when_the_server_took_it() {
     let (mut w, id) = sent_through_outbox(mailcraft_model::AccountKind::Imap);
     assert_eq!(w.m(id).follow_up.unwrap().at, NOON + 4 * DAY, "from the click while it waits");
     let result = mailcraft_model::sync::SyncResult { sent: vec![id], ..Default::default() };
-    super::account::file_sent(&mut w.s.mailbox, w.account, &result, NOON + 2 * DAY);
+    super::account::file_sent(&mut w.s.mailbox, w.account, &result, false, NOON + 2 * DAY);
     assert_eq!(w.m(id).folder, w.sent);
     assert_eq!(w.m(id).follow_up.unwrap().at, NOON + 6 * DAY);
     // A message that waits in the Outbox never fires, however late.
@@ -651,7 +651,7 @@ fn a_reminder_pending_for_a_copy_is_kept_in_the_file_and_let_go_of_with_time() {
     let (mut w, id) = sent_through_outbox(mailcraft_model::AccountKind::Microsoft);
     let m = w.m(id).clone();
     let done = mailcraft_model::sync::SendDone { message: id, outcome: mailcraft_model::sync::SendOutcome::Sent, ..Default::default() };
-    super::graph_send::send_done_at(&mut w.s.mailbox, w.account, &done, mailcraft_i18n::Lang::default(), &mut Vec::new(), Some(NOON));
+    super::graph_send::send_done_at(&mut w.s.mailbox, w.account, &done, mailcraft_i18n::Lang::default(), &mut Vec::new(), false, Some(NOON));
     assert_eq!(w.s.mailbox.follow_ups_pending.len(), 1);
     reopen(&mut w);
     assert_eq!(w.s.mailbox.follow_ups_pending.len(), 1);
@@ -672,7 +672,7 @@ fn only_the_owners_own_copy_in_sent_items_takes_a_kept_reminder() {
     let (mut w, id) = sent_through_outbox(mailcraft_model::AccountKind::Microsoft);
     let m = w.m(id).clone();
     let done = mailcraft_model::sync::SendDone { message: id, outcome: mailcraft_model::sync::SendOutcome::Sent, ..Default::default() };
-    super::graph_send::send_done_at(&mut w.s.mailbox, w.account, &done, mailcraft_i18n::Lang::default(), &mut Vec::new(), Some(NOON));
+    super::graph_send::send_done_at(&mut w.s.mailbox, w.account, &done, mailcraft_i18n::Lang::default(), &mut Vec::new(), false, Some(NOON));
     let down = |folder, from: &str| Message { id: 0, folder, follow_up: None, from: mailcraft_model::Address::new("X", from), ..m.clone() };
     // A self-Bcc or a list's echo in the Inbox, a forged copy from someone else in Sent Items:
     // none takes it.
@@ -690,7 +690,7 @@ fn undo_leaves_the_reminders_kept_for_a_sent_copy_as_they_are() {
     let (mut w, id) = sent_through_outbox(mailcraft_model::AccountKind::Microsoft);
     let before = w.s.mailbox.clone();
     let done = mailcraft_model::sync::SendDone { message: id, outcome: mailcraft_model::sync::SendOutcome::Sent, ..Default::default() };
-    super::graph_send::send_done_at(&mut w.s.mailbox, w.account, &done, mailcraft_i18n::Lang::default(), &mut Vec::new(), Some(NOON));
+    super::graph_send::send_done_at(&mut w.s.mailbox, w.account, &done, mailcraft_i18n::Lang::default(), &mut Vec::new(), false, Some(NOON));
     assert_eq!(w.s.mailbox.follow_ups_pending.len(), 1);
     let touched = crate::undo::touched(&before, &w.s.mailbox);
     let (out, _) = crate::undo::keep_in_step(before.clone(), &touched, &w.s.mailbox, mailcraft_i18n::Lang::default());
@@ -821,7 +821,7 @@ fn a_follow_up_on_a_delayed_message_counts_from_when_it_goes_and_a_cancelled_one
     // It goes at its time (a run later, here): the two days count from that moment.
     let went = NOON + 3 * DAY + 120;
     let result = mailcraft_model::sync::SyncResult { sent: vec![id], ..Default::default() };
-    assert_eq!(super::account::file_sent(&mut s.mailbox, a, &result, went), 1);
+    assert_eq!(super::account::file_sent(&mut s.mailbox, a, &result, false, went), 1);
     assert_eq!(s.mailbox.message(id).unwrap().follow_up.unwrap().at, went + 2 * DAY);
     at(&mut s, went + 2 * DAY - 1);
     assert_eq!(s.run("mail.settleReminders", &json!({})).unwrap()["raised"], json!([]));
