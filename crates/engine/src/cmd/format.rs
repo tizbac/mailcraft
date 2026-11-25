@@ -101,6 +101,18 @@ pub fn specs() -> Vec<CommandSpec> {
             .pure()
             .params(r#"{"html"?: string, "spreadsheet"?: string (Excel's "XML Spreadsheet" clipboard data, made into a table), "text"?: string} — over the selection; supported HTML formatting includes bold, italic, underline, font, size, colours, links, lists and a paragraph's indent and alignment. The HTML composer keeps bounded tables as selectable objects. Tables flatten to text in plain-text messages and signatures. HTML that comes to no text gives way to `text`; text alone that is a spreadsheet's Copy (two or more rows of lines with the same number of tab-separated cells) becomes a table in an HTML message. Nothing to paste changes nothing"#)
             .when_writing(needs_doc),
+        CommandSpec::new("table.cellEdit", "Edit Cell", "Insert › Tables", cell_edit)
+            .pure()
+            .params(r#"{"from": number (the table's place in the text), "row": number, "cell": number (both 0-based), "at"?: number (the character in the cell; default 0)} — the owner types in that cell: what follows is table.cellType, table.cellErase and table.cellEnter till table.cellLeave"#)
+            .when_writing(needs_html),
+        CommandSpec::new("table.cellType", "Type in Cell", "Insert › Tables", cell_type)
+            .params(r#"{"text": string} — put in at the caret in the cell being edited, a `\n` starting a new line"#)
+            .when_writing(needs_html),
+        CommandSpec::new("table.cellErase", "Erase in Cell", "Insert › Tables", cell_erase)
+            .params(r#"{"forward"?: bool (the character after the caret; else the one before), "to"?: number (erase from the caret to there)}"#)
+            .when_writing(needs_html),
+        CommandSpec::new("table.cellEnter", "New Line in Cell", "Insert › Tables", cell_enter).when_writing(needs_html),
+        CommandSpec::new("table.cellLeave", "Leave Cell", "Insert › Tables", cell_leave).pure().when_writing(needs_html),
         CommandSpec::new("table.cellBorders", "Cell Borders", "Insert › Tables", cell_borders)
             .pure()
             .params(r#"{"from": number (the table's place in the text), "row": number, "cell": number (both 0-based)} — the sides that cell has a line on: {"top", "right", "bottom", "left"}"#)
@@ -543,6 +555,91 @@ fn pasted_text(text: &str, plain: bool, signature: bool) -> RichText {
         Some(table) => RichText::from_paragraphs(vec![Paragraph::new(vec![Run::table(std::sync::Arc::new(table))], ListKind::None)]),
         None => RichText::from_plain(text),
     }
+}
+
+/// Where in a table cell the owner types.
+fn cell_edit(s: &mut Session, v: &Value) -> CmdResult {
+    let (from, row, cell) = cell_of(s, v)?;
+    let at = p::u64(v, "at").and_then(|n| usize::try_from(n).ok()).unwrap_or(0);
+    let length = s
+        .doc()
+        .and_then(|(body, _)| body.text().table_at(from))
+        .and_then(|table| table.cell_len(row, cell))
+        .ok_or_else(|| fail("there is no such cell in that table"))?;
+    let edit = crate::session::TableEdit { from, row, cell, at: at.min(length) };
+    s.table_edit = Some(edit);
+    Ok(cell_caret(s, edit))
+}
+
+fn cell_type(s: &mut Session, v: &Value) -> CmdResult {
+    let text = p::str(v, "text").ok_or_else(|| bad("`text` (string) is required"))?.to_string();
+    cell_write(s, |table, edit| table.cell_insert(edit.row, edit.cell, edit.at, &text), text.chars().count())
+}
+
+fn cell_erase(s: &mut Session, v: &Value) -> CmdResult {
+    let forward = p::bool(v, "forward").unwrap_or(false);
+    let to = p::u64(v, "to").and_then(|n| usize::try_from(n).ok());
+    let edit = s.table_edit.ok_or_else(|| fail("the owner isn't typing in a table cell"))?;
+    let length = s
+        .doc()
+        .and_then(|(body, _)| body.text().table_at(edit.from))
+        .and_then(|table| table.cell_len(edit.row, edit.cell))
+        .ok_or_else(|| fail("there is no such cell in that table"))?;
+    let (from, to) = match to {
+        Some(to) => (edit.at.min(length), to.min(length)),
+        None if forward => (edit.at.min(length), edit.at.saturating_add(1).min(length)),
+        None => (edit.at.saturating_sub(1), edit.at.min(length)),
+    };
+    let (from, to) = (from.min(to), from.max(to));
+    let removed = to.saturating_sub(from);
+    let mut new_at = edit.at;
+    if from < edit.at {
+        new_at = edit.at.saturating_sub(removed);
+    }
+    let result = cell_write_at(s, |table, edit| table.cell_erase(edit.row, edit.cell, from, to), new_at, 0)?;
+    Ok(result)
+}
+
+fn cell_enter(s: &mut Session, v: &Value) -> CmdResult {
+    let _ = v;
+    cell_write(s, |table, edit| table.cell_insert(edit.row, edit.cell, edit.at, "\n"), 1)
+}
+
+fn cell_leave(s: &mut Session, _: &Value) -> CmdResult {
+    s.table_edit = None;
+    Ok(json!({"editing": false}))
+}
+
+/// Edit the cell the owner is in, and move the caret on by `advance` characters.
+fn cell_write(
+    s: &mut Session,
+    f: impl FnOnce(&mut mailcraft_model::rich::PastedTable, crate::session::TableEdit) -> bool,
+    advance: usize,
+) -> CmdResult {
+    let edit = s.table_edit.ok_or_else(|| fail("the owner isn't typing in a table cell"))?;
+    cell_write_at(s, f, edit.at.saturating_add(advance), advance)
+}
+
+fn cell_write_at(
+    s: &mut Session,
+    f: impl FnOnce(&mut mailcraft_model::rich::PastedTable, crate::session::TableEdit) -> bool,
+    new_at: usize,
+    _advance: usize,
+) -> CmdResult {
+    let place = s.table_edit.ok_or_else(|| fail("the owner isn't typing in a table cell"))?;
+    edit(s, &json!({"from": place.from}), |body| {
+        let table = body.text_mut().table_at_mut(place.from).ok_or_else(|| ModelError::Invalid("there is no table there".into()))?;
+        if f(table, place) { Ok(()) } else { Err(ModelError::Invalid("there is no such cell in that table".into())) }
+    })?;
+    if let Some(edit) = s.table_edit.as_mut() {
+        edit.at = new_at;
+    }
+    Ok(cell_caret(s, s.table_edit.unwrap_or(place)))
+}
+
+fn cell_caret(s: &Session, edit: crate::session::TableEdit) -> Value {
+    let length = s.doc().and_then(|(body, _)| body.text().table_at(edit.from)).and_then(|table| table.cell_len(edit.row, edit.cell)).unwrap_or(0);
+    json!({"from": edit.from, "row": edit.row, "cell": edit.cell, "at": edit.at.min(length), "length": length})
 }
 
 /// The sides a table cell has a line on, as the window's selected cell names it.

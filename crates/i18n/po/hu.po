@@ -5469,6 +5469,11 @@ msgstr ""
 "szerkesztése"
 
 #. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Edit Cell"
+msgstr ""
+
+#. command label
 #: crates/engine/src/cmd/people.rs
 #, fuzzy
 msgid "Edit Contact"
@@ -5690,6 +5695,11 @@ msgstr "Adjon meg dátumot és időpontot."
 #, fuzzy
 msgid "Equation"
 msgstr "Egyenlet"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Erase in Cell"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/CalendarEditor.kt
@@ -8622,6 +8632,11 @@ msgstr "Naptár megjelenítése a többi fölött"
 msgid "Layout"
 msgstr "Elrendezés"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Leave Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 #, fuzzy
@@ -10564,6 +10579,11 @@ msgstr "Új mappa…"
 #, fuzzy
 msgid "New Items"
 msgstr "Új elemek"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "New Line in Cell"
+msgstr ""
 
 #. command label
 #: crates/engine/src/cmd/file.rs
@@ -20915,6 +20935,11 @@ msgstr "Típus"
 msgid "Type a name in the search box to search the organisation's address list"
 msgstr "Írjon be egy nevet a keresőmezőbe a szervezet címlistájában való kereséshez"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Type in Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 #, fuzzy
@@ -24905,6 +24930,11 @@ msgstr "A csatorna nem tudott odaérni."
 #, fuzzy
 msgid "the occurrence was not changed; nothing was moved"
 msgstr "az előfordulás nem módosult; semmi sem lett áthelyezve"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "the owner isn't typing in a table cell"
+msgstr ""
 
 #. what a command says
 #: crates/model/src/mailbox.rs

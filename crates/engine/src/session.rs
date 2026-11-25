@@ -1271,6 +1271,16 @@ pub(crate) struct Undo {
     mail: bool,
 }
 
+/// Where the owner is typing inside a table: the table's place in the text, the cell, and the
+/// character in the cell (its lines' `\n` counted). Not kept between runs.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct TableEdit {
+    pub from: usize,
+    pub row: usize,
+    pub cell: usize,
+    pub at: usize,
+}
+
 pub struct Session {
     pub mailbox: Mailbox,
     pub view: ViewState,
@@ -1334,6 +1344,8 @@ pub struct Session {
     /// as new as the first (#566). Let go of with the run's last piece (an Inbox pass's: its own),
     /// a run that ends without it ([`Session::end_run_unfinished`]), an undo, or another mailbox.
     pub(crate) run_had: std::collections::HashMap<Id, std::collections::HashSet<String>>,
+    /// Where the owner is typing inside a table, when they are ([`TableEdit`]). Never saved.
+    pub(crate) table_edit: Option<TableEdit>,
     /// Messages of Microsoft and JMAP accounts the server wouldn't give whole this session (or, for
     /// JMAP, said it no longer has), by account and server id: the background passes them over
     /// (opening one still asks). Never saved.
@@ -1615,6 +1627,7 @@ impl Session {
             graph_index: Default::default(),
             ews_run_cut: Default::default(),
             run_had: Default::default(),
+            table_edit: None,
             graph_unfetchable: Default::default(),
             fetch_failed: Default::default(),
             kept_for_now: Default::default(),

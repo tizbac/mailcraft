@@ -793,3 +793,27 @@ fn a_table_cells_sides_can_be_chosen_and_are_what_is_sent() {
     let said = run(&mut s, "table.cellBorders", json!({"from": 0, "row": 0, "cell": 0}));
     assert_eq!((said["top"].as_bool(), said["bottom"].as_bool()), (Some(false), Some(false)));
 }
+
+#[test]
+fn typing_in_a_table_cell_puts_text_in_that_cell() {
+    let mut s = session();
+    run(&mut s, "mail.new", json!({}));
+    run(&mut s, "insert.table", json!({"rows": 2, "columns": 2}));
+    let from = {
+        let body = &s.compose.as_ref().unwrap().body;
+        (0..body.text().len()).find(|at| body.text().table_at(*at).is_some()).unwrap()
+    };
+    run(&mut s, "table.cellEdit", json!({"from": from, "row": 0, "cell": 0, "at": 0}));
+    run(&mut s, "table.cellType", json!({"text": "Hi"}));
+    run(&mut s, "table.cellEnter", json!({}));
+    run(&mut s, "table.cellType", json!({"text": "there"}));
+    run(&mut s, "table.cellErase", json!({}));
+    let table = s.compose.as_ref().unwrap().body.text().table_at(from).and_then(|table| table.cell_text(0, 0)).expect("the cell");
+    assert_eq!(table, "Hi\nther");
+    // The other cells are untouched, and the text is what a message would send.
+    assert_eq!(s.compose.as_ref().unwrap().body.text().table_at(from).and_then(|t| t.cell_text(0, 1)).as_deref(), Some(""));
+    let html = mailcraft_mime_model::rich::to_html(s.compose.as_ref().unwrap().body.text());
+    assert!(html.contains("Hi<br>ther"), "{html}");
+    run(&mut s, "table.cellLeave", json!({}));
+    assert!(s.run("table.cellType", &json!({"text": "x"})).is_err(), "not in a cell any more");
+}

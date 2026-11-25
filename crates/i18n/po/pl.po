@@ -5482,6 +5482,11 @@ msgstr ""
 "zadanie"
 
 #. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Edit Cell"
+msgstr ""
+
+#. command label
 #: crates/engine/src/cmd/people.rs
 #, fuzzy
 msgid "Edit Contact"
@@ -5706,6 +5711,11 @@ msgstr "Wpisz datę i godzinę."
 #, fuzzy
 msgid "Equation"
 msgstr "Równanie"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Erase in Cell"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/CalendarEditor.kt
@@ -8658,6 +8668,11 @@ msgstr "Nałóż ten kalendarz na pozostałe"
 msgid "Layout"
 msgstr "Układ"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Leave Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 #, fuzzy
@@ -10606,6 +10621,11 @@ msgstr "Nowy folder…"
 #, fuzzy
 msgid "New Items"
 msgstr "Nowe elementy"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "New Line in Cell"
+msgstr ""
 
 #. command label
 #: crates/engine/src/cmd/file.rs
@@ -20992,6 +21012,11 @@ msgstr "Typ"
 msgid "Type a name in the search box to search the organisation's address list"
 msgstr "Wpisz nazwę w polu wyszukiwania, aby przeszukać listę adresów organizacji"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Type in Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 #, fuzzy
@@ -24995,6 +25020,11 @@ msgstr "sieć nie mogła tam dotrzeć"
 #, fuzzy
 msgid "the occurrence was not changed; nothing was moved"
 msgstr "wystąpienie nie zostało zmienione; nic nie zostało przeniesione"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "the owner isn't typing in a table cell"
+msgstr ""
 
 #. what a command says
 #: crates/model/src/mailbox.rs

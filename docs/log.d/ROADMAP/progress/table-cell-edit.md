@@ -1,0 +1,1 @@
+| 2026-11-25 | The editor can go inside a table cell: a click sets a caret in it, typing/Enter/Backspace/Delete/Left/Right/paste edit that cell (`table.cellEdit`/`cellType`/`cellErase`/`cellEnter`/`cellLeave`), Escape or a click away leaves it, and the cell is highlighted with its caret drawn |

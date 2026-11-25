@@ -5461,6 +5461,11 @@ msgstr ""
 "რედაქტირება"
 
 #. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Edit Cell"
+msgstr ""
+
+#. command label
 #: crates/engine/src/cmd/people.rs
 #, fuzzy
 msgid "Edit Contact"
@@ -5684,6 +5689,11 @@ msgstr "შეიყვანეთ თარიღი და დრო."
 #, fuzzy
 msgid "Equation"
 msgstr "განტოლება"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Erase in Cell"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/CalendarEditor.kt
@@ -8611,6 +8621,11 @@ msgstr "ამ კალენდრის სხვებზე გადაფ
 msgid "Layout"
 msgstr "განლაგება"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Leave Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 #, fuzzy
@@ -10542,6 +10557,11 @@ msgstr ""
 #, fuzzy
 msgid "New Items"
 msgstr "ახალი ელემენტები"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "New Line in Cell"
+msgstr ""
 
 #. command label
 #: crates/engine/src/cmd/file.rs
@@ -20843,6 +20863,11 @@ msgstr "ტიპი"
 msgid "Type a name in the search box to search the organisation's address list"
 msgstr "ორგანიზაციის მისამართების სიაში მოსაძებნად საძიებო ველში აკრიფეთ სახელი"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Type in Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 #, fuzzy
@@ -24827,6 +24852,11 @@ msgstr "ქსელმა იქამდე ვერ მიაღწია"
 #, fuzzy
 msgid "the occurrence was not changed; nothing was moved"
 msgstr "შემთხვევა არ შეცვლილა; არაფერი გადატანილა"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "the owner isn't typing in a table cell"
+msgstr ""
 
 #. what a command says
 #: crates/model/src/mailbox.rs

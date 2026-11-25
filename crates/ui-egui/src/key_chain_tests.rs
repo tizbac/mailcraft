@@ -706,6 +706,9 @@ fn escape_and_enter_are_read_through_the_gate_only() {
         ("keys.rs", r#"Key::Enter => "Enter","#),
         ("keys.rs", r#"Key::Escape => "Escape","#),
         ("keys.rs", "if key == Key::Escape && modifiers.is_none() {"),
+        // While the owner types in a table cell, Enter is a line and Escape leaves the cell.
+        ("compose/editor.rs", r#"Event::Key { key: Key::Enter, pressed: true, .. } => Some(("table.cellEnter", json!({}))),"#),
+        ("compose/editor.rs", r#"Event::Key { key: Key::Escape, pressed: true, .. } => Some(("table.cellLeave", json!({}))),"#),
     ];
     let reads = |line: &str| {
         ["Key::Escape", "Key::Enter"]

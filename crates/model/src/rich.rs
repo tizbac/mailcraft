@@ -591,6 +591,40 @@ pub struct CellText {
     pub style: Style,
 }
 
+/// A cell's characters, each with the style of the run it came from, its lines separated by
+/// `\n` with the plain style.
+fn chars_of(lines: &[Vec<CellText>]) -> Vec<(char, Style)> {
+    let mut out = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        if i > 0 {
+            out.push(('\n', Style::default()));
+        }
+        for run in line {
+            for c in run.text.chars() {
+                out.push((c, run.style.clone()));
+            }
+        }
+    }
+    out
+}
+
+/// A cell's lines out of its characters and their styles.
+fn lines_of(chars: &[(char, Style)]) -> Vec<Vec<CellText>> {
+    let mut lines: Vec<Vec<CellText>> = vec![Vec::new()];
+    for (c, style) in chars {
+        if *c == '\n' {
+            lines.push(Vec::new());
+            continue;
+        }
+        let Some(line) = lines.last_mut() else { break };
+        match line.last_mut() {
+            Some(run) if run.style == *style => run.text.push(*c),
+            _ => line.push(CellText { text: c.to_string(), style: style.clone() }),
+        }
+    }
+    lines
+}
+
 impl PastedTable {
     pub fn new(columns: u16, mut rows: Vec<Vec<TableCell>>) -> Option<Self> {
         let width = usize::from(columns);
@@ -687,6 +721,46 @@ impl PastedTable {
             })
             .collect();
         PastedTable::new(u16::try_from(width).ok()?, cells)
+    }
+
+    /// A cell's text with its lines separated by `\n`; `None` when there is no such cell.
+    pub fn cell_text(&self, row: usize, cell: usize) -> Option<String> {
+        let cell = self.rows.get(row)?.get(cell)?;
+        Some(cell.lines.iter().map(|line| line.iter().map(|run| run.text.as_str()).collect::<String>()).collect::<Vec<_>>().join("\n"))
+    }
+
+    /// The number of characters a cell has, its lines' `\n` counted.
+    pub fn cell_len(&self, row: usize, cell: usize) -> Option<usize> {
+        self.rows.get(row)?.get(cell).map(|cell| chars_of(&cell.lines).len())
+    }
+
+    /// Put `text` in a cell at character `at` (counted with its lines' `\n`), in the style the
+    /// character there has; `\n` in it starts a new line. Whether there was such a cell.
+    pub fn cell_insert(&mut self, row: usize, cell: usize, at: usize, text: &str) -> bool {
+        let Some(cell) = self.rows.get_mut(row).and_then(|row| row.get_mut(cell)) else { return false };
+        let mut chars = chars_of(&cell.lines);
+        let at = at.min(chars.len());
+        let style = chars.get(at).or_else(|| chars.last()).map(|(_, style)| style.clone()).unwrap_or_default();
+        let tail = chars.split_off(at);
+        // (A cell is not a place to keep a message: what is typed into it is held to what a cell
+        // of a message may hold.)
+        let room = 64 * 1024usize.saturating_sub(chars.len());
+        chars.extend(text.chars().take(room).map(|c| (c, style.clone())));
+        chars.extend(tail);
+        cell.lines = lines_of(&chars);
+        true
+    }
+
+    /// Take out the characters of a cell between `from` and `to` (`to` at least `from`), with
+    /// their lines. Whether there was such a cell.
+    pub fn cell_erase(&mut self, row: usize, cell: usize, from: usize, to: usize) -> bool {
+        let Some(cell) = self.rows.get_mut(row).and_then(|row| row.get_mut(cell)) else { return false };
+        let mut chars = chars_of(&cell.lines);
+        let from = from.min(chars.len());
+        let to = to.max(from).min(chars.len());
+        chars.drain(from..to);
+        cell.lines = lines_of(&chars);
+        true
     }
 
     /// The sides a cell at `row`, `cell` (its place in that row) has a line on; `None` when there

@@ -943,6 +943,10 @@ pub struct UiState {
     /// one the Borders dialog changes. Not kept between runs.
     #[serde(skip)]
     pub table_cell: Option<(usize, usize, usize)>,
+    /// Where the owner's caret stands in that cell, as (the table's place, row, cell, character).
+    /// Not kept between runs.
+    #[serde(skip)]
+    pub table_caret: Option<(usize, usize, usize, usize)>,
     pub backstage: bool,
     pub backstage_page: String,
     pub ribbon_collapsed: bool,
@@ -1100,6 +1104,7 @@ impl Default for UiState {
         UiState {
             tab: "Home".into(),
             table_cell: None,
+            table_caret: None,
             backstage: false,
             backstage_page: "info".into(),
             ribbon_collapsed: false,

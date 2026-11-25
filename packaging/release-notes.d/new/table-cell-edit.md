@@ -1,0 +1,1 @@
+- **A table cell can be typed in.** Clicking a cell puts the caret in it (the cell is highlighted), and typing, Enter, Backspace/Delete, Left/Right and a paste go into that cell; Escape or a click elsewhere leaves it. The cell's text, lines and styles are kept in the draft/signature and sent as the cell's own text.

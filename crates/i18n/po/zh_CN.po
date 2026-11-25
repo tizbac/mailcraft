@@ -5473,6 +5473,11 @@ msgstr ""
 "任务"
 
 #. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Edit Cell"
+msgstr ""
+
+#. command label
 #: crates/engine/src/cmd/people.rs
 #, fuzzy
 msgid "Edit Contact"
@@ -5695,6 +5700,11 @@ msgstr "请输入日期和时间。"
 #, fuzzy
 msgid "Equation"
 msgstr "公式"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Erase in Cell"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/CalendarEditor.kt
@@ -8621,6 +8631,11 @@ msgstr "将此日历叠加到其他日历上"
 msgid "Layout"
 msgstr "布局"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Leave Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 #, fuzzy
@@ -10565,6 +10580,11 @@ msgstr "新建文件夹…"
 #, fuzzy
 msgid "New Items"
 msgstr "新建项目"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "New Line in Cell"
+msgstr ""
 
 #. command label
 #: crates/engine/src/cmd/file.rs
@@ -20897,6 +20917,11 @@ msgstr "类型"
 msgid "Type a name in the search box to search the organisation's address list"
 msgstr "在搜索框中输入姓名以搜索组织的地址列表"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Type in Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 #, fuzzy
@@ -24886,6 +24911,11 @@ msgstr "无法通过网络连接"
 #, fuzzy
 msgid "the occurrence was not changed; nothing was moved"
 msgstr "单次日程未更改；未移动任何内容"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "the owner isn't typing in a table cell"
+msgstr ""
 
 #. what a command says
 #: crates/model/src/mailbox.rs

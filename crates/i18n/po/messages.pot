@@ -4569,6 +4569,11 @@ msgid ""
 msgstr ""
 
 #. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Edit Cell"
+msgstr ""
+
+#. command label
 #: crates/engine/src/cmd/people.rs
 msgid "Edit Contact"
 msgstr ""
@@ -4752,6 +4757,11 @@ msgstr ""
 #. ribbon
 #: crates/ui-egui/src/ribbon.rs
 msgid "Equation"
+msgstr ""
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Erase in Cell"
 msgstr ""
 
 #. android
@@ -7194,6 +7204,11 @@ msgstr ""
 msgid "Layout"
 msgstr ""
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Leave Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 msgid "Leave empty to keep the one in use"
@@ -8807,6 +8822,11 @@ msgstr ""
 #. ribbon
 #: crates/ui-egui/src/ribbon.rs
 msgid "New Items"
+msgstr ""
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "New Line in Cell"
 msgstr ""
 
 #. command label
@@ -17445,6 +17465,11 @@ msgstr ""
 msgid "Type a name in the search box to search the organisation's address list"
 msgstr ""
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Type in Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 msgid "Type the name of the incoming mail server"
@@ -20785,6 +20810,11 @@ msgstr ""
 #. what a command says
 #: crates/engine/src/cmd/calendar/selection.rs
 msgid "the occurrence was not changed; nothing was moved"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "the owner isn't typing in a table cell"
 msgstr ""
 
 #. what a command says

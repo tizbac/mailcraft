@@ -4,6 +4,7 @@
 
 use std::sync::Arc;
 
+use egui::text::CCursor;
 use egui::{
     Color32, Painter, Pos2, Rect, Stroke, StrokeKind, Vec2, pos2,
     text::{Galley, LayoutJob},
@@ -24,6 +25,8 @@ struct Cell {
     /// Its row and its place in that row, as the model names it.
     row: usize,
     column: usize,
+    /// Where its text starts, measured from the table's own top left.
+    text_at: Pos2,
 }
 
 pub(super) struct TableLayout {
@@ -140,7 +143,12 @@ impl TableLayout {
             .into_iter()
             .filter_map(|(row, cell_index, end_row, left, right, text, background, borders)| {
                 let rect = Rect::from_min_max(pos2(left, *ys.get(row)?), pos2(right, *ys.get(end_row)?));
-                Some(Cell { rect, text, background, borders, row, column: cell_index })
+                let x = match text.job.halign {
+                    egui::Align::Min => rect.left() + PADDING,
+                    egui::Align::Center => rect.center().x,
+                    egui::Align::Max => rect.right() - PADDING,
+                };
+                Some(Cell { rect, text, background, borders, row, column: cell_index, text_at: pos2(x, rect.top() + PADDING) })
             })
             .collect();
         Self { size: vec2(total * scale, heights.iter().sum()), cells, plain: None }
@@ -151,7 +159,16 @@ impl TableLayout {
         self.cells.iter().find(|cell| cell.rect.contains(at.to_pos2())).map(|cell| (cell.row, cell.column))
     }
 
-    pub fn paint(&self, painter: &Painter, at: Pos2, tokens: &Tokens, selected: Option<(usize, usize)>) {
+    /// The row, the cell and the character in it nearest to `at`, measured from the table's own
+    /// top left.
+    pub fn caret_at(&self, at: Vec2) -> Option<(usize, usize, usize)> {
+        let point = at.to_pos2();
+        let cell = self.cells.iter().find(|cell| cell.rect.contains(point))?;
+        let index = cell.text.cursor_from_pos(point.to_vec2() - cell.text_at.to_vec2()).index.0;
+        Some((cell.row, cell.column, index.min(cell.text.len())))
+    }
+
+    pub fn paint(&self, painter: &Painter, at: Pos2, tokens: &Tokens, selected: Option<(usize, usize)>, caret: Option<(usize, usize, usize)>) {
         if let Some(text) = &self.plain {
             painter.galley(at, text.clone(), tokens.text);
             return;
@@ -189,6 +206,14 @@ impl TableLayout {
                 egui::Align::Max => rect.right() - PADDING,
             };
             painter.with_clip_rect(rect).galley(pos2(x, rect.top() + PADDING), cell.text.clone(), tokens.text);
+            if let Some((row, column, caret_at)) = caret
+                && (row, column) == (cell.row, cell.column)
+            {
+                let pos = cell.text.pos_from_cursor(CCursor::new(caret_at.min(cell.text.len()))).min;
+                let foot = pos2(at.x + cell.text_at.x + pos.x, at.y + cell.text_at.y + pos.y);
+                let height = cell.text.rows.first().map_or(14.0, |row| row.height());
+                painter.line_segment([foot, pos2(foot.x, foot.y + height)], Stroke::new(1.5, tokens.accent_text));
+            }
         }
     }
 }
