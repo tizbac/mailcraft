@@ -219,3 +219,15 @@ fn a_subject_that_exactly_fills_the_xml_readers_room_is_whole() {
     assert_eq!(read(&fits), ("a b".to_string(), false), "exact");
     assert_eq!(read(&format!("{fits}c")), (String::new(), true), "one byte more");
 }
+
+#[test]
+fn a_real_servers_fifty_thousand_read_states_are_a_page() {
+    // The answer Grommunio sent: 49,952 read-state changes in 8.8 MB, three elements each, which
+    // is at the edge of the parser's node guard.
+    let many = 50_000usize;
+    let changes: String = (0..many)
+        .map(|n| format!("<t:ReadFlagChange><t:ItemId Id=\"AAMkAGI2-n-{n}\" ChangeKey=\"CK{n}\"/><t:IsRead>true</t:IsRead></t:ReadFlagChange>"))
+        .collect();
+    let got = page(&changes, 512).unwrap_or_else(|why| panic!("50,000 read states are a page: {why:?}"));
+    assert_eq!((got.read.len(), got.messages.len(), got.last), (many, 0, true));
+}

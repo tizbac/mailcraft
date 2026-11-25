@@ -51,8 +51,10 @@ where: it is what tells a broken server from a proxy's sign-in page in one look.
 hold mail, stays on this computer, and is never sent or put in a log line.
 
 A server that ignores the size asked for and sends more changes in one page gives all of them:
-nothing is dropped, and the folder is never left stuck at a page it can never take in. A change
-with no usable id is still refused for that folder, since the state it came with would hide it.
+nothing is dropped, and the folder is never left stuck at a page it can never take in. A real
+Grommunio answer with 49,952 read-state changes in 8.8 MB (149,856 elements) is taken whole; the
+parser's element guard is far above what a 16 MiB answer can carry. A change with no usable id is
+still refused for that folder, since the state it came with would hide it.
 
 ## Grommunio
 
