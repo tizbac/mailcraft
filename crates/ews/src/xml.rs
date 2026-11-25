@@ -30,12 +30,14 @@ use quick_xml::events::{BytesRef, BytesStart, Event};
 
 /// Deepest the elements may nest.
 pub const MAX_DEPTH: usize = 40;
-/// Most elements in one answer. A page of a folder's changes is items, a few elements each; a
+/// A hard guard on the elements in one answer, for a broken host or a document that is no EWS
+/// answer at all: not a page size. A page of a folder's changes is items, a few elements each; a
 /// server working through a long list of read states (Grommunio sends the ones it already sent
-/// along with every new page, #252) puts three elements for each of them, so this is high enough
-/// for a folder whose mail was read in bulk to come through in pages at all. What the tree may
-/// cost is held by [`budget`] however many elements there are.
-pub const MAX_NODES: usize = 150_000;
+/// along with every new page, #252) puts three elements for each of them, and a real answer with
+/// 49,952 of them (8.8 MB) is 149,856 elements — over what this once allowed, which made a whole
+/// folder unreadable. The answer is already held to the request's size and the tree to [`budget`],
+/// so this is far above anything a 16 MiB answer can carry and is never reached by a working server.
+pub const MAX_NODES: usize = 1_000_000;
 /// Longest name of an element or an attribute that is kept (a longer one is no name anybody
 /// asks for), most attributes read of one element, and the longest value of one.
 const MAX_NAME: usize = 64;

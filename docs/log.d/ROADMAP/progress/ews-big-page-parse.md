@@ -1,0 +1,1 @@
+| 2026-11-25 | The XML reader's element guard is raised far above any 16 MiB answer, so a Grommunio page of 49,952 read states in 8.8 MB is parsed and applied whole instead of making the folder unreadable |
