@@ -316,8 +316,21 @@ pub fn apply_graph_fetch(s: &mut Session, result: GraphFetchResult) -> CmdResult
     let taken = taken.len();
     // Gone before it could be fetched: a message being moved out of the account stays as it is.
     let incomplete = graph_up::missing(&mut s.mailbox, account, &result.missing);
-    // Refused although there: not asked for again in the background this session.
+    // Refused although there: not asked for again in the background this session, and why, for
+    // the reading pane (a server code or a kind, never its text).
     s.graph_unfetchable.extend(result.failed.iter().take(1_000).map(|id| (account, id.clone())));
+    for failure in result.failures.iter().take(1_000) {
+        let why: String = failure.why.chars().filter(|c| !c.is_control()).take(300).collect();
+        let why = if why.trim().is_empty() { "the server wouldn't give it".to_owned() } else { why };
+        s.fetch_failed.insert((account, failure.id.clone()), why);
+    }
+    for id in result.failed.iter().filter(|id| !result.failures.iter().any(|failure| &failure.id == *id)) {
+        s.fetch_failed.insert((account, id.clone()), "the server wouldn't give it".to_owned());
+    }
+    // What came, or is gone, has nothing to say any more.
+    for id in result.fetched.iter().map(|f| f.id.as_str()).chain(result.missing.iter().map(String::as_str)) {
+        s.fetch_failed.remove(&(account, id.to_owned()));
+    }
     if taken + incomplete > 0 {
         s.mailbox_changed();
     }

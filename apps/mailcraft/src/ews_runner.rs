@@ -646,7 +646,17 @@ pub(crate) fn run_fetch_with(request: &EwsFetchRequest, password: &str, cancel: 
     let transport = Transport::new(&request.trusted).with_ntlm(ntlm_key(&request.username, &request.email, password));
     let mut pause = |ms: u32| wait(cancel, ms);
     let result = crate::block_on::block_on(mailcraft_ews::fetch_messages(&client, &transport, request, cancel, &mut pause));
-    settled_fetch(result, transport.problem().as_ref(), transport.auth_problem())
+    let mut result = settled_fetch(result, transport.problem().as_ref(), transport.auth_problem());
+    // A message's answer that couldn't be used is kept where the owner can look at it, and the
+    // run says where. It may hold mail: never a log line, never sent anywhere.
+    for failure in result.failures.iter() {
+        if let Some(answer) = failure.answer.as_deref()
+            && let Some(line) = save_answer(answer, result.account, &result.email)
+        {
+            result.errors.push(line);
+        }
+    }
+    result
 }
 
 /// Looks names up in the address list of an Exchange server account on a thread of its own

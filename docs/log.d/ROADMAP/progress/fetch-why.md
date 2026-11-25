@@ -1,0 +1,1 @@
+| 2026-11-25 | A message a fetch couldn't bring says why in the reading pane — the server's code or the kind of failure — and the answer that couldn't be used is saved in `sync-errors/` as a folder's is |

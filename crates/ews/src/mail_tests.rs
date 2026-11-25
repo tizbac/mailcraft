@@ -955,6 +955,11 @@ fn a_message_is_fetched_whole_and_the_missing_and_the_refused_are_told() {
     standin.state().hostile = Some(Hostile::NotXml);
     let got = block_on(fetch_messages(&client(), &standin, &fetch, &cancel, &mut |_| true)).unwrap();
     assert!(got.fetched.is_empty() && got.failed.len() == 2);
+    // Why each couldn't be had: the answer wasn't a document, and the answer itself is kept for
+    // the owner (a host writes it where they can look at it).
+    assert_eq!(got.failures.len(), 2);
+    assert!(got.failures.iter().all(|f| f.why == "the server's answer wasn't a document that could be read"), "{:?}", got.failures);
+    assert!(got.failures.iter().all(|f| f.answer.is_some()));
 }
 
 #[test]

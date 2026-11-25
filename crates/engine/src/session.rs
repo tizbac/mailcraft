@@ -1333,6 +1333,9 @@ pub struct Session {
     /// JMAP, said it no longer has), by account and server id: the background passes them over
     /// (opening one still asks). Never saved.
     pub(crate) graph_unfetchable: std::collections::HashSet<(Id, String)>,
+    /// Why each of those couldn't be had, in safe words (a server code or a kind, never its text),
+    /// by account and server id: what the reading pane says. Never saved.
+    pub(crate) fetch_failed: std::collections::HashMap<(Id, String), String>,
     /// Messages fetched whole this session although they are outside their account's mail to
     /// keep offline (the owner opened, answered or saved one, #143): kept in full until the
     /// mailbox is opened again, then back to their headers and preview. Never saved.
@@ -1671,6 +1674,7 @@ impl Session {
             ews_run_cut: Default::default(),
             run_had: Default::default(),
             graph_unfetchable: Default::default(),
+            fetch_failed: Default::default(),
             kept_for_now: Default::default(),
             openings: 0,
             restored: 0,
@@ -4431,6 +4435,13 @@ impl Session {
     /// pane's message is still only its beginning.
     pub fn unfetchable(&self, m: &Message) -> bool {
         m.server.as_ref().is_some_and(|s| self.graph_unfetchable.contains(&(m.account, s.id.clone())))
+    }
+
+    /// Why a fetch couldn't bring `m` this session, in safe words: a server code or a kind, never
+    /// text the server wrote. `None` for one that wasn't tried.
+    pub fn fetch_failure(&self, m: &Message) -> Option<&str> {
+        let server = m.server.as_ref()?;
+        self.fetch_failed.get(&(m.account, server.id.clone())).map(String::as_str)
     }
 
     /// Whether a command exists and is enabled now.

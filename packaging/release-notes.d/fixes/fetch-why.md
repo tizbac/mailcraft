@@ -1,0 +1,1 @@
+- **A message that couldn't be downloaded says why.** The reading pane names the server's code or which way its answer failed (not a document, not the answer to the request, lost, or too large), and the answer itself is saved in `sync-errors/` when it couldn't be used, as a folder's is.

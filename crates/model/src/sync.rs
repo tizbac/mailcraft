@@ -542,6 +542,10 @@ pub struct GraphFetchResult {
     /// host's own cap): they wait until the owner opens them on a device that takes them.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub too_large: Vec<String>,
+    /// Why each message of `failed` couldn't be fetched: its server id, a safe reason (a server
+    /// code or a kind, never text it wrote), and the answer itself when it couldn't be used.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub failures: Vec<FetchFailure>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub errors: Vec<String>,
     /// The server could not be reached: whatever wasn't fetched waits until it can.
@@ -557,6 +561,18 @@ pub struct GraphFetchResult {
 pub struct GraphFetched {
     pub id: String,
     pub mime: Vec<u8>,
+}
+
+/// Why a message couldn't be fetched whole: what the server said or which way its answer failed,
+/// in safe words, and the answer itself when it couldn't be used (for a host to write where the
+/// owner can look at it; it may hold mail).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct FetchFailure {
+    pub id: String,
+    pub why: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub answer: Option<Box<ews::BadAnswer>>,
 }
 
 /// A value from a mailbox file, or `None` when what the file holds in its place isn't one (a
