@@ -828,9 +828,9 @@ fn a_folder_that_could_not_be_read_is_named_with_the_servers_code_or_why_it_gave
         &mut s,
         EwsMailResult {
             unread: vec![
-                UnreadFolder { folder: "F1".into(), code: "ErrorAccessDenied".into(), why: UnreadWhy::Code },
+                UnreadFolder { folder: "F1".into(), code: "ErrorAccessDenied".into(), why: UnreadWhy::Code, ..Default::default() },
                 UnreadFolder { folder: "F2".into(), why: UnreadWhy::TooLarge, ..Default::default() },
-                UnreadFolder { folder: "F3".into(), why: UnreadWhy::Answer, ..Default::default() },
+                UnreadFolder { folder: "F3".into(), why: UnreadWhy::Unexpected, ..Default::default() },
             ],
             partial: false,
             ..piece(account)
@@ -842,11 +842,53 @@ fn a_folder_that_could_not_be_read_is_named_with_the_servers_code_or_why_it_gave
         json!([
             "Inbox couldn't be read from the server (ErrorAccessDenied)",
             "Sent Items: the server's answer was larger than MailCraft reads",
-            "Apollo: the server's answer couldn't be used",
+            "Apollo: the server's answer wasn't the answer to the request",
         ])
     );
     assert_eq!(answer["unreadableFolders"], json!(["Inbox", "Sent Items", "Apollo"]));
     assert_eq!(answer["summary"], "Inbox couldn't be read from the server (ErrorAccessDenied)");
+}
+
+/// Each way the server's answer can fail says which way: a broken document, an answer to another
+/// request, a stray HTTP status, or no answer at all — so one Send/Receive names the cause.
+#[test]
+fn a_folder_that_could_not_be_read_says_which_way_the_answer_failed() {
+    let (mut s, account) = session();
+    let deltas = EwsFolderDeltas {
+        changed: vec![
+            folder("F1", "", "Inbox", FolderKind::Inbox),
+            folder("F4", "", "Archive", FolderKind::Custom),
+            folder("F5", "", "Projects", FolderKind::Custom),
+            folder("F6", "", "Team", FolderKind::Custom),
+        ],
+        afresh: true,
+        ..Default::default()
+    };
+    apply_ews_mail(&mut s, EwsMailResult { folders: Some(deltas), hierarchy: "H".into(), ..piece(account) }).unwrap();
+    let answer = apply_ews_mail(
+        &mut s,
+        EwsMailResult {
+            unread: vec![
+                UnreadFolder { folder: "F1".into(), why: UnreadWhy::Malformed, ..Default::default() },
+                UnreadFolder { folder: "F4".into(), why: UnreadWhy::Unexpected, ..Default::default() },
+                UnreadFolder { folder: "F6".into(), why: UnreadWhy::Status(502), ..Default::default() },
+                UnreadFolder { folder: "F5".into(), why: UnreadWhy::Lost, ..Default::default() },
+            ],
+            partial: false,
+            ..piece(account)
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        answer["errors"],
+        json!([
+            "Inbox: the server's answer wasn't a document MailCraft could read",
+            "Archive: the server's answer wasn't the answer to the request",
+            "Team: the server answered with HTTP status 502",
+            "Projects: the server stopped answering",
+        ])
+    );
+    assert_eq!(answer["unreadableFolders"], json!(["Inbox", "Archive", "Team", "Projects"]));
 }
 
 /// A result that names a folder it couldn't read is no run that went well, whatever its `whole`

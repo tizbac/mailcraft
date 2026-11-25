@@ -62,6 +62,7 @@ pub async fn sync_directory<E: HttpExchange>(
         recipients_unsaid: false,
         read_overflow: false,
         mailbox: request.mailbox.trim().to_owned(),
+        bad_answer: None,
     };
     let mut out = mailcraft_model::sync::EwsDirectoryResult {
         account: request.account,
@@ -72,9 +73,17 @@ pub async fn sync_directory<E: HttpExchange>(
     if let Err(stop) = run.directory(request, &mut out).await {
         match stop {
             Asked::Stop(why) => stop_line(why, &mut out),
-            Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable(_) => {
-                out.errors.push("The server's answer for the calendar, contacts or to-dos couldn't be used".to_owned());
+            // The server's own short code, never its words.
+            Asked::Code(code) => out.errors.push(format!("The server refused the calendar, contacts or to-dos ({code})")),
+            Asked::Unusable(fault) => {
+                out.bad_answer = run.take_bad_answer();
+                out.errors.push(format!("The server's answer for the calendar, contacts or to-dos couldn't be used: {}", fault.words()));
             }
+            Asked::Lost => out.errors.push("The server's answer for the calendar, contacts or to-dos was lost".to_owned()),
+            Asked::Unreadable(_) => {
+                out.errors.push("A change in the server's answer for the calendar, contacts or to-dos couldn't be taken in".to_owned())
+            }
+            Asked::Bad => out.errors.push("The server's answer for the calendar, contacts or to-dos couldn't be used".to_owned()),
             Asked::TooLarge => {
                 out.errors.push("The server's answer for the calendar, contacts or to-dos was larger than MailCraft reads".to_owned());
             }
@@ -136,21 +145,30 @@ impl<E: HttpExchange> Run<'_, E> {
                     out.events.extend(events);
                 }
                 Err(Asked::Stop(stop)) => return Err(Asked::Stop(stop)),
-                Err(_) => out.errors.push("Couldn't read the calendars from the server".to_owned()),
+                Err(_) => {
+                    out.bad_answer = self.take_bad_answer().or(out.bad_answer.take());
+                    out.errors.push("Couldn't read the calendars from the server".to_owned());
+                }
             }
         }
         if request.contacts {
             match self.read_contacts(request.account, &request.email, mailbox, None).await {
                 Ok(download) => out.contacts = Some(download),
                 Err(Asked::Stop(stop)) => return Err(Asked::Stop(stop)),
-                Err(_) => out.errors.push("Couldn't read the contacts from the server".to_owned()),
+                Err(_) => {
+                    out.bad_answer = self.take_bad_answer().or(out.bad_answer.take());
+                    out.errors.push("Couldn't read the contacts from the server".to_owned());
+                }
             }
         }
         if request.tasks {
             match self.read_tasks(request.account, &request.email, mailbox).await {
                 Ok(download) => out.tasks = Some(download),
                 Err(Asked::Stop(stop)) => return Err(Asked::Stop(stop)),
-                Err(_) => out.errors.push("Couldn't read the to-dos from the server".to_owned()),
+                Err(_) => {
+                    out.bad_answer = self.take_bad_answer().or(out.bad_answer.take());
+                    out.errors.push("Couldn't read the to-dos from the server".to_owned());
+                }
             }
         }
         // Calendars and address books given by another mailbox's address.
@@ -177,7 +195,10 @@ impl<E: HttpExchange> Run<'_, E> {
                         out.events.extend(events);
                     }
                     Err(Asked::Stop(stop)) => return Err(Asked::Stop(stop)),
-                    Err(_) => out.errors.push("Couldn't read a calendar that was shared with the account".to_owned()),
+                    Err(_) => {
+                        out.bad_answer = self.take_bad_answer().or(out.bad_answer.take());
+                        out.errors.push("Couldn't read a calendar that was shared with the account".to_owned());
+                    }
                 }
             }
             if shared.contacts {
@@ -190,7 +211,10 @@ impl<E: HttpExchange> Run<'_, E> {
                         None => out.contacts = Some(download),
                     },
                     Err(Asked::Stop(stop)) => return Err(Asked::Stop(stop)),
-                    Err(_) => out.errors.push("Couldn't read an address book that was shared with the account".to_owned()),
+                    Err(_) => {
+                        out.bad_answer = self.take_bad_answer().or(out.bad_answer.take());
+                        out.errors.push("Couldn't read an address book that was shared with the account".to_owned());
+                    }
                 }
             }
         }
@@ -547,9 +571,9 @@ impl<E: HttpExchange> Run<'_, E> {
                 outcome.result = EventResult::Refused;
                 outcome.error = "the server won't do it".to_owned();
             }
-            Err(_) => {
+            Err(asked) => {
                 outcome.result = EventResult::Failed;
-                outcome.error = "the server's answer couldn't be used".to_owned();
+                outcome.error = answer_why(&asked);
             }
         }
         outcome
@@ -614,9 +638,9 @@ impl<E: HttpExchange> Run<'_, E> {
                 outcome.result = EventResult::Refused;
                 outcome.error = "the server won't do it".to_owned();
             }
-            Err(_) => {
+            Err(asked) => {
                 outcome.result = EventResult::Failed;
-                outcome.error = "the server's answer couldn't be used".to_owned();
+                outcome.error = answer_why(&asked);
             }
         }
         outcome
@@ -666,12 +690,21 @@ impl<E: HttpExchange> Run<'_, E> {
                 outcome.result = TaskResult::Refused;
                 outcome.error = "the server won't do it".to_owned();
             }
-            Err(_) => {
+            Err(asked) => {
                 outcome.result = TaskResult::Failed;
-                outcome.error = "the server's answer couldn't be used".to_owned();
+                outcome.error = answer_why(&asked);
             }
         }
         outcome
+    }
+}
+
+/// A safe phrase for a change whose answer couldn't be used: never any text the server wrote.
+fn answer_why(asked: &Asked) -> String {
+    match asked {
+        Asked::Unusable(fault) => format!("the server's answer couldn't be used: {}", fault.words()),
+        Asked::Lost => "the server's answer was lost".to_owned(),
+        _ => "the server's answer couldn't be used".to_owned(),
     }
 }
 

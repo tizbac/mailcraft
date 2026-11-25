@@ -229,6 +229,9 @@ pub struct State {
     /// Every `SyncFolderItems` for these folders (their ids) is refused with
     /// `ErrorInternalServerError`, as a folder whose mail the server won't read.
     pub refuse_sync: Vec<String>,
+    /// Every `SyncFolderItems` for these folders (their ids) is answered with a body that isn't
+    /// XML at all, as a proxy's sign-in page or a broken server would be.
+    pub bad_sync: Vec<String>,
     /// `GetItem` answers these items with `ErrorItemNotFound`, as when they went between the
     /// listing and the question.
     pub gone_from_get_item: Vec<String>,
@@ -334,6 +337,7 @@ impl Default for State {
             lists_no_recipients: false,
             refuses_get_item: false,
             refuse_sync: Vec::new(),
+            bad_sync: Vec::new(),
             gone_from_get_item: Vec::new(),
             omits_recipients: false,
             versions: Vec::new(),

@@ -39,18 +39,19 @@
 //! Help › Copy Diagnostics say how long an Exchange run took, as for a Microsoft account.
 
 use std::future::{Future, ready};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{Receiver, sync_channel};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use mailcraft_ews::{
     AuthError, Candidate, Client, HttpExchange, HttpRequest, HttpResponse, NtlmCredentials, RecipientKind, ResolveNames, Scheme, Secret,
     TransportError, auth, ntlm,
 };
 use mailcraft_model::sync::{
-    DirectoryKind, DirectoryPerson, EwsDirectoryRequest, EwsDirectoryResult, EwsFetchRequest, EwsMailRequest, EwsMailResult, EwsResolveRequest,
-    EwsResolveResult, EwsResolved, GraphFetchResult, MAX_RESOLVE_PEOPLE, MAX_RESOLVE_TEXTS, SyncPhase, Timings,
+    BadAnswer, DirectoryKind, DirectoryPerson, EwsDirectoryRequest, EwsDirectoryResult, EwsFetchRequest, EwsMailRequest, EwsMailResult,
+    EwsResolveRequest, EwsResolveResult, EwsResolved, GraphFetchResult, MAX_RESOLVE_PEOPLE, MAX_RESOLVE_TEXTS, SyncPhase, Timings,
 };
 use mailcraft_net::https::Connection;
 use mailcraft_net::{CertificateProblem, NetError};
@@ -610,6 +611,11 @@ pub(crate) fn run_mail_with(request: &EwsMailRequest, password: &str, cancel: &A
         if let Some(scheme) = transport.scheme_name() {
             scheme.clone_into(&mut piece.signed_in_with);
         }
+        // An answer that couldn't be used is written where the owner can look at it, and the
+        // piece says where: it may hold mail, so never a log line and never sent anywhere.
+        if let Some(line) = save_sync_error(&piece) {
+            piece.errors.push(line);
+        }
         emit(piece);
     }));
 }
@@ -783,7 +789,108 @@ pub(crate) fn run_calendar_with(request: &EwsDirectoryRequest, password: &str, c
     if let Some(scheme) = transport.scheme_name() {
         scheme.clone_into(&mut result.signed_in_with);
     }
+    if let Some(answer) = result.bad_answer.as_deref()
+        && let Some(line) = save_answer(answer, result.account, &result.email)
+    {
+        result.errors.push(line);
+    }
     result
+}
+
+/// The folder beside the mailbox where an Exchange answer that couldn't be used is kept.
+const SYNC_ERRORS: &str = "sync-errors";
+/// The most such files kept, and their total size: old ones go first.
+const MAX_SYNC_ERRORS: usize = 20;
+const MAX_SYNC_ERROR_BYTES: u64 = 20 * 1024 * 1024;
+
+/// The answer that couldn't be used in `piece`, if any: the mail run's own, a folder's, or the
+/// calendar, contacts and to-dos'.
+fn answer_of(piece: &EwsMailResult) -> Option<&BadAnswer> {
+    piece
+        .bad_answer
+        .as_deref()
+        .or_else(|| piece.unread.iter().find_map(|folder| folder.answer.as_deref()))
+        .or_else(|| piece.directory.as_deref().and_then(|directory| directory.bad_answer.as_deref()))
+}
+
+/// Writes the answer an Exchange run couldn't use to the owner's data folder, and says the line
+/// that names it. `None` when there is no answer to write (or no data folder). The file is
+/// owner-only, holds what the server said (it may be mail), and is never sent or logged.
+fn save_sync_error(piece: &EwsMailResult) -> Option<String> {
+    let answer = answer_of(piece)?;
+    save_answer(answer, piece.account, &piece.email)
+}
+
+fn save_answer(answer: &BadAnswer, account: mailcraft_model::Id, email: &str) -> Option<String> {
+    // (A test's runs leave the owner's own folder alone; the writer itself is tested directly.)
+    if cfg!(test) {
+        return None;
+    }
+    let dir = mailcraft_control_key::settings_dir()?;
+    match write_sync_error(&dir, answer, account, email, SystemTime::now()) {
+        Ok(path) => Some(format!("The server's answer was saved for diagnosis in {}", path.display())),
+        Err(error) => {
+            log::warn!("ews: the answer that couldn't be used was not saved: {error}");
+            Some("The server's answer couldn't be used and wasn't saved".to_owned())
+        }
+    }
+}
+
+/// The file's text: what was asked, and the answer as it came.
+fn sync_error_text(answer: &BadAnswer, account: mailcraft_model::Id, email: &str) -> String {
+    let mut text = String::new();
+    text.push_str("MailCraft: an Exchange server's answer could not be used\n");
+    text.push_str(&format!("Account: {} ({account})\n", email.trim()));
+    text.push_str(&format!("Operation: {}\n", answer.operation.trim()));
+    text.push_str(&format!("HTTP status: {}\n", answer.status));
+    if answer.cut {
+        text.push_str("The answer was longer than 1 MiB; only its beginning is here.\n");
+    }
+    text.push_str("It may contain mail. It is kept only on this computer, and is never sent or logged.\n");
+    text.push_str("\n----- the server's answer -----\n");
+    text.push_str(&answer.body);
+    text.push('\n');
+    text
+}
+
+/// Writes one answer into `dir/sync-errors/`, then drops the oldest files beyond the caps.
+fn write_sync_error(dir: &Path, answer: &BadAnswer, account: mailcraft_model::Id, email: &str, now: SystemTime) -> std::io::Result<PathBuf> {
+    let folder = dir.join(SYNC_ERRORS);
+    mailcraft_engine::store::create_private_dir_all(&folder)?;
+    let seconds = now.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    let mut path = folder.join(format!("exchange-{seconds}-{account}.txt"));
+    // (Two answers in the same second: a suffix rather than one over the other.)
+    for n in 1..1_000u32 {
+        if !path.exists() {
+            break;
+        }
+        path = folder.join(format!("exchange-{seconds}-{account}-{n}.txt"));
+    }
+    mailcraft_engine::store::write_atomic(&path, sync_error_text(answer, account, email).as_bytes())?;
+    prune_sync_errors(&folder);
+    Ok(path)
+}
+
+/// Keeps at most [`MAX_SYNC_ERRORS`] files and [`MAX_SYNC_ERROR_BYTES`]: the oldest go first.
+/// (A failure to list or remove is ignored: it is a diagnostic, not the mailbox.)
+fn prune_sync_errors(folder: &Path) {
+    let Ok(entries) = std::fs::read_dir(folder) else { return };
+    let mut files: Vec<(PathBuf, u64)> = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let meta = entry.metadata().ok()?;
+            meta.is_file().then(|| (entry.path(), meta.len()))
+        })
+        .collect();
+    // (Named with the second they were written in: the name sorts oldest first.)
+    files.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut total: u64 = files.iter().map(|(_, size)| *size).sum();
+    while files.len() > MAX_SYNC_ERRORS || (total > MAX_SYNC_ERROR_BYTES && files.len() > 1) {
+        let (path, size) = files.remove(0);
+        if std::fs::remove_file(&path).is_ok() {
+            total = total.saturating_sub(size);
+        }
+    }
 }
 
 #[cfg(test)]

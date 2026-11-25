@@ -578,6 +578,11 @@ impl State {
                 response("SyncFolderItems", &error_message("SyncFolderItems", "ErrorInternalServerError")),
             ));
         }
+        // A folder whose answer is no document at all: the run names it as one it couldn't read,
+        // and says the answer wasn't one that could be read.
+        if self.bad_sync.iter().any(|id| id == &folder.id) {
+            return Ok((200, "NoError".into(), "<html><body><h1>Sign in</h1><p>Nothing of the service is here.</body></html>".into()));
+        }
         let max = Check::required(operation, parts.get(4).copied().flatten(), "MaxChangesReturned")?;
         Check::is(max, MESSAGES, "MaxChangesReturned", &[])?;
         Check::no_children(max)?;

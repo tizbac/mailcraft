@@ -552,7 +552,17 @@ fn take_in(s: &mut Session, result: EwsMailResult) -> CmdResult {
                 UnreadWhy::TooLarge => {
                     mailcraft_i18n::fmt(lang.t("{folder}: the server's answer was larger than MailCraft reads"), &[("folder", &name)])
                 }
-                UnreadWhy::Answer => mailcraft_i18n::fmt(lang.t("{folder}: the server's answer couldn't be used"), &[("folder", &name)]),
+                UnreadWhy::Malformed => {
+                    mailcraft_i18n::fmt(lang.t("{folder}: the server's answer wasn't a document MailCraft could read"), &[("folder", &name)])
+                }
+                UnreadWhy::Unexpected => {
+                    mailcraft_i18n::fmt(lang.t("{folder}: the server's answer wasn't the answer to the request"), &[("folder", &name)])
+                }
+                UnreadWhy::Status(status) => mailcraft_i18n::fmt(
+                    lang.t("{folder}: the server answered with HTTP status {status}"),
+                    &[("folder", &name), ("status", &status.to_string())],
+                ),
+                UnreadWhy::Lost => mailcraft_i18n::fmt(lang.t("{folder}: the server stopped answering"), &[("folder", &name)]),
                 UnreadWhy::Code => mailcraft_i18n::fmt(lang.t("{folder} couldn't be read from the server"), &[("folder", &name)]),
             }
         };

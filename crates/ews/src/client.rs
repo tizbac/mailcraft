@@ -9,11 +9,12 @@
 //! once more, asking for [`Version::FALLBACK`], and the client asks for that from then on. That is
 //! one step down and no more: a server that refuses that version too gets its answer as it was.
 
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 use crate::error::{Error, ResponseCode};
 use crate::folder::{DistinguishedFolder, FolderInfo, GetFolder};
-use crate::http::{HttpExchange, HttpRequest, Secret, check_endpoint};
+use crate::http::{HttpExchange, HttpRequest, HttpResponse, Secret, check_endpoint};
 use crate::reply::Reply;
 use crate::soap::{Element, Version, envelope};
 
@@ -23,11 +24,18 @@ pub struct Client {
     authorization: Secret,
     /// The version asked for ([`Version::index`]): lowered once when the server doesn't know it.
     version: AtomicU8,
+    /// The last answer that couldn't be used, for the run to hand to the owner (never a log).
+    bad: Mutex<Option<mailcraft_model::sync::BadAnswer>>,
 }
 
 impl Clone for Client {
     fn clone(&self) -> Self {
-        Self { endpoint: self.endpoint.clone(), authorization: self.authorization.clone(), version: AtomicU8::new(self.version().index()) }
+        Self {
+            endpoint: self.endpoint.clone(),
+            authorization: self.authorization.clone(),
+            version: AtomicU8::new(self.version().index()),
+            bad: Mutex::new(None),
+        }
     }
 }
 
@@ -43,7 +51,7 @@ impl Client {
     /// `http` only to this machine), sending `authorization` as the `Authorization` field.
     pub fn new(endpoint: &str, authorization: Secret) -> Result<Self, Error> {
         check_endpoint(endpoint)?;
-        Ok(Self { endpoint: endpoint.to_owned(), authorization, version: AtomicU8::new(Version::default().index()) })
+        Ok(Self { endpoint: endpoint.to_owned(), authorization, version: AtomicU8::new(Version::default().index()), bad: Mutex::new(None) })
     }
 
     /// Asks for the schema of `version`.
@@ -57,6 +65,24 @@ impl Client {
     /// once the server has said it doesn't know that one.
     pub fn version(&self) -> Version {
         Version::from_index(self.version.load(Ordering::Relaxed))
+    }
+
+    /// The answer that couldn't be used, once ([`Client::remember_bad`]): a body is kept only
+    /// when an answer could not be used, at most [`mailcraft_model::sync::MAX_BAD_ANSWER`] bytes,
+    /// and the run says where it was written. Never a log line: it may hold mail.
+    pub fn take_bad_answer(&self) -> Option<mailcraft_model::sync::BadAnswer> {
+        self.bad.lock().ok().and_then(|mut bad| bad.take())
+    }
+
+    /// Keeps `response` as the answer a parse could not use. The operation is filled in by the
+    /// caller, which knows what it asked.
+    fn remember_bad(&self, response: &HttpResponse) {
+        let body = response.body();
+        let cut = body.len() > mailcraft_model::sync::MAX_BAD_ANSWER;
+        let shown = String::from_utf8_lossy(body.get(..body.len().min(mailcraft_model::sync::MAX_BAD_ANSWER)).unwrap_or_default());
+        if let Ok(mut bad) = self.bad.lock() {
+            *bad = Some(mailcraft_model::sync::BadAnswer { operation: String::new(), status: response.status(), body: shown.into_owned(), cut });
+        }
     }
 
     /// The server the endpoint is on, as it is written in the address: lower case, with its port
@@ -124,9 +150,20 @@ impl Client {
         // may have been done. Only a SOAP `ErrorServerBusy`, which comes before anything is done,
         // is waited out and asked again.
         if !request.is_repeatable() && matches!(response.status(), 429 | 503) && !matches!(Reply::parse(response.body()), Err(Error::Busy { .. })) {
+            self.remember_bad(&response);
             return Err(Error::Status(response.status()));
         }
-        let reply = Reply::judge(&response, request.max_response_bytes())?;
+        let reply = match Reply::judge(&response, request.max_response_bytes()) {
+            Ok(reply) => reply,
+            Err(error) => {
+                // (Only an answer that came and could not be used is kept: a code or a busy
+                // server says enough without a body.)
+                if matches!(error, Error::Malformed | Error::Unexpected | Error::Status(_)) {
+                    self.remember_bad(&response);
+                }
+                return Err(error);
+            }
+        };
         match reply.busy() {
             Some(busy) => Err(busy),
             None => Ok(reply),
