@@ -39,7 +39,7 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("file.exportContacts", "Export Contacts", "File › Open & Export", export_contacts).pure().params(r#"{"ids"?: [number], "path"?: string} — .vcf"#),
         CommandSpec::new("file.info", "Info", "File › Info", info).pure(),
         CommandSpec::new("file.options", "Options", "File", options).pure().params(
-            r#"{"clock"?: "auto" (the interface language's) | "12" | "24" (independent of the language), "twelveHour"?: bool, "weekStart"?: "sun"|"mon"|…, "workDays"?: ["mon",…], "workStart"?: 0-23, "workEnd"?: 1-24, "markReadOnOpen"?: bool, "defaultReminder"?: minutes | null, "quoteOnReply"?: bool, "autoLists"?: bool, "previewLines"?: 0-3, "syncLimit"?: number, "syncMinutes"?: 0-1440 (0: only when asked), "importMaxFileMb"?: 1-16384 (the most one imported file may be), "importMaxMessages"?: 1-10000000 (the most one imported mbox file brings in), "importTreeMaxMb"?: 1-65536 (the most one folder import may be), "importTreeMaxMessages"?: 1-10000000 (the most one folder import brings in), "saveMessageFormat"?: "eml"|"msg" (what File › Save As writes by default)}"#,
+            r#"{"clock"?: "auto" (the interface language's) | "12" | "24" (independent of the language), "twelveHour"?: bool, "weekStart"?: "sun"|"mon"|…, "workDays"?: ["mon",…], "workStart"?: 0-23, "workEnd"?: 1-24, "markReadOnOpen"?: bool, "sentUnread"?: bool (keep the copy of a message that is sent in Sent Items unread), "sentFolders"?: [{"address": string, "folder": number | null (the folder that keeps what is sent from that address; null: the account's own Sent Items)}], "defaultReminder"?: minutes | null, "quoteOnReply"?: bool, "autoLists"?: bool, "previewLines"?: 0-3, "syncLimit"?: number, "syncMinutes"?: 0-1440 (0: only when asked), "importMaxFileMb"?: 1-16384 (the most one imported file may be), "importMaxMessages"?: 1-10000000 (the most one imported mbox file brings in), "importTreeMaxMb"?: 1-65536 (the most one folder import may be), "importTreeMaxMessages"?: 1-10000000 (the most one folder import brings in), "saveMessageFormat"?: "eml"|"msg" (what File › Save As writes by default)}"#,
         ),
     ]
 }
@@ -588,6 +588,32 @@ fn options(s: &mut Session, v: &Value) -> CmdResult {
     }
     if let Some(b) = p::bool(v, "markReadOnOpen") {
         prefs.mark_read_on_open = b;
+    }
+    if let Some(b) = p::bool(v, "sentUnread") {
+        prefs.sent_unread = b;
+    }
+    // The folder that keeps what is sent from an address (`sentFolders`): each entry sets one,
+    // and `null` takes the choice back to the account's own Sent Items.
+    if let Some(list) = v.get("sentFolders").and_then(Value::as_array) {
+        for item in list.iter().take(500) {
+            let Some(address) = item.get("address").and_then(Value::as_str) else { continue };
+            let address = address.trim().to_lowercase();
+            if address.is_empty() || address.len() > 320 || address.chars().any(char::is_control) {
+                return Err(bad("`sentFolders` names an address that can't be one"));
+            }
+            match item.get("folder") {
+                None | Some(Value::Null) => {
+                    prefs.sent_folder_for.remove(&address);
+                }
+                Some(folder) => {
+                    let id = folder.as_u64().ok_or_else(|| bad("`sentFolders` folder is a folder id, or null"))?;
+                    if id == 0 || s.mailbox.folder(id).is_none() {
+                        return Err(failed!("no folder with id {id}", id));
+                    }
+                    prefs.sent_folder_for.insert(address, id);
+                }
+            }
+        }
     }
     match v.get("defaultReminder") {
         Some(Value::Null) => prefs.default_reminder = None,

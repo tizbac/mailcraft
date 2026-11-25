@@ -972,6 +972,11 @@ msgid "Account name"
 msgstr "Nome dell'account"
 
 #. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Account's Sent Items"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/account_setup/senders.rs
 #, fuzzy
 msgid "Account's signature"
@@ -3548,6 +3553,11 @@ msgstr "Scegliere una cartella"
 #, fuzzy
 msgid "Choose default signatures"
 msgstr "Scegli firme predefinite"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Choose the folder that keeps the copy of what is sent from each address. An Exchange server account can use one of its own folders, such as a shared mailbox's Sent Items. Other accounts file it in their server's Sent Items."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/account_setup.rs
@@ -8344,6 +8354,11 @@ msgstr "Mantieni la posta degli ultimi"
 #, fuzzy
 msgid "Keep on the server of {address}"
 msgstr "Conserva sul server di {address}"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Keep the copy of a sent message unread in Sent Items"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/import_pst.rs
@@ -15467,11 +15482,16 @@ msgstr "La riservatezza è"
 msgid "Sent"
 msgstr "Inviato"
 
-#. name
-#: crates/model/src/mailbox.rs
+#. interface, name
+#: crates/model/src/mailbox.rs crates/ui-egui/src/backstage.rs
 #, fuzzy
 msgid "Sent Items"
 msgstr "Posta inviata"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Sent Items for {address}"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/signatures.rs

@@ -61,7 +61,7 @@ fn message(signed: bool) -> (Message, Vec<u8>) {
 fn a_signed_message_goes_with_send_mail_byte_for_byte() {
     let server = StandIn::start().unwrap_or_else(|e| panic!("{e}"));
     let (m, entity) = message(true);
-    let all = run(&server, vec![SendUp { message: 5, draft: None, mime: Some(Box::new(m)), discard: String::new() }]);
+    let all = run(&server, vec![SendUp { message: 5, draft: None, mime: Some(Box::new(m)), discard: String::new(), ..Default::default() }]);
     assert!(matches!(all.sent.as_slice(), [d] if d.outcome == SendOutcome::Sent), "{:?} {:?}", all.sent, all.errors);
     let state = server.state();
     let sent = state.sent.first().cloned().unwrap_or_default();
@@ -79,7 +79,7 @@ fn a_signed_message_saved_as_a_draft_goes_as_its_own_bytes_and_the_draft_is_take
     let draft = server.state().mailbox.add(&drafts, "Rota", NOW);
     server.state().mailbox.update(&draft, |d| d.draft = true);
     let (m, entity) = message(true);
-    let all = run(&server, vec![SendUp { message: 5, draft: None, mime: Some(Box::new(m)), discard: draft.clone() }]);
+    let all = run(&server, vec![SendUp { message: 5, draft: None, mime: Some(Box::new(m)), discard: draft.clone(), ..Default::default() }]);
     let done = all.sent.first().cloned().unwrap_or_default();
     assert_eq!(done.outcome, SendOutcome::Sent, "{:?}", all.errors);
     assert!(done.draft_left.is_empty(), "taken away in the run");
@@ -94,7 +94,7 @@ fn a_signed_message_saved_as_a_draft_goes_as_its_own_bytes_and_the_draft_is_take
 fn a_message_to_be_signed_that_isnt_never_goes() {
     let server = StandIn::start().unwrap_or_else(|e| panic!("{e}"));
     let (m, _) = message(false);
-    let all = run(&server, vec![SendUp { message: 5, draft: None, mime: Some(Box::new(m)), discard: String::new() }]);
+    let all = run(&server, vec![SendUp { message: 5, draft: None, mime: Some(Box::new(m)), discard: String::new(), ..Default::default() }]);
     let done = all.sent.first().cloned().unwrap_or_default();
     assert!(matches!(&done.outcome, SendOutcome::Held { lost: false, why } if why.contains("Digitally signed")), "{done:?}");
     assert!(server.state().sent.is_empty(), "nothing went");

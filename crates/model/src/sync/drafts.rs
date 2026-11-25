@@ -336,6 +336,11 @@ pub struct SendUp {
     /// server build it again), and the draft is taken away once it has gone. Empty otherwise.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub discard: String,
+    /// The folder of an Exchange server account that keeps the sent copy (`file.options`
+    /// `sentFolders`, by the sending address): its server id, when the account files it somewhere
+    /// other than its own Sent Items (a shared mailbox's, say). Empty: the account's Sent Items.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub sent_folder: String,
 }
 
 /// What became of a message sent.

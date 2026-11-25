@@ -973,6 +973,11 @@ msgid "Account name"
 msgstr "账户名称"
 
 #. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Account's Sent Items"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/account_setup/senders.rs
 #, fuzzy
 msgid "Account's signature"
@@ -3552,6 +3557,11 @@ msgstr "选择一个文件夹"
 #, fuzzy
 msgid "Choose default signatures"
 msgstr "选择默认签名"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Choose the folder that keeps the copy of what is sent from each address. An Exchange server account can use one of its own folders, such as a shared mailbox's Sent Items. Other accounts file it in their server's Sent Items."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/account_setup.rs
@@ -8343,6 +8353,11 @@ msgstr "保留最近这段时间的邮件"
 #, fuzzy
 msgid "Keep on the server of {address}"
 msgstr "保留在 {address} 的服务器上"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Keep the copy of a sent message unread in Sent Items"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/import_pst.rs
@@ -15473,11 +15488,16 @@ msgstr "敏感度为"
 msgid "Sent"
 msgstr "已发送"
 
-#. name
-#: crates/model/src/mailbox.rs
+#. interface, name
+#: crates/model/src/mailbox.rs crates/ui-egui/src/backstage.rs
 #, fuzzy
 msgid "Sent Items"
 msgstr "已发送邮件"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Sent Items for {address}"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/signatures.rs
