@@ -1,0 +1,1 @@
+- **An Exchange page with tens of thousands of read-state changes is read whole.** Grommunio's 49,952 read states in one 8.8 MB answer (149,856 elements) used to meet the XML reader's element guard and made the folder unreadable; the guard is now far above any 16 MiB answer, and every change is applied.
