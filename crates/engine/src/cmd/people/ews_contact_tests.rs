@@ -37,6 +37,7 @@ fn download(account: u64, rights: Rights) -> ContactsDownload {
             emails: vec![Labeled::new("", "ada@example.org")],
             ..Default::default()
         }],
+        ..Default::default()
     }
 }
 
