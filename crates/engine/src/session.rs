@@ -4,7 +4,7 @@
 //! undo/redo.
 
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -946,6 +946,19 @@ pub struct Prefs {
     pub work_end: u8,
     /// Opening a message in the reading pane marks it read.
     pub mark_read_on_open: bool,
+    /// A copy of a message that is sent is kept in Sent Items marked unread (`file.options`
+    /// `sentUnread`). Off: it is marked read, as Outlook does. Local accounts and every account
+    /// whose server MailCraft files the copy with (IMAP's APPEND, Exchange's `CreateItem`) are
+    /// told at once; a server that files its own copy (Microsoft Graph, JMAP) has it set read
+    /// when that copy comes down, and the change goes up with the next run.
+    #[serde(skip_serializing_if = "is_false")]
+    pub sent_unread: bool,
+    /// The folder that keeps the sent copy of mail from an address (`file.options`
+    /// `sentFolders`): the address it is sent from (lower case) and the folder's id here. An
+    /// address that isn't named keeps the account's own Sent Items. Read through
+    /// [`Prefs::sent_folder`].
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub sent_folder_for: BTreeMap<String, Id>,
     /// Reminder a new appointment gets, in minutes before it starts.
     pub default_reminder: Option<u32>,
     /// Put the original message under a reply.
@@ -1057,6 +1070,8 @@ impl Default for Prefs {
             work_start: 8,
             work_end: 17,
             mark_read_on_open: true,
+            sent_unread: false,
+            sent_folder_for: BTreeMap::new(),
             default_reminder: Some(15),
             quote_on_reply: true,
             auto_lists: true,
@@ -1097,6 +1112,13 @@ impl Prefs {
     pub const UNDO_SEND_CHOICES: [u8; 8] = [0, 5, 10, 15, 20, 30, 60, 120];
     /// The longest wait offered.
     pub const UNDO_SEND_MOST: u8 = 120;
+
+    /// The folder that keeps the sent copy of mail from `address`, when the owner chose one
+    /// (`sentFolders`); `None` for the account's own Sent Items.
+    pub fn sent_folder(&self, address: &str) -> Option<Id> {
+        let address = address.trim().to_lowercase();
+        (!address.is_empty()).then(|| self.sent_folder_for.get(&address).copied()).flatten()
+    }
 
     /// The seconds to wait before a message goes, 0 for none (a settings file may say anything:
     /// a value the choice doesn't offer is read as the next one up, never more than the most).

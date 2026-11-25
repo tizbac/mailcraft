@@ -192,6 +192,8 @@ pub mod send_receive;
 pub mod senders;
 #[cfg(test)]
 mod senders_tests;
+#[cfg(test)]
+mod sent_folder_tests;
 pub mod shared;
 pub mod signature;
 #[cfg(test)]

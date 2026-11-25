@@ -110,6 +110,24 @@ pub struct PendingFollowUp {
 pub const MAX_PENDING_FOLLOW_UPS: usize = 200;
 pub const PENDING_FOLLOW_UP_KEPT: i64 = 14 * 86_400;
 
+/// A message that was sent whose copy a server files in Sent Items, and whether that copy is to
+/// be read or unread (`file.options` `sentUnread`): the copy is found by its `Message-ID` when it
+/// comes down, and set so. Plain data.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct PendingSentCopy {
+    pub account: Id,
+    pub message_id: String,
+    /// Whether the copy in Sent Items is to be read.
+    pub read: bool,
+    /// When it was sent.
+    pub since: Timestamp,
+}
+
+/// How many such copies are kept, and for how long (seconds) before one is let go of.
+pub const MAX_PENDING_SENT_COPIES: usize = 200;
+pub const PENDING_SENT_COPY_KEPT: i64 = 14 * 86_400;
+
 /// What [`Mailbox::settle_follow_ups`] changed.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct FollowUpsSettled {
@@ -413,6 +431,45 @@ impl Mailbox {
         }
     }
 
+    /// The message `id` was sent and a server files its copy in Sent Items: `read` is how that
+    /// copy is to be when it comes down (`file.options` `sentUnread`, inverted), found by its
+    /// `Message-ID` and dated within the time it is kept.
+    pub fn keep_sent_read_for_copy(&mut self, id: Id, read: bool, now: Timestamp) {
+        let Some(m) = self.message(id) else { return };
+        if m.message_id.is_empty() {
+            return;
+        }
+        let entry = PendingSentCopy { account: m.account, message_id: m.message_id.clone(), read, since: now };
+        self.sent_copies_pending
+            .retain(|p| now.saturating_sub(p.since) < PENDING_SENT_COPY_KEPT && !(p.account == entry.account && p.message_id == entry.message_id));
+        if self.sent_copies_pending.len() < MAX_PENDING_SENT_COPIES {
+            self.sent_copies_pending.push(entry);
+        }
+    }
+
+    /// A message that has come down takes the read state kept for a copy of it, if any: only a
+    /// message in Sent Items of that account, from one of the owner's addresses, dated within the
+    /// time it is kept of when it was sent (a copy in the Inbox, a list's echo or a forged one
+    /// takes nothing).
+    pub(super) fn take_pending_sent_copy(&mut self, m: &mut Message) {
+        if self.sent_copies_pending.is_empty() || m.message_id.is_empty() {
+            return;
+        }
+        let in_sent = self.folder(m.folder).is_some_and(|f| f.account == m.account && f.kind == FolderKind::Sent);
+        let own = self.accounts.iter().any(|a| !norm(&a.email).is_empty() && norm(&a.email) == norm(&m.from.email));
+        if !in_sent || !own {
+            return;
+        }
+        let Some(i) = self
+            .sent_copies_pending
+            .iter()
+            .position(|p| p.account == m.account && p.message_id == m.message_id && m.date.abs_diff(p.since) < PENDING_SENT_COPY_KEPT.unsigned_abs())
+        else {
+            return;
+        };
+        m.read = self.sent_copies_pending.remove(i).read;
+    }
+
     /// A message that has come down takes the reminder kept for it, if any: only a message in
     /// Sent Items of that account, from one of the owner's addresses, dated within the time a
     /// reminder is kept of when it was sent (a copy in the Inbox, a list's echo or a forged one
@@ -439,11 +496,14 @@ impl Mailbox {
     /// Let go of reminders kept too many, too long or with a `Message-ID` too long (a file can
     /// say anything); answers whether any went.
     pub(super) fn repair_follow_ups_pending(&mut self) -> bool {
-        let n = self.follow_ups_pending.len();
+        let n = self.follow_ups_pending.len() + self.sent_copies_pending.len();
         self.follow_ups_pending.retain(|p| !p.message_id.is_empty() && p.message_id.len() <= 998);
         self.follow_ups_pending.sort_by_key(|p| std::cmp::Reverse(p.since));
         self.follow_ups_pending.truncate(MAX_PENDING_FOLLOW_UPS);
-        n != self.follow_ups_pending.len()
+        self.sent_copies_pending.retain(|p| !p.message_id.is_empty() && p.message_id.len() <= 998);
+        self.sent_copies_pending.sort_by_key(|p| std::cmp::Reverse(p.since));
+        self.sent_copies_pending.truncate(MAX_PENDING_SENT_COPIES);
+        n != self.follow_ups_pending.len() + self.sent_copies_pending.len()
     }
 
     /// Follow Up with a date was chosen for `ids` (`due`: when the flag is due): a reminder for a

@@ -444,7 +444,7 @@ fn apply_graph_news(s: &mut Session, result: GraphMailResult) -> CmdResult {
     let mut sent = 0;
     for done in &result.sent {
         let sent_at = s.now();
-        if super::graph_send::send_done_at(&mut s.mailbox, account, done, s.interface_language, &mut refused, Some(sent_at)) {
+        if super::graph_send::send_done_at(&mut s.mailbox, account, done, s.interface_language, &mut refused, s.prefs.sent_unread, Some(sent_at)) {
             sent += usize::from(matches!(done.outcome, SendOutcome::Sent));
             taken.updated += 1;
             s.graph_index = Default::default();

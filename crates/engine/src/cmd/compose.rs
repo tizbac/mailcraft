@@ -1726,13 +1726,25 @@ pub(super) fn send_now(s: &mut Session) -> CmdResult {
     if let Some(at) = m.send_at {
         (m.date, m.received) = (at, at);
     }
-    m.folder = s
-        .mailbox
-        .folder_of_kind(account.id, kind)
+    // A local account files the copy here, so the owner's chosen folder for this address is
+    // used when it is one of the account's; a queued message goes to the Outbox, and the host
+    // files the copy where the address's folder says (an Exchange server account's, EWS).
+    let chosen = (!queued)
+        .then(|| s.prefs.sent_folder(&m.from.email))
+        .flatten()
+        .and_then(|id| s.mailbox.folder(id))
+        .filter(|f| f.account == account.id)
+        .map(|f| f.id);
+    m.folder = chosen
+        .or_else(|| s.mailbox.folder_of_kind(account.id, kind))
         .ok_or_else(|| failed!("this account has no {folder} folder", folder = mailcraft_i18n::Arg::folder(kind.default_name())))?;
     // The original is marked replied or forwarded once this has gone (#154): from the Outbox when
     // the server has taken it, at once for a local account, which files it as sent.
     m.answers = answers_of(s, &c).or_else(|| c.draft.and_then(|d| s.mailbox.message(d)).and_then(|d| d.answers.clone()));
+    // A local account files the copy here and nowhere else: its read state is the setting's.
+    if !queued {
+        m.read = !s.prefs.sent_unread;
+    }
     let id = s.mailbox.add_message(m.clone())?;
     // A draft begun elsewhere and sent here is queued here: it carries MailCraft's marker, as one
     // saved here does, so that it is the owner's to send and never taken for mail the server

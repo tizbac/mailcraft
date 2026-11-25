@@ -1,0 +1,1 @@
+| 2026-11-25 | A sent message's copy can be kept in a chosen folder per sending address (an Exchange server account's own folder, a shared mailbox's Sent Items say) and marked read or unread by choice, in File › Options › Sent Items; other accounts fall back to their own Sent Items, and a server that files its own copy has it set when it comes down |

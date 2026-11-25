@@ -25,7 +25,7 @@ use crate::{
 };
 #[cfg(test)]
 pub(crate) use bulk::MOVE_EACH_CALLS;
-pub use followup::{FollowUp, FollowUpsSettled, MAX_FOLLOW_UP_AHEAD, PendingFollowUp};
+pub use followup::{FollowUp, FollowUpsSettled, MAX_FOLLOW_UP_AHEAD, PendingFollowUp, PendingSentCopy};
 pub use snooze::{MAX_SNOOZE_AHEAD, MAX_SNOOZE_REFUSALS, Settled, Snooze};
 
 /// Deepest a folder tree may nest (a hostile file could otherwise chain folders without end).
@@ -1469,6 +1469,10 @@ pub struct Mailbox {
     /// Reminders of mail sent whose copy the server files in Sent Items ([`PendingFollowUp`], #948).
     #[serde(skip_serializing_if = "Vec::is_empty", deserialize_with = "crate::sync::lenient_list")]
     pub follow_ups_pending: Vec<PendingFollowUp>,
+    /// Copies of mail that was sent and that a server files in Sent Items, and how each is to be
+    /// read when it comes down (`file.options` `sentUnread`, inverted). See [`PendingSentCopy`].
+    #[serde(skip_serializing_if = "Vec::is_empty", deserialize_with = "crate::sync::lenient_list")]
+    pub sent_copies_pending: Vec<PendingSentCopy>,
 }
 
 impl Default for Mailbox {
@@ -1522,6 +1526,7 @@ impl Default for Mailbox {
             device_limits: None,
             next_id: 1,
             follow_ups_pending: Vec::new(),
+            sent_copies_pending: Vec::new(),
         }
     }
 }
@@ -1708,6 +1713,7 @@ impl Mailbox {
         self.folders.retain(|f| !going.contains(&f.account));
         self.messages.retain(|_, m| !going.contains(&m.account));
         self.pending.retain(|p| !going.contains(&p.account()));
+        self.sent_copies_pending.retain(|p| !going.contains(&p.account));
         self.event_changes.retain(|change| !going.contains(&change.account));
         self.event_checks.retain(|check| !going.contains(&check.account));
         self.task_gone.retain(|gone| !going.contains(&gone.account));
@@ -2441,6 +2447,7 @@ impl Mailbox {
         }
         self.next_id = self.next_id.max(m.id.saturating_add(1));
         self.take_pending_follow_up(&mut m);
+        self.take_pending_sent_copy(&mut m);
         let id = m.id;
         self.messages.insert(id, Arc::new(m));
         Ok(id)

@@ -720,7 +720,7 @@ impl<E: HttpExchange> Run<'_, E> {
             log::info!("ews sending: a message without its content waits");
             return Ok(());
         };
-        let op = match SendMessage::new(message, mailbox) {
+        let op = match SendMessage::new(message, mailbox, &send.sent_folder) {
             Ok(op) => op,
             Err(e) => {
                 done.outcome = SendOutcome::Held { lost: false, why: e.to_string() };

@@ -54,7 +54,7 @@ fn what_cant_be_signed_is_taken_out_and_said() {
 
 #[test]
 fn a_send_that_cant_be_signed_is_held() {
-    let up = |id| SendUp { message: id, draft: None, mime: Some(Box::new(message(id, true))), discard: String::new() };
+    let up = |id| SendUp { message: id, draft: None, mime: Some(Box::new(message(id, true))), discard: String::new(), ..Default::default() };
     let mut sends = vec![up(1), up(2)];
     let held = held_sends(sign_sends_with(&mut sends, &stand_in));
     assert_eq!(sends.len(), 1);

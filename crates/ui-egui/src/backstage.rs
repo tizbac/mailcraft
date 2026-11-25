@@ -1150,6 +1150,38 @@ fn options(app: &mut MailApp, ui: &mut Ui, t: &Tokens) {
         ))
         .color(t.text_dim),
     );
+    let mut sent_unread = prefs.sent_unread;
+    if ui.checkbox(&mut sent_unread, tl!("Keep the copy of a sent message unread in Sent Items")).changed() {
+        set(app, json!({"sentUnread": sent_unread}));
+    }
+    // The folder that keeps the copy of what is sent, by the address it is sent from (#sentFolders):
+    // an Exchange server account can use one of its own folders, a shared mailbox's Sent Items say.
+    section(ui, tl!("Sent Items"), t);
+    ui.label(tl!(
+        "Choose the folder that keeps the copy of what is sent from each address. An Exchange server account can use one of its own folders, such as a shared mailbox's Sent Items. Other accounts file it in their server's Sent Items."
+    ));
+    let addresses: Vec<(String, u64)> =
+        app.session.mailbox.accounts.iter().filter(|a| !a.email.trim().is_empty()).map(|a| (a.email.trim().to_lowercase(), a.id)).collect();
+    let folders: Vec<(u64, u64, String)> = app.session.mailbox.folders.iter().map(|f| (f.account, f.id, f.name.chars().take(80).collect())).collect();
+    for (address, account) in addresses {
+        let chosen = prefs.sent_folder(&address);
+        let label = crate::i18n::fmt(tl!("Sent Items for {address}"), &[("address", &address)]);
+        row(ui, &label, |ui| {
+            let own = tl!("Account's Sent Items").to_string();
+            let selected =
+                chosen.and_then(|id| folders.iter().find(|(a, f, _)| *a == account && *f == id)).map(|(_, _, name)| name.clone()).unwrap_or(own);
+            egui::ComboBox::from_id_salt(("opt_sent_folder", address.as_str())).selected_text(selected).show_ui(ui, |ui| {
+                if ui.selectable_label(chosen.is_none(), tl!("Account's Sent Items")).clicked() {
+                    set(app, json!({"sentFolders": [{"address": address, "folder": null}]}));
+                }
+                for (_, id, name) in folders.iter().filter(|(a, _, _)| *a == account) {
+                    if ui.selectable_label(chosen == Some(*id), name).clicked() {
+                        set(app, json!({"sentFolders": [{"address": address, "folder": id}]}));
+                    }
+                }
+            });
+        });
+    }
 }
 
 /// The time zone the calendar is shown in, and a second one for its time bar, each with a label
