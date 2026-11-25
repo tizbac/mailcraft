@@ -54,7 +54,10 @@ A server that ignores the size asked for and sends more changes in one page give
 nothing is dropped, and the folder is never left stuck at a page it can never take in. A real
 Grommunio answer with 49,952 read-state changes in 8.8 MB (149,856 elements) is taken whole; the
 parser's element guard is far above what a 16 MiB answer can carry. A change with no usable id is
-still refused for that folder, since the state it came with would hide it.
+still refused for that folder, since the state it came with would hide it. A message a fetch
+couldn't bring is passed over for the rest of the session, so that it can't hold up the rest:
+raising Download messages in full or Send/Receive asks for it again, and opening it does too. The
+"download x of y" bar counts only what the background can still bring, so it ends.
 
 ## Grommunio
 

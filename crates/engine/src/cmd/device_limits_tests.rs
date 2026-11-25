@@ -267,3 +267,39 @@ fn thinning_counts_only_what_it_releases_so_the_cap_is_met() {
     assert!(said["thinned"].as_u64().unwrap() >= 14, "{said}");
     assert!(said["bytes"].as_u64().unwrap() <= MIN_STORAGE, "{said}");
 }
+
+#[test]
+fn raising_the_download_limit_asks_again_for_what_was_too_large_or_given_up_on() {
+    use mailcraft_model::sync::ServerMessage;
+    use mailcraft_model::{Address, Message};
+    let (mut s, account, inbox) = graph_session();
+    // Listed only, under a limit smaller than it, and a fetch had given up on it.
+    let id = s
+        .mailbox
+        .add_message(Message {
+            account,
+            folder: inbox,
+            server: Some(ServerMessage { id: "M1".into(), size: 60 << 20, ..Default::default() }),
+            unfetched: true,
+            not_downloaded: 60 << 20,
+            from: Address::new("Ada", "ada@example.org"),
+            subject: "Big".into(),
+            date: NOW,
+            ..Default::default()
+        })
+        .unwrap();
+    s.graph_unfetchable.insert((account, "M1".into()));
+    s.run("account.edit", &json!({"id": account, "downloadInFull": "everything"})).unwrap();
+    let m = s.mailbox.message(id).unwrap();
+    assert_eq!((m.unfetched, m.not_downloaded), (true, 0), "asked for again, not left as too large");
+    assert!(s.graph_unfetchable.is_empty(), "the fetch that gave up on it may try again");
+}
+
+#[test]
+fn retry_skipped_messages_asks_again_for_what_a_fetch_gave_up_on() {
+    let (mut s, account, _) = graph_session();
+    s.graph_unfetchable.insert((account, "M1".into()));
+    let said = s.run("sync.retryFailed", &json!({"account": account})).unwrap();
+    assert_eq!(said["unfetchable"], 1);
+    assert!(s.graph_unfetchable.is_empty());
+}

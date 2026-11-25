@@ -72,3 +72,11 @@ fn the_offline_line_comes_before_the_size_line() {
     app.session.driver.fetch.offline = false;
     assert!(said(&app).starts_with("This message is 60 MB on the server"), "the size is said when the server is there");
 }
+
+#[test]
+fn a_message_a_fetch_gave_up_on_says_to_open_it_again() {
+    let mut app = one_message(5 << 20, DownloadInFull::Everything);
+    let account = app.session.mailbox.accounts[0].id;
+    app.session.run("sync.applyGraphFetch", &serde_json::json!({"result": {"account": account, "failed": ["AAkA1"]}})).unwrap();
+    assert_eq!(said(&app), "This message couldn't be downloaded. Open it to try again, or use Send/Receive.");
+}

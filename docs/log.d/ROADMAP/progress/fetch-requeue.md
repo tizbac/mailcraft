@@ -1,0 +1,1 @@
+| 2026-11-25 | A message a fetch gave up on, or one too large under an older Download messages in full, is asked for again when the setting grows, on Send/Receive (Retry Skipped Messages) and when opened; the background's x of y counts only what it can still bring, so it ends |

@@ -4346,6 +4346,13 @@ impl Session {
         self.swaps.is_some()
     }
 
+    /// Whether a fetch for `m` couldn't bring it this session ([`Session::graph_unfetchable`]):
+    /// the background passes it over, and opening it asks the server again. Says why the reading
+    /// pane's message is still only its beginning.
+    pub fn unfetchable(&self, m: &Message) -> bool {
+        m.server.as_ref().is_some_and(|s| self.graph_unfetchable.contains(&(m.account, s.id.clone())))
+    }
+
     /// Whether a command exists and is enabled now.
     pub fn enabled(&self, id: &str) -> bool {
         self.registry.get(id).is_some_and(|s| (s.enabled)(self).is_none())
