@@ -58,6 +58,7 @@ fn a_result_round_trips_and_pieces_are_absorbed_in_order() {
         hierarchy: "H1".into(),
         pages: vec![EwsMessagePage { folder: "F1".into(), state: "S1".into(), ..Default::default() }],
         errors: vec!["one".into()],
+        unread: vec![UnreadFolder { folder: "F2".into(), code: "ErrorAccessDenied".into(), why: UnreadWhy::Code }],
         partial: true,
         ..Default::default()
     };
@@ -70,6 +71,7 @@ fn a_result_round_trips_and_pieces_are_absorbed_in_order() {
             ..Default::default()
         }),
         pages: vec![EwsMessagePage { folder: "F1".into(), from: "S1".into(), state: "S2".into(), ..Default::default() }],
+        unread: vec![UnreadFolder { folder: "F3".into(), why: UnreadWhy::TooLarge, ..Default::default() }],
         whole: true,
         ..Default::default()
     };
@@ -80,6 +82,8 @@ fn a_result_round_trips_and_pieces_are_absorbed_in_order() {
     assert_eq!((all.account, all.email.as_str(), all.hierarchy.as_str()), (3, ME, "H1"));
     assert_eq!(all.pages.iter().map(|p| p.state.as_str()).collect::<Vec<_>>(), ["S1", "S2"]);
     assert_eq!(all.errors.len(), 1);
+    assert_eq!(all.unread.len(), 2, "the folders that couldn't be read are kept from every piece");
+    assert_eq!((all.unread[0].code.as_str(), all.unread[1].why), ("ErrorAccessDenied", UnreadWhy::TooLarge));
     assert!(all.whole && !all.partial);
     let folders = all.folders.unwrap();
     assert_eq!((folders.changed.len(), folders.deleted, folders.afresh), (1, vec!["F0".to_string(), "F9".to_string()], true));
@@ -171,6 +175,19 @@ fn a_result_beyond_the_caps_is_refused() {
             "an unreadable change with a subject that is too long",
             Box::new(|r| r.unreadable = vec![UnreadableChange { folder: "F1".into(), kind: "Create".into(), subject: "s".repeat(20_000) }]),
         ),
+        (
+            "too many folders that couldn't be read",
+            Box::new(|r| r.unread = vec![UnreadFolder { folder: "F".into(), ..Default::default() }; MAX_LISTED_FOLDERS + 1]),
+        ),
+        ("a folder that couldn't be read with no id", Box::new(|r| r.unread = vec![UnreadFolder::default()])),
+        (
+            "a folder that couldn't be read with a long code",
+            Box::new(|r| r.unread = vec![UnreadFolder { folder: "F1".into(), code: "E".repeat(MAX_EWS_CODE + 1), ..Default::default() }]),
+        ),
+        (
+            "a folder that couldn't be read with a code that isn't one",
+            Box::new(|r| r.unread = vec![UnreadFolder { folder: "F1".into(), code: "no code".into(), ..Default::default() }]),
+        ),
     ];
     for (what, change) in refused {
         let mut r = whole_result();
@@ -185,6 +202,25 @@ fn a_missing_or_unknown_field_still_reads() {
     assert_eq!(result, EwsMailResult::default());
     let result: EwsMailResult = serde_json::from_str(r#"{"account": 2, "future": [1, 2]}"#).unwrap();
     assert_eq!(result.account, 2);
+}
+
+#[test]
+fn a_folder_that_could_not_be_read_round_trips_and_keeps_no_id_in_debug() {
+    let unread = vec![
+        UnreadFolder { folder: "F-ONE".into(), code: "ErrorAccessDenied".into(), why: UnreadWhy::Code },
+        UnreadFolder { folder: "F-TWO".into(), why: UnreadWhy::Answer, ..Default::default() },
+        UnreadFolder { folder: "F-THREE".into(), why: UnreadWhy::TooLarge, ..Default::default() },
+    ];
+    let result = EwsMailResult { unread: unread.clone(), ..Default::default() };
+    round_trip(&result);
+    assert_eq!(result.check(), Ok(()));
+    // A code is the default reason and is left out of the JSON; the others are named.
+    let code = serde_json::to_string(&unread[0]).unwrap();
+    assert!(!code.contains("why"), "{code}");
+    assert!(serde_json::to_string(&unread[1]).unwrap().contains(r#""why":"answer""#));
+    // Counts only: no folder id and no code in debug output.
+    let text = format!("{result:?}");
+    assert!(!text.contains("F-ONE") && !text.contains("ErrorAccessDenied"), "{text}");
 }
 
 #[test]

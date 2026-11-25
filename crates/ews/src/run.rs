@@ -36,7 +36,11 @@
 //! page that came with neither a To nor a Cc are asked with `GetItem` as above, so that Sent
 //! Items says who each message went to.
 //!
-//! **The lines of trouble** name no folder, no address and nothing a server said.
+//! **The lines of trouble** name no folder, no address and nothing a server said: a folder that
+//! couldn't be read at all is named by its server id in [`EwsMailResult::unread`], with the
+//! server's response code or why it gave none, and the engine says it as the owner knows it.
+//! The log keeps the ordinal of the folder and that safe reason, never the folder's name
+//! or the server's words.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -44,7 +48,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use mailcraft_model::FolderKind;
 use mailcraft_model::sync::{
     EwsFetchRequest, EwsFolderDeltas, EwsMailRequest, EwsMailResult, EwsMessagePage, EwsScope, FolderChange, GraphFetchResult, GraphFetched,
-    GraphFolder, GraphMessage, GraphProgress, MAX_THREAD_ASKS, ThreadOf, UnreadableChange,
+    GraphFolder, GraphMessage, GraphProgress, MAX_THREAD_ASKS, ThreadOf, UnreadFolder, UnreadWhy, UnreadableChange,
 };
 
 use crate::client::Client;
@@ -152,6 +156,9 @@ struct Outcome {
     blocked: Vec<String>,
     /// Those changes, each with its folder, kind and (when there was one) its item's subject.
     unreadable: Vec<UnreadableChange>,
+    /// The folders (their server ids) that couldn't be read at all, with the server's code or why
+    /// it gave none.
+    unread: Vec<UnreadFolder>,
 }
 
 impl Outcome {
@@ -623,6 +630,7 @@ pub async fn sync_mail<E: HttpExchange>(
         auth_refused: out.auth_refused,
         blocked: out.blocked,
         unreadable: out.unreadable,
+        unread: out.unread,
         threads,
         ..base(request)
     });
@@ -741,9 +749,36 @@ impl<E: HttpExchange> Run<'_, E> {
                         out.unreadable.push(UnreadableChange { folder: folder.clone(), kind: why.kind, subject: why.subject });
                     }
                 }
-                Err(_) => {
+                Err(asked) => {
                     out.incomplete = true;
-                    out.line("Some folders couldn't be read from the server");
+                    // The folder (its id) and a safe reason: its code when the server gave one,
+                    // else why it gave none. The log keeps the ordinal, never the folder's name or
+                    // the server's words.
+                    let (code, why) = match asked {
+                        Asked::Code(code) => {
+                            let named = match &code {
+                                ResponseCode::Other(name) if name.is_empty() => String::new(),
+                                _ => code.to_string(),
+                            };
+                            (named, UnreadWhy::Code)
+                        }
+                        Asked::TooLarge => (String::new(), UnreadWhy::TooLarge),
+                        _ => (String::new(), UnreadWhy::Answer),
+                    };
+                    if !code.is_empty() {
+                        log::warn!("ews mail: folder {} of {} couldn't be read: the server said {}", number, folders, code);
+                    } else if why == UnreadWhy::TooLarge {
+                        log::warn!(
+                            "ews mail: folder {} of {} couldn't be read: the server's answer was larger than MailCraft reads",
+                            number,
+                            folders
+                        );
+                    } else {
+                        log::warn!("ews mail: folder {} of {} couldn't be read: the server's answer couldn't be used", number, folders);
+                    }
+                    if out.unread.len() < MAX_FOLDERS {
+                        out.unread.push(UnreadFolder { folder: folder.clone(), code, why });
+                    }
                     failed_in_a_row = failed_in_a_row.saturating_add(1);
                     if failed_in_a_row >= MAX_IN_A_ROW {
                         return Ok(());

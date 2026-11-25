@@ -4,7 +4,9 @@
 //! takes in what it brings back, with results made by hand. (Against `mailcraft-ews`'s stand-in:
 //! `apps/mailcraft/src/ews_mail_flow.rs`.)
 
-use mailcraft_model::sync::{EwsFolderDeltas, EwsMessagePage, GraphFetched, GraphFolder, GraphMessage, ReadState, ServerMessage};
+use mailcraft_model::sync::{
+    EwsFolderDeltas, EwsMessagePage, GraphFetched, GraphFolder, GraphMessage, ReadState, ServerMessage, UnreadFolder, UnreadWhy,
+};
 use mailcraft_model::{Address, FlagStatus, Message};
 use serde_json::json;
 
@@ -814,4 +816,67 @@ fn a_folder_that_could_not_be_read_in_a_place_not_here_keeps_what_is_at_the_top(
     afresh_past(&mut s, account, part, &["ROOT"], false, "HIER-2");
     assert!(s.mailbox.folder_by_server(account, "F6").is_some(), "at the top: it may be that folder");
     assert!(s.mailbox.folder_by_server(account, "F3").is_none(), "in Projects, which was read: gone");
+}
+
+/// A folder the server wouldn't read at all is named as the owner knows it, with the server's
+/// safe code or why it gave none, and it is one of the folders File › Info lists.
+#[test]
+fn a_folder_that_could_not_be_read_is_named_with_the_servers_code_or_why_it_gave_none() {
+    let (mut s, account) = session();
+    list(&mut s, account);
+    let answer = apply_ews_mail(
+        &mut s,
+        EwsMailResult {
+            unread: vec![
+                UnreadFolder { folder: "F1".into(), code: "ErrorAccessDenied".into(), why: UnreadWhy::Code },
+                UnreadFolder { folder: "F2".into(), why: UnreadWhy::TooLarge, ..Default::default() },
+                UnreadFolder { folder: "F3".into(), why: UnreadWhy::Answer, ..Default::default() },
+            ],
+            partial: false,
+            ..piece(account)
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        answer["errors"],
+        json!([
+            "Inbox couldn't be read from the server (ErrorAccessDenied)",
+            "Sent Items: the server's answer was larger than MailCraft reads",
+            "Apollo: the server's answer couldn't be used",
+        ])
+    );
+    assert_eq!(answer["unreadableFolders"], json!(["Inbox", "Sent Items", "Apollo"]));
+    assert_eq!(answer["summary"], "Inbox couldn't be read from the server (ErrorAccessDenied)");
+}
+
+/// A result that names a folder it couldn't read is no run that went well, whatever its `whole`
+/// says: a fresh read that ended with a folder left out removes nothing.
+#[test]
+fn a_result_that_names_a_folder_it_could_not_read_is_never_whole() {
+    let result = EwsMailResult {
+        unread: vec![UnreadFolder { folder: "F1".into(), code: "ErrorAccessDenied".into(), ..Default::default() }],
+        whole: true,
+        ..Default::default()
+    };
+    let (bounded, _) = ews_down::bounded(result);
+    assert!(!bounded.whole, "a folder left out is no run that went well");
+}
+
+/// An id the mailbox no longer knows can't be named: the line says some folder couldn't be read,
+/// as before, rather than naming nothing.
+#[test]
+fn a_folder_that_could_not_be_read_and_is_not_known_still_gives_a_line() {
+    let (mut s, account) = session();
+    list(&mut s, account);
+    let answer = apply_ews_mail(
+        &mut s,
+        EwsMailResult {
+            unread: vec![UnreadFolder { folder: "GONE".into(), code: "ErrorFolderNotFound".into(), ..Default::default() }],
+            partial: false,
+            ..piece(account)
+        },
+    )
+    .unwrap();
+    assert_eq!(answer["errors"], json!(["Some folders couldn't be read from the server"]));
+    assert_eq!(answer["unreadableFolders"], json!([]));
 }

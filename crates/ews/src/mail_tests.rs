@@ -7,7 +7,7 @@ use std::future::{Future, ready};
 use std::sync::atomic::AtomicBool;
 
 use mailcraft_model::FolderKind;
-use mailcraft_model::sync::{EwsFetchRequest, EwsFolderState, EwsMailRequest, EwsMailResult, EwsScope};
+use mailcraft_model::sync::{EwsFetchRequest, EwsFolderState, EwsMailRequest, EwsMailResult, EwsScope, UnreadWhy};
 
 use crate::standin::{AUTHORIZATION, Hostile, StandIn, block_on};
 use crate::*;
@@ -814,6 +814,56 @@ fn a_blocked_folder_leaves_the_others_to_be_read_and_is_no_server_failing() {
     expect.push(standin.state().folder_id("inbox").unwrap());
     expect.sort();
     assert_eq!(blocked, expect);
+}
+
+#[test]
+fn a_folder_the_server_will_not_read_is_named_with_its_code_and_the_others_go_on() {
+    let standin = StandIn::new();
+    let (broken, inbox) = {
+        let mut s = standin.state();
+        s.deliver("inbox", "Kickoff", false);
+        let broken = s.add_folder("Broken");
+        s.deliver(&broken, "Stuck", false);
+        (broken, s.folder_id("inbox").unwrap())
+    };
+    standin.state().refuse_sync = vec![broken.clone()];
+    let (pieces, _) = run(&standin, &request());
+    // The other folders were read: only the refused one was left out.
+    assert_eq!(subjects(&pieces), ["Kickoff"]);
+    // It is named by its server id (the engine says it as the owner knows it), with the server's
+    // code and no line of the server's words; the run is not whole.
+    let end = last(&pieces);
+    assert_eq!(end.unread.len(), 1);
+    assert_eq!(
+        (end.unread[0].folder.as_str(), end.unread[0].code.as_str(), end.unread[0].why),
+        (broken.as_str(), "ErrorInternalServerError", UnreadWhy::Code)
+    );
+    assert!(end.errors.is_empty(), "the engine says it, with the owner's name for the folder");
+    assert!(!end.whole && !end.partial);
+    // The Inbox was read before the refused folder: a failure later in the run does not make it
+    // look empty.
+    assert!(pieces.iter().flat_map(|p| &p.pages).any(|page| page.folder == inbox));
+}
+
+#[test]
+fn three_folders_in_a_row_that_the_server_will_not_read_end_the_run() {
+    let standin = StandIn::new();
+    let ids = {
+        let mut s = standin.state();
+        let ids: Vec<String> = (0..4).map(|n| s.add_folder(&format!("Box {n}"))).collect();
+        s.deliver("inbox", "Kickoff", false);
+        for (n, id) in ids.iter().enumerate() {
+            s.deliver(id, &format!("In box {n}"), false);
+        }
+        ids
+    };
+    // The Inbox is read first, then the boxes in the order they came: the first three are refused.
+    standin.state().refuse_sync = ids[..3].to_vec();
+    let (pieces, _) = run(&standin, &request());
+    // The Inbox came, and no box did: the run ended at the third folder in a row it couldn't read.
+    assert_eq!(subjects(&pieces), ["Kickoff"]);
+    assert_eq!(last(&pieces).unread.len(), 3);
+    assert!(!last(&pieces).whole);
 }
 
 #[test]

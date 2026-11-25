@@ -34,7 +34,7 @@
 use mailcraft_model::sync::{
     ChangeOutcome, EwsFetchRequest, EwsFolderState, EwsMailRequest, EwsMailResult, EwsResolveRequest, EwsScope, FolderChange, FolderChangeDone,
     GraphFetchResult, MAX_DRAFTS, MAX_EWS_STATE_BYTES, MAX_EWS_STATES, MAX_FOLDER_CHANGES, MAX_MESSAGE_CHANGES, MAX_RESOLVE_TEXT, MAX_RESOLVE_TEXTS,
-    MessageOutcome, SendOutcome, SyncPhase, one_line,
+    MessageOutcome, SendOutcome, SyncPhase, UnreadWhy, one_line,
 };
 use mailcraft_model::{Account, AccountKind, EwsServer, FolderKind, Id, Mailbox};
 use serde_json::{Value, json};
@@ -485,7 +485,7 @@ fn take_in(s: &mut Session, result: EwsMailResult) -> CmdResult {
     // The run's end: what its fresh reads left out goes, when every folder was read and it went
     // well (the host says `whole` of such a run only).
     // A page lost anywhere in the run, not in this piece alone, keeps the end from sweeping.
-    if cut || left_out > 0 || !result.blocked.is_empty() {
+    if cut || left_out > 0 || !result.blocked.is_empty() || !result.unread.is_empty() {
         s.ews_run_cut.insert(account);
     }
     let run_cut = s.ews_run_cut.contains(&account);
@@ -533,6 +533,34 @@ fn take_in(s: &mut Session, result: EwsMailResult) -> CmdResult {
         };
         blocked.push(name);
         errors.push(line);
+    }
+    // A folder that couldn't be read at all is named too, with the server's code or why it gave
+    // none: a failing folder is not just "some folder". An id the mailbox doesn't know is
+    // left out; when none of them can be named, the old line stands.
+    let mut any_named = false;
+    for unread in &result.unread {
+        let Some(folder) = s.mailbox.folder_by_server(account, &unread.folder).and_then(|f| s.mailbox.folder(f)) else { continue };
+        any_named = true;
+        if blocked.len() >= MAX_BLOCKED_SHOWN {
+            continue;
+        }
+        let name = sync_progress::shown(&folder.name);
+        let line = if !unread.code.is_empty() {
+            mailcraft_i18n::fmt(lang.t("{folder} couldn't be read from the server ({code})"), &[("folder", &name), ("code", &unread.code)])
+        } else {
+            match unread.why {
+                UnreadWhy::TooLarge => {
+                    mailcraft_i18n::fmt(lang.t("{folder}: the server's answer was larger than MailCraft reads"), &[("folder", &name)])
+                }
+                UnreadWhy::Answer => mailcraft_i18n::fmt(lang.t("{folder}: the server's answer couldn't be used"), &[("folder", &name)]),
+                UnreadWhy::Code => mailcraft_i18n::fmt(lang.t("{folder} couldn't be read from the server"), &[("folder", &name)]),
+            }
+        };
+        blocked.push(name);
+        errors.push(line);
+    }
+    if !any_named && !result.unread.is_empty() {
+        errors.push(lang.t("Some folders couldn't be read from the server").to_string());
     }
     // Send/Receive Progress: where the run is, what it brought, what went wrong.
     let step = match (&result.up, &result.progress, &result.folders) {

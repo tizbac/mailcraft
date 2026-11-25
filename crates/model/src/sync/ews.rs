@@ -77,6 +77,10 @@ pub const MAX_EWS_ERROR: usize = 1000;
 /// Most folders whose sync state a request or an answer carries.
 pub const MAX_EWS_STATES: usize = 10_000;
 
+/// Longest response code kept of a folder that couldn't be read: a short schema identifier, never
+/// a server's words.
+pub const MAX_EWS_CODE: usize = 64;
+
 /// Longest sync state, in bytes, that is kept or handed back. The server's own grow with the
 /// folder (a compressed record of the items it has told of, some tens of kilobytes for a large
 /// folder), so the limit is a megabyte; a longer one is not one, and the folder is read afresh.
@@ -516,6 +520,42 @@ pub struct UnreadableChange {
     pub subject: String,
 }
 
+/// Why a folder couldn't be read at all in a run: the server gave a response code (kept
+/// apart as its short identifier, never its words), or it gave none that could be used.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum UnreadWhy {
+    /// The server answered with a response code: `code` of [`UnreadFolder`] is its name, or empty
+    /// when it gave one that can't be named.
+    #[default]
+    Code,
+    /// The server's answer couldn't be read as an answer.
+    Answer,
+    /// The server's answer was larger than MailCraft reads.
+    TooLarge,
+}
+
+impl UnreadWhy {
+    /// The server gave a code, so nothing else is to be said.
+    fn is_code(&self) -> bool {
+        matches!(self, Self::Code)
+    }
+}
+
+/// A folder that couldn't be read at all in a run: the folder (a server id, which the
+/// engine names as the owner knows it), the server's response code when it gave one (a short
+/// schema identifier, never its text), and why it couldn't be read when it gave none. No id is
+/// logged, and no server text is kept at all.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct UnreadFolder {
+    pub folder: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub code: String,
+    #[serde(skip_serializing_if = "UnreadWhy::is_code")]
+    pub why: UnreadWhy,
+}
+
 /// What a run for an Exchange server account brought back, or a piece of it.
 ///
 /// A run arrives in pieces, in the order things were done (`partial` on all but the last), each
@@ -572,6 +612,11 @@ pub struct EwsMailResult {
     /// the answer had one: what the owner can find the message by.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub unreadable: Vec<UnreadableChange>,
+    /// The folders (server ids) that couldn't be read at all, each with the server's response code
+    /// or why it gave none: the engine names them as the owner knows them and says why, so
+    /// that a folder that fails is not just "some folder".
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub unread: Vec<UnreadFolder>,
     /// Problems worth telling the owner; empty when all went well.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub errors: Vec<String>,
@@ -692,6 +737,11 @@ impl EwsMailResult {
         {
             return Err("has an unreadable change that can't be told");
         }
+        if self.unread.len() > MAX_LISTED_FOLDERS
+            || self.unread.iter().any(|u| !id_ok(&u.folder) || u.code.len() > MAX_EWS_CODE || !u.code.bytes().all(|b| b.is_ascii_alphanumeric()))
+        {
+            return Err("has a folder that couldn't be read that can't be told");
+        }
         if self.threads.len() > MAX_THREAD_ASKS {
             return Err(TOO_MANY);
         }
@@ -793,6 +843,7 @@ impl EwsMailResult {
             self.blocked.extend(piece.blocked);
         }
         self.unreadable.extend(piece.unreadable);
+        self.unread.extend(piece.unread);
         self.threads.extend(piece.threads);
         self.errors.extend(piece.errors);
         self.busy_for = piece.busy_for.or(self.busy_for);
@@ -882,6 +933,7 @@ impl std::fmt::Debug for EwsMailResult {
             .field("folders", &self.folders.as_ref().map(|folders| (folders.changed.len(), folders.deleted.len(), folders.afresh)))
             .field("pages", &self.pages.len())
             .field("blocked", &self.blocked.len())
+            .field("unread", &self.unread.len())
             .field("messages", &messages)
             .field("errors", &self.errors.len())
             .field("busy_for", &self.busy_for)

@@ -16310,6 +16310,11 @@ msgstr "Social"
 msgid "Some characters in this message couldn't be read: the sender's program didn't say properly how they were written."
 msgstr "Certains caractères de ce message n'ont pas pu être lus : le programme de l'expéditeur n'a pas correctement indiqué leur encodage."
 
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "Some folders couldn't be read from the server"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/data_removal.rs
 #, fuzzy
@@ -25899,6 +25904,21 @@ msgstr "{folder} et ses sous-dossiers"
 #, fuzzy
 msgid "{folder} couldn't be read from the server"
 msgstr "{folder} n'a pas pu être lu depuis le serveur"
+
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder} couldn't be read from the server ({code})"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder}: the server's answer couldn't be used"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/ews_mail.rs
+msgid "{folder}: the server's answer was larger than MailCraft reads"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/ews_mail.rs
