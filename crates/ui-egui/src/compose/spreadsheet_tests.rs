@@ -47,7 +47,7 @@ fn centered_and_right_aligned_text_stay_inside_their_cells() {
     let ctx = egui::Context::default();
     let mut frame = ctx.run_ui(egui::RawInput::default(), |ui| {
         let tokens = Tokens::light();
-        table::TableLayout::new(ui.ctx(), source, &tokens, 240.0).paint(ui.painter(), pos2(40.0, 40.0), &tokens);
+        table::TableLayout::new(ui.ctx(), source, &tokens, 240.0).paint(ui.painter(), pos2(40.0, 40.0), &tokens, None, None);
     });
     frame.textures_delta.clear();
     let shapes = frame.shapes.iter().filter_map(|clipped| match &clipped.shape {
@@ -103,9 +103,36 @@ fn plain_mode_draws_the_actual_table_text_in_one_object() {
         let para = Layout::default().lay(ui.ctx(), paragraph, 0, true, &[], &tokens, 240.0, &mut crate::fonts::Chooser::none());
         chars = para.chars;
         let table = para.tables.first().unwrap();
-        table.grid.paint(ui.painter(), pos2(40.0, 40.0), &tokens);
+        table.grid.paint(ui.painter(), pos2(40.0, 40.0), &tokens, None, None);
     });
     frame.textures_delta.clear();
     assert_eq!(chars, 1);
     assert!(frame.shapes.iter().any(|clipped| matches!(&clipped.shape, egui::Shape::Text(text) if text.galley.text() == fragment.to_plain())));
+}
+
+#[test]
+fn the_cell_under_the_pointer_is_known() {
+    let cell = |n: usize| mailcraft_model::rich::TableCell {
+        lines: vec![vec![mailcraft_model::rich::CellText { text: format!("{n}"), style: mailcraft_model::rich::Style::default() }]],
+        header: false,
+        colspan: 1,
+        rowspan: 1,
+        background: None,
+        alignment: mailcraft_model::rich::CellAlignment::Left,
+        borders: mailcraft_model::rich::CellBorders::ALL,
+    };
+    let source =
+        std::sync::Arc::new(mailcraft_model::rich::PastedTable::new(2, vec![vec![cell(0), cell(1)], vec![cell(2), cell(3)]]).expect("a table"));
+    let ctx = egui::Context::default();
+    let tokens = Tokens::light();
+    let mut layout = None;
+    let mut frame = ctx.run_ui(egui::RawInput::default(), |ui| {
+        layout = Some(table::TableLayout::new(ui.ctx(), &source, &tokens, 240.0));
+    });
+    frame.textures_delta.clear();
+    let layout = layout.expect("a layout");
+    let size = layout.size;
+    assert_eq!(layout.cell_at(egui::vec2(2.0, 2.0)), Some((0, 0)));
+    assert_eq!(layout.cell_at(egui::vec2(size.x - 2.0, 2.0)), Some((0, 1)));
+    assert_eq!(layout.cell_at(egui::vec2(size.x - 2.0, size.y - 2.0)), Some((1, 1)));
 }

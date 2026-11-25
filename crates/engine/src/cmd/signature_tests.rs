@@ -579,3 +579,22 @@ fn a_signature_in_the_fixed_width_font_is_kept_in_it() {
     let first = back.signature("Standard").unwrap().body().paragraphs().first().unwrap().runs.first().unwrap().style.font.clone();
     assert_eq!(first.as_ref().map(|f| f.label()), Some("Courier New"));
 }
+
+#[test]
+fn a_table_can_be_put_in_an_open_signature() {
+    let mut s = session();
+    run(&mut s, "signature.open", json!({"name": "Standard"}));
+    run(&mut s, "compose.select", json!({"from": 0}));
+    run(&mut s, "insert.table", json!({"rows": 2, "columns": 3}));
+    let text = s.signature_edit.as_ref().unwrap().body.text().clone();
+    let grid = text
+        .paragraphs()
+        .iter()
+        .find_map(|p| p.runs.iter().find_map(|r| r.table.as_ref()))
+        .unwrap_or_else(|| panic!("no grid in {:?}", text.to_plain()));
+    assert_eq!((grid.columns(), grid.rows().len()), (3, 2));
+    run(&mut s, "signature.save", json!({}));
+    // It stays a table in the signature, not flattened to text.
+    let sig = s.mailbox.signature("Standard").unwrap();
+    assert!(sig.body().paragraphs().iter().flat_map(|p| &p.runs).any(|r| r.table.is_some()), "{:?}", sig.plain());
+}

@@ -1,0 +1,1 @@
+- **A table cell's borders can be chosen one side at a time.** Click a cell in the message or a signature, then Insert › Table › Borders (or the signature's Borders button): top, right, bottom and left are each on or off, kept in the text, and sent as per-side borders; other cells keep the table's frame.

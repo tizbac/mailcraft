@@ -164,9 +164,15 @@ fn paragraph(out: &mut String, p: &Paragraph, pictures: &dyn Fn(u32) -> Option<I
     }
 }
 
+/// The sides a parsed HTML cell has a line on, as the model keeps them.
+fn borders_of(sides: mailcraft_html::Sides) -> mailcraft_model::rich::CellBorders {
+    mailcraft_model::rich::CellBorders { top: sides.top, right: sides.right, bottom: sides.bottom, left: sides.left }
+}
+
 /// Write the table using fixed markup and the same escaped text runs as the rest of the body.
 fn write_table(out: &mut String, table: &PastedTable) {
-    // The fixed grid makes cell boundaries visible in the editor and in the mail it sends.
+    // The fixed grid makes cell boundaries visible in the editor and in the mail it sends. A cell
+    // that keeps only some of its sides says so itself, over the table's own border.
     out.push_str("<table data-mailcraft-grid=\"1\" border=\"1\" cellpadding=\"4\" cellspacing=\"0\" style=\"border-collapse:collapse\">");
     for row in table.rows() {
         out.push_str("<tr>");
@@ -179,13 +185,20 @@ fn write_table(out: &mut String, table: &PastedTable) {
             };
             out.push_str(&format!("<{tag} colspan=\"{}\" rowspan=\"{}\" align=\"{align}\"", cell.colspan, cell.rowspan));
             let color = cell.background.as_deref().and_then(safe_color);
-            if cell.header || color.is_some() {
+            let borders = (!cell.borders.all()).then(|| border_style(cell.borders));
+            if cell.header || color.is_some() || borders.is_some() {
                 out.push_str(" style=\"");
                 if cell.header {
                     out.push_str("font-weight:normal;");
                 }
                 if let Some(color) = color {
                     out.push_str(&format!("background-color:{color}"));
+                    if borders.is_some() {
+                        out.push(';');
+                    }
+                }
+                if let Some(borders) = borders {
+                    out.push_str(&borders);
                 }
                 out.push('"');
             }
@@ -202,6 +215,18 @@ fn write_table(out: &mut String, table: &PastedTable) {
         out.push_str("</tr>");
     }
     out.push_str("</table>");
+}
+
+/// The CSS for a cell's sides: the ones kept are a line, the others none. (A cell with all of
+/// them needs none, the table's own border draws them.)
+fn border_style(borders: mailcraft_model::rich::CellBorders) -> String {
+    let side = |on: bool, name: &str| if on { format!("border-{name}:1px solid;") } else { format!("border-{name}:0;") };
+    let mut style = String::from("border:0;");
+    style.push_str(&side(borders.top, "top"));
+    style.push_str(&side(borders.right, "right"));
+    style.push_str(&side(borders.bottom, "bottom"));
+    style.push_str(&side(borders.left, "left"));
+    style
 }
 
 /// A picture as `<img>`: its `cid:` address, width and description, all escaped.
@@ -635,7 +660,17 @@ impl Reader {
                     _ => CellAlignment::Left,
                 };
                 let background = cell.background.or(source.background).map(|c| format!("#{:02x}{:02x}{:02x}", c.0, c.1, c.2));
-                cells.push(TableCell { lines, header: cell.header, colspan: cell.colspan, rowspan: cell.rowspan, background, alignment });
+                cells.push(TableCell {
+                    lines,
+                    header: cell.header,
+                    colspan: cell.colspan,
+                    rowspan: cell.rowspan,
+                    background,
+                    alignment,
+                    // A cell that says which sides it has keeps them; one that says nothing has
+                    // them all (the grid every pasted table is shown with).
+                    borders: if cell.border.any() { borders_of(cell.border) } else { mailcraft_model::rich::CellBorders::ALL },
+                });
             }
             rows.push(cells);
         }

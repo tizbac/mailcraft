@@ -140,14 +140,29 @@ fn the_table_button_inserts_a_grid() {
     assert!(app.enabled("insert.table"), "the command is enabled while a message is being written");
     let described = crate::ribbon::describe(&app);
     let item = described.items().find(|item| item.label == "Table").unwrap_or_else(|| panic!("no Table in Insert"));
-    assert_eq!(item.command, Some(("insert.table", json!({}))), "the button runs the command, not a dialog");
+    assert_eq!(item.command, Some(("ui.dialog", json!({"name": "insertTable"}))), "the button asks for a size");
     let mut h = window(app);
     crate::reminders::dismiss(h.state_mut(), None);
     h.state_mut().run("ui.tab", json!({"tab": "Insert"})).unwrap();
+    h.run_steps(3);
+    // The window's own (simplified) row shows Table with its name, not an unnamed grid among
+    // others: it is what the Insert tab is for.
+    let simple = h
+        .state()
+        .hit
+        .rect("ribbon", crate::ribbon::hit_id("insert.table"))
+        .unwrap_or_else(|| panic!("Table isn't drawn in the simplified Insert row"));
+    assert!(simple.width() > 60.0, "Table keeps its name in the simplified row: {simple:?}");
     h.state_mut().run("ui.ribbonMode", json!({"value": "classic"})).unwrap();
     h.run_steps(3);
     let rect = h.state().hit.rect("ribbon", crate::ribbon::hit_id("insert.table")).unwrap_or_else(|| panic!("Table isn't drawn in the ribbon"));
     click_at(&mut h, rect.center());
+    assert!(
+        matches!(h.state().dialog, Some(crate::dialogs::Dialog::InsertTable { rows: 3, columns: 3 })),
+        "the button asks how many rows and columns"
+    );
+    h.state_mut().run("ui.closeDialog", json!({})).unwrap();
+    h.state_mut().run("insert.table", json!({"rows": 2, "columns": 3})).unwrap();
     let state = h.state();
     let compose = state.session.compose.as_ref().unwrap_or_else(|| panic!("the message is still being written"));
     let grid = compose
@@ -157,8 +172,8 @@ fn the_table_button_inserts_a_grid() {
         .iter()
         .find_map(|p| p.runs.iter().find_map(|r| r.table.as_ref()))
         .unwrap_or_else(|| panic!("no grid in {:?}", compose.body.plain()));
-    assert_eq!((grid.columns(), grid.rows().len()), (3, 3));
-    assert_eq!(grid.plain(), "\t\t\n\t\t\n\t\t");
+    assert_eq!((grid.columns(), grid.rows().len()), (3, 2));
+    assert_eq!(grid.plain(), "\t\t\n\t\t");
 }
 
 fn click_at(harness: &mut Harness<'static, MailApp>, pos: egui::Pos2) {
@@ -195,4 +210,91 @@ fn neither_opens_without_a_message() {
     assert!(app.run("review.wordCount", json!({})).is_err());
     assert!(app.run("insert.dateTime", json!({})).is_err());
     assert!(app.dialog.is_none());
+}
+
+#[test]
+fn the_borders_dialog_opens_for_the_clicked_table_cell() {
+    let mut app = writing();
+    app.execute("insert.table", json!({"rows": 2, "columns": 2})).unwrap();
+    let from = {
+        let body = &app.session.compose.as_ref().unwrap().body;
+        (0..body.text().len()).find(|at| body.text().table_at(*at).is_some()).expect("the table")
+    };
+    app.ui.table_cell = Some((from, 0, 0));
+    app.execute("ui.dialog", json!({"name": "tableBorders"})).unwrap();
+    match &app.dialog {
+        Some(crate::dialogs::Dialog::TableBorders { from: at, row: 0, cell: 0, top: true, right: true, bottom: true, left: true }) if *at == from => {
+        }
+        other => panic!("the cell's borders were not asked about: {:?}", other.is_some()),
+    }
+}
+
+/// Typing while the caret is in a table cell goes into that cell (the click that puts it there
+/// does `table.cellEdit`, and the text events follow it), not into the message around it.
+#[test]
+fn typing_goes_into_the_table_cell_the_caret_is_in() {
+    let mut app = writing();
+    app.execute("insert.table", json!({"rows": 2, "columns": 2})).unwrap();
+    let from = {
+        let body = &app.session.compose.as_ref().unwrap().body;
+        (0..body.text().len()).find(|at| body.text().table_at(*at).is_some()).expect("the table")
+    };
+    let mut h = window(app);
+    h.state_mut().want_body_focus();
+    h.run_steps(3);
+    let answer = h.state_mut().execute("table.cellEdit", json!({"from": from, "row": 1, "cell": 1, "at": 0})).expect("the cell can be entered");
+    assert_eq!(answer.get("at").and_then(serde_json::Value::as_u64), Some(0));
+    h.state_mut().ui.table_cell = Some((from, 1, 1));
+    h.state_mut().ui.table_caret = Some((from, 1, 1, 0));
+    h.run_steps(2);
+    h.event(egui::Event::Text("cell".into()));
+    h.run_steps(3);
+    let cell = h.state().session.compose.as_ref().unwrap().body.text().table_at(from).and_then(|table| table.cell_text(1, 1));
+    assert_eq!(cell.as_deref(), Some("cell"));
+}
+
+/// A click in a table cell puts the caret there and typing goes into the cell: the whole way a
+/// press takes, not only `table.cellEdit` run by a script.
+#[test]
+fn a_click_in_a_table_cell_takes_the_typing() {
+    let mut app = writing();
+    // An empty message, whose table is the one thing at the top.
+    app.execute("compose.select", json!({"from": 0})).unwrap();
+    app.execute("compose.type", json!({"text": "\u{8}"})).ok();
+    app.execute("compose.set", json!({"body": ""})).unwrap();
+    app.execute("insert.table", json!({"rows": 2, "columns": 2})).unwrap();
+    let from = {
+        let body = &app.session.compose.as_ref().unwrap().body;
+        (0..body.text().len()).find(|at| body.text().table_at(*at).is_some()).expect("the table")
+    };
+    let mut h = window(app);
+    h.run_steps(3);
+    let body = h.state().hit.rect("composeBody", 0).expect("the body is drawn");
+    click_at(&mut h, body.min + egui::vec2(20.0, 12.0));
+    assert_eq!(h.state().ui.table_caret.map(|(place, row, cell, _)| (place, row, cell)), Some((from, 0, 0)), "the click is in the first cell");
+    assert!(h.state().session.compose.as_ref().unwrap().body.selection().is_empty(), "the table is not selected beside the cell");
+    h.event(egui::Event::Text("p".into()));
+    h.run_steps(3);
+    let cell = h.state().session.compose.as_ref().unwrap().body.text().table_at(from).and_then(|table| table.cell_text(0, 0));
+    assert_eq!(cell.as_deref(), Some("p"));
+}
+
+/// Insert › Table puts the window's caret in the first cell, so that typing goes there without a
+/// click (the engine says where it is; the window follows).
+#[test]
+fn inserting_a_table_puts_the_typing_in_its_first_cell() {
+    let mut app = writing();
+    app.execute("insert.table", json!({"rows": 2, "columns": 2})).unwrap();
+    let from = {
+        let body = &app.session.compose.as_ref().unwrap().body;
+        (0..body.text().len()).find(|at| body.text().table_at(*at).is_some()).expect("the table")
+    };
+    let mut h = window(app);
+    h.state_mut().want_body_focus();
+    h.run_steps(3);
+    assert_eq!(h.state().ui.table_caret, Some((from, 0, 0, 0)), "the first cell has the caret");
+    h.event(egui::Event::Text("t".into()));
+    h.run_steps(3);
+    let cell = h.state().session.compose.as_ref().unwrap().body.text().table_at(from).and_then(|table| table.cell_text(0, 0));
+    assert_eq!(cell.as_deref(), Some("t"));
 }

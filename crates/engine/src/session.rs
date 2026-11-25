@@ -1276,6 +1276,27 @@ pub(crate) struct Undo {
     mail: bool,
 }
 
+/// Which text the owner edits ([`Session::doc`]): the signature open, the message being written,
+/// or nothing. A [`TableEdit`] belongs to the one it was made in.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum TableDoc {
+    #[default]
+    None,
+    Compose(u64),
+    Signature,
+}
+
+/// Where the owner is typing inside a table: the table's place in the text, the cell, and the
+/// character in the cell (its lines' `\n` counted). Not kept between runs.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct TableEdit {
+    pub doc: TableDoc,
+    pub from: usize,
+    pub row: usize,
+    pub cell: usize,
+    pub at: usize,
+}
+
 pub struct Session {
     pub mailbox: Mailbox,
     pub view: ViewState,
@@ -1339,6 +1360,8 @@ pub struct Session {
     /// as new as the first (#566). Let go of with the run's last piece (an Inbox pass's: its own),
     /// a run that ends without it ([`Session::end_run_unfinished`]), an undo, or another mailbox.
     pub(crate) run_had: std::collections::HashMap<Id, std::collections::HashSet<String>>,
+    /// Where the owner is typing inside a table, when they are ([`TableEdit`]). Never saved.
+    pub(crate) table_edit: Option<TableEdit>,
     /// Messages of Microsoft and JMAP accounts the server wouldn't give whole this session (or, for
     /// JMAP, said it no longer has), by account and server id: the background passes them over
     /// (opening one still asks). Never saved.
@@ -1683,6 +1706,7 @@ impl Session {
             graph_index: Default::default(),
             ews_run_cut: Default::default(),
             run_had: Default::default(),
+            table_edit: None,
             graph_unfetchable: Default::default(),
             fetch_failed: Default::default(),
             kept_for_now: Default::default(),
@@ -1987,6 +2011,51 @@ impl Session {
             (None, Some(c)) => Some(Doc { plain: c.format == BodyFormat::Plain, body: &mut c.body, dirty: &mut c.dirty }),
             (None, None) => None,
         }
+    }
+
+    /// The text the editing commands act on ([`Session::doc`]).
+    fn table_doc(&self) -> TableDoc {
+        match (&self.signature_edit, &self.compose) {
+            (Some(_), _) => TableDoc::Signature,
+            (None, Some(c)) => TableDoc::Compose(c.id),
+            (None, None) => TableDoc::None,
+        }
+    }
+
+    /// Where the owner is typing inside a table in the text they are editing, as (the table's
+    /// place in it, the row, the cell's place in it, the character in the cell), when they are
+    /// and it is still there. The window draws its caret there.
+    pub fn table_edit(&self) -> Option<(usize, usize, usize, usize)> {
+        let edit = self.table_edit?;
+        if edit.doc != self.table_doc() {
+            return None;
+        }
+        let length = self.doc()?.0.text().table_at(edit.from)?.cell_len(edit.row, edit.cell)?;
+        Some((edit.from, edit.row, edit.cell, edit.at.min(length)))
+    }
+
+    /// Whether a table cell was being typed in before the text being edited changed (another
+    /// message, or a signature): its caret is not this text's.
+    pub fn table_edit_stale(&self) -> bool {
+        self.table_edit.is_some_and(|edit| edit.doc != self.table_doc())
+    }
+
+    /// The cell the owner types in, when it is in the text being edited now (a table edit from
+    /// another message, or a signature, is let go of).
+    pub(crate) fn table_edit_now(&mut self) -> Option<TableEdit> {
+        if self.table_edit_stale() {
+            self.table_edit = None;
+        }
+        self.table_edit
+    }
+
+    /// Put the owner's typing in the cell at `row`, `cell` (the character `at`, clamped to what it
+    /// holds) of the table at `from`; `None` when there is no such cell there.
+    pub(crate) fn set_table_edit(&mut self, from: usize, row: usize, cell: usize, at: usize) -> Option<TableEdit> {
+        let length = self.doc()?.0.text().table_at(from)?.cell_len(row, cell)?;
+        let edit = TableEdit { doc: self.table_doc(), from, row, cell, at: at.min(length) };
+        self.table_edit = Some(edit);
+        Some(edit)
     }
 
     pub fn focused_message(&self) -> Option<&Message> {

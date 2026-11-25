@@ -492,6 +492,35 @@ impl Layout {
         p.tables.iter().find(|b| b.rect.contains(local)).map(|b| p.start + b.local)
     }
 
+    /// The table cell and the character in it under a point of the body: the table's place in
+    /// the text, the row, the cell's place in that row and the character.
+    fn table_caret_at(&self, at: Vec2) -> Option<(usize, usize, usize, usize)> {
+        let p = self.para_at_y(at.y)?;
+        let local = pos2(at.x - p.indent(), at.y - p.top);
+        let b = p.tables.iter().find(|b| b.rect.contains(local))?;
+        let (row, cell, ch) = b.grid.caret_at((local - b.rect.min.to_vec2()).to_vec2())?;
+        Some((p.start + b.local, row, cell, ch))
+    }
+
+    /// Where the caret stands in a table cell, measured from the body's own top left.
+    fn table_caret_rect(&self, place: usize, row: usize, cell: usize, at: usize) -> Option<Rect> {
+        let p = self.para_at(place)?;
+        let local = place.checked_sub(p.start)?;
+        let b = p.tables.iter().find(|b| b.local == local)?;
+        let r = b.grid.caret_rect(row, cell, at)?;
+        Some(r.translate(vec2(p.indent(), p.top) + b.rect.min.to_vec2()))
+    }
+
+    /// The table cell under a point of the body: the table's place in the text, the row and the
+    /// cell's place in that row.
+    fn table_cell_hit(&self, at: Vec2) -> Option<(usize, usize, usize)> {
+        let p = self.para_at_y(at.y)?;
+        let local = pos2(at.x - p.indent(), at.y - p.top);
+        let b = p.tables.iter().find(|b| b.rect.contains(local))?;
+        let (row, cell) = b.grid.cell_at((local - b.rect.min.to_vec2()).to_vec2())?;
+        Some((p.start + b.local, row, cell))
+    }
+
     /// The picture that is the selection, alone: its id and where it is in the body.
     fn selected_picture(&self, sel: Selection) -> Option<(u32, Rect)> {
         if sel.end() != sel.start() + 1 {
@@ -796,6 +825,28 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
         }
     };
     resync(&mut layout, app);
+    // The cell the engine says the owner is typing in is the one the window shows: Insert ›
+    // Table puts the caret in the first one, a script can through `table.cellEdit`, and one of
+    // another message (or of a signature) is not this text's.
+    let mine = match which {
+        Which::Message => app.session.compose.is_some() && app.session.signature_edit.is_none(),
+        Which::Signature => app.session.signature_edit.is_some(),
+    };
+    if mine {
+        match app.session.table_edit() {
+            Some((from, row, cell, at)) => {
+                app.ui.table_caret = Some((from, row, cell, at));
+                app.ui.table_cell = Some((from, row, cell));
+            }
+            // (A caret whose message was closed, or whose signature is no longer open, goes with
+            // it. One whose click the engine didn't take stays: typing enters the cell again.)
+            None if app.session.table_edit_stale() => {
+                app.ui.table_caret = None;
+                app.ui.table_cell = None;
+            }
+            None => {}
+        }
+    }
 
     let (rect, _) = ui.allocate_exact_size(vec2(width, layout.height.max(min_height)), Sense::hover());
     let resp = ui.interact(rect, id, if editable { Sense::click_and_drag() } else { Sense::hover() });
@@ -863,7 +914,32 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
         let at = layout.hit(pointer - origin);
         let on = layout.char_under(pointer - origin).unwrap_or(at);
         let (pressed, shift) = ui.input(|i| (i.pointer.primary_pressed(), i.modifiers.shift));
-        let object = if pressed && !shift {
+        let mut cell_click = None;
+        if pressed {
+            // The cell a click lands in, and where the caret stands in it; a click anywhere else
+            // leaves the cell.
+            match layout.table_cell_hit(pointer - origin) {
+                Some((place, row, cell)) => {
+                    let at = layout
+                        .table_caret_at(pointer - origin)
+                        .filter(|(there, r, c, _)| (*there, *r, *c) == (place, row, cell))
+                        .map_or(0, |(_, _, _, at)| at);
+                    cell_click = Some(place);
+                    st.preedit.clear();
+                    app.ui.table_cell = Some((place, row, cell));
+                    app.ui.table_caret = Some((place, row, cell, at));
+                    if let Err(e) = app.execute("table.cellEdit", json!({"from": place, "row": row, "cell": cell, "at": at})) {
+                        app.status(e);
+                    }
+                }
+                None => {
+                    app.ui.table_cell = None;
+                    app.ui.table_caret = None;
+                    let _ = app.run("table.cellLeave", json!({}));
+                }
+            }
+        }
+        let object = if pressed && !shift && cell_click.is_none() {
             layout.picture_hit(pointer - origin).map(|(place, _, _)| place).or_else(|| layout.table_hit(pointer - origin))
         } else {
             None
@@ -877,6 +953,12 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
             st.anchor = None;
             resp.request_focus();
             select(place, place + 1)
+        } else if let Some(place) = cell_click {
+            // (The table itself is not selected: the cell has the caret, and a frame around the
+            // whole table would be a second caret beside it.)
+            st.anchor = None;
+            resp.request_focus();
+            select(place, place)
         // A press let go of in the same frame (a tap on a touchpad) is a press all the same.
         } else if pressed && (resp.is_pointer_button_down_on() || resp.clicked()) {
             let anchor = if shift { Anchor::new(Unit::Char, (sel.anchor, sel.anchor)) } else { Anchor::new(unit, under(unit)) };
@@ -989,6 +1071,64 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
         let page = ui.clip_rect().height().max(40.0) - 20.0;
         for event in ui.input(|i| i.events.clone()) {
             resync(&mut layout, app);
+            // While the owner types in a table cell, the events go to that cell.
+            if let Some((from, row, cell, at)) = app.ui.table_caret
+                && let Event::Key { key, pressed: true, .. } = &event
+            {
+                let moved = match key {
+                    Key::ArrowLeft => Some(at.saturating_sub(1)),
+                    Key::ArrowRight => Some(at.saturating_add(1)),
+                    _ => None,
+                };
+                if let Some(new_at) = moved {
+                    if let Ok(answer) = app.execute("table.cellEdit", json!({"from": from, "row": row, "cell": cell, "at": new_at }))
+                        && let Some(new_at) = answer.get("at").and_then(Value::as_u64)
+                        && let Some(caret) = app.ui.table_caret.as_mut()
+                    {
+                        caret.3 = usize::try_from(new_at).unwrap_or(caret.3);
+                    }
+                    resync(&mut layout, app);
+                    continue;
+                }
+                // (Up and down, and Tab, are not yet moves inside the cell: they must not move
+                // the message's own caret away from it.)
+                if matches!(key, Key::ArrowUp | Key::ArrowDown | Key::Tab) {
+                    continue;
+                }
+            }
+            if app.ui.table_caret.is_some()
+                && let Some((command, params)) = cell_event(&event)
+            {
+                if command == "table.cellLeave" {
+                    app.ui.table_caret = None;
+                }
+                if matches!(&event, Event::Ime(egui::ImeEvent::Commit(_))) {
+                    st.preedit.clear();
+                }
+                let answer = match app.execute(command, params.clone()) {
+                    // (The cell the window shows is entered again, once, when the engine no
+                    // longer has it: the message changed, or the click's was let go of.)
+                    Err(_) => match app.ui.table_caret {
+                        Some((from, row, cell, at)) => app
+                            .execute("table.cellEdit", json!({"from": from, "row": row, "cell": cell, "at": at}))
+                            .and_then(|_| app.execute(command, params)),
+                        None => Err(tl!("the caret is not in a table cell").to_string()),
+                    },
+                    ok => ok,
+                };
+                match answer {
+                    Ok(answer) => {
+                        if let Some(at) = answer.get("at").and_then(Value::as_u64)
+                            && let Some(caret) = app.ui.table_caret.as_mut()
+                        {
+                            caret.3 = usize::try_from(at).unwrap_or(caret.3);
+                        }
+                    }
+                    Err(e) => app.status(e),
+                }
+                resync(&mut layout, app);
+                continue;
+            }
             let Some((sel, plain)) = now(app, which) else { break };
             let asked = match event {
                 // (A space may start a list, #973: the engine looks at the paragraph.)
@@ -1110,6 +1250,9 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
     }
     // Paint what is in view.
     let Some((sel, _)) = now(app, which) else { return };
+    // The caret is the cell's while the owner types in a table, not the message's beside it.
+    let cell_caret =
+        app.ui.table_caret.and_then(|(place, row, cell, at)| layout.table_caret_rect(place, row, cell, at)).map(|r| r.translate(origin.to_vec2()));
     let painter = ui.painter();
     let clip = ui.clip_rect();
     let fill = ui.visuals().selection.bg_fill;
@@ -1149,7 +1292,10 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
         }
         for table in &p.tables {
             let rect = table.rect.translate(at.to_vec2());
-            table.grid.paint(painter, rect.min, &t);
+            let place = p.start + table.local;
+            let selected = app.ui.table_cell.filter(|(there, _, _)| *there == place).map(|(_, row, cell)| (row, cell));
+            let caret = app.ui.table_caret.filter(|(there, _, _, _)| *there == place).map(|(_, row, cell, at)| (row, cell, at));
+            table.grid.paint(painter, rect.min, &t, selected, caret);
             let index = p.start + table.local;
             if sel.start() <= index && sel.end() > index {
                 painter.rect_stroke(rect, 0.0, Stroke::new(2.0, fill), egui::StrokeKind::Inside);
@@ -1218,11 +1364,13 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
             painter.rect_filled(Rect::from_center_size(r.right_bottom(), vec2(8.0, 8.0)), 1.0, t.accent);
         }
     }
-    let caret = layout.caret(sel.head).translate(origin.to_vec2());
+    let main_caret = layout.caret(sel.head).translate(origin.to_vec2());
+    let caret = cell_caret.unwrap_or(main_caret);
     if focused {
-        if st.preedit.is_empty() {
+        // In a cell the table draws the caret itself; only a composition is drawn here, at it.
+        if cell_caret.is_none() && st.preedit.is_empty() {
             painter.line_segment([caret.center_top(), caret.center_bottom()], Stroke::new(1.5, t.text));
-        } else {
+        } else if !st.preedit.is_empty() {
             // What the input method is composing, over the text at the caret until it is typed.
             let galley = ctx.fonts_mut(|f| f.layout_no_wrap(st.preedit.clone(), regular(BASE_SIZE), t.text));
             let r = Rect::from_min_size(caret.left_top(), galley.size());
@@ -1460,6 +1608,24 @@ mod wide_picture_tests;
 #[cfg(test)]
 #[path = "spreadsheet_tests.rs"]
 mod spreadsheet_tests;
+
+/// The command an event runs in the table cell the caret is in, if it is one for that cell.
+fn cell_event(event: &Event) -> Option<(&'static str, Value)> {
+    match event {
+        Event::Text(text) if !text.is_empty() => Some(("table.cellType", json!({"text": text}))),
+        Event::Ime(egui::ImeEvent::Commit(text)) if !text.is_empty() => Some(("table.cellType", json!({"text": text}))),
+        Event::Paste(text) if !text.is_empty() => Some(("table.cellType", json!({"text": text}))),
+        Event::Key { key: Key::Backspace, pressed: true, modifiers, .. } if !modifiers.command && !modifiers.alt => {
+            Some(("table.cellErase", json!({})))
+        }
+        Event::Key { key: Key::Delete, pressed: true, modifiers, .. } if !modifiers.command && !modifiers.alt => {
+            Some(("table.cellErase", json!({"forward": true})))
+        }
+        Event::Key { key: Key::Enter, pressed: true, .. } => Some(("table.cellEnter", json!({}))),
+        Event::Key { key: Key::Escape, pressed: true, .. } => Some(("table.cellLeave", json!({}))),
+        _ => None,
+    }
+}
 
 /// The HTML is one picture and nothing else that reads (a browser's Copy Image, #1217). A table
 /// or a rule (whose words `Block::text` doesn't hold) or a second picture is more than the one

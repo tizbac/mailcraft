@@ -1093,7 +1093,14 @@ fn insert() -> Tab {
                 Item::big_menu("signature", "signature", "Signature", "Signature", Menu::Signature).at(0, 3),
             ],
         ),
-        g("Tables", vec![Item::small("table", "Table", "Insert Table", "insert.table", no()).at(1, 5)]),
+        g(
+            "Tables",
+            vec![
+                // (Table keeps its name in the simplified row: it is what the Insert tab is for.)
+                Item::small("table", "Table", "Insert Table", "ui.dialog", json!({"name": "insertTable"})).key("insert.table").at(1, 1),
+                Item::small("tableBorders", "Borders", "Cell Borders", "ui.dialog", json!({"name": "tableBorders"})).key("table.borders").at(2, 5),
+            ],
+        ),
         g(
             "Illustrations",
             vec![
