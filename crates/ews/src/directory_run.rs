@@ -60,7 +60,6 @@ pub async fn sync_directory<E: HttpExchange>(
         reread_folders: false,
         needs_change_key: false,
         recipients_unsaid: false,
-        read_overflow: false,
         mailbox: request.mailbox.trim().to_owned(),
         bad_answer: None,
     };

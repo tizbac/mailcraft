@@ -112,9 +112,8 @@ fn a_folder_whose_read_states_come_back_page_after_page_is_not_stuck() {
     assert!(last(&pieces).whole && last(&pieces).errors.is_empty(), "the run ends whole");
     let pages: Vec<usize> = pieces.iter().flat_map(|p| &p.pages).map(|page| page.read.len()).collect();
     assert!(pages.iter().all(|n| *n <= mailcraft_model::sync::MAX_EWS_PAGE_READ), "no page hands on more read states than the model takes in");
-    assert!(pages.contains(&mailcraft_model::sync::MAX_EWS_PAGE_READ), "a page longer than the cap was taken in at its cap rather than refused");
-    // (Each page keeps the tail of its list — the states the folder hasn't had — and the earlier
-    // pages had the head, so every item's read state arrives in the run.)
+    // (Every page is taken whole, however long: nothing the server sent is dropped, and every
+    // item's read state arrives in the run.)
     let seen: std::collections::HashSet<String> =
         pieces.iter().flat_map(|p| &p.pages).flat_map(|page| page.read.iter().map(|r| r.id.clone())).collect();
     assert!(ids.iter().all(|id| seen.contains(id)), "every item's read state came through the run");
@@ -756,14 +755,18 @@ fn a_server_that_ignores_the_page_size_is_believed_when_every_change_is_readable
     assert_eq!(pages.len(), 1);
     assert!(pages[0].last && !pages[0].state.is_empty());
     assert!(last(&pieces).blocked.is_empty());
-    // A page larger than the model takes in is no page (the folder is named, not cut).
+    // A page larger than one used to take in is taken whole: nothing the server sent is dropped,
+    // and the folder goes on with the state that covers all of it.
     let standin = StandIn::new();
     for n in 0..2_100 {
         standin.state().deliver("inbox", &format!("Mail {n}"), false);
     }
     standin.state().ignores_max = true;
     let (pieces, _) = run(&standin, &EwsMailRequest { inbox_pass: true, list_folders: false, ..request() });
-    assert!(subjects(&pieces).is_empty() && last(&pieces).blocked.len() == 1 && !last(&pieces).whole);
+    let end = last(&pieces);
+    assert_eq!(subjects(&pieces).len(), 2_100);
+    assert!(end.blocked.is_empty() && end.unreadable.is_empty() && end.errors.is_empty());
+    assert!(pieces.iter().flat_map(|p| &p.pages).all(|page| !page.state.is_empty()));
 }
 
 #[test]
@@ -866,7 +869,7 @@ fn a_folder_whose_answer_is_no_document_is_named_as_a_broken_answer() {
     let answer = end.unread[0].answer.as_deref().expect("the answer that couldn't be used is kept");
     assert_eq!((answer.operation.as_str(), answer.status), ("SyncFolderItems", 200));
     assert!(answer.body.contains("Sign in"), "{}", answer.body);
-    assert!(end.bad_answer.is_some(), "the run carries it too, for a host to write");
+    assert_eq!(answer.reason, "the server's answer wasn't a document that could be read");
     // The other folders were read.
     assert_eq!(subjects(&pieces), ["Kickoff"]);
     assert!(!end.whole);

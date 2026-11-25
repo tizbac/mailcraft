@@ -23,14 +23,6 @@ use crate::xml::{MAX_MIME_TEXT, Node};
 
 /// Most changes one page asks for (the schema's own limit is 512).
 pub const MAX_CHANGES: u32 = 512;
-/// The most changes of an item one page holds that are taken in: what the model takes in of a page.
-const MAX_PAGE: usize = mailcraft_model::sync::MAX_EWS_PAGE_MESSAGES;
-/// Most changes of read state one page holds that are taken in. A `ReadFlagChange` is an id and a
-/// flag and nothing else, and a server keeping a long list of them hands over more of those than
-/// of items (Grommunio sends the read states it already sent along with each new page, so a folder
-/// whose mail was read in bulk has thousands of them in one page while its items stay within the
-/// page asked for). A page with more than this keeps the newest of them; see `read_left_out`.
-const MAX_PAGE_FLAGS: usize = mailcraft_model::sync::MAX_EWS_PAGE_READ;
 /// Longest subject, `Message-ID`, preview and name kept, in characters; the most people a
 /// message names in one list.
 const MAX_SUBJECT: usize = 998;
@@ -97,10 +89,6 @@ pub struct ItemsPage {
     pub read: Vec<ReadState>,
     /// How many `ReadFlagChange`s said no read state and were passed over (they carry nothing to lose).
     pub read_unsaid: usize,
-    /// How many changes of read state the page gave beyond what one page takes in, which are not
-    /// handed on. The server's own repeats come first in the list, so what is kept is the newest
-    /// of them: see [`SyncFolderItems::answer`].
-    pub read_left_out: usize,
 }
 
 impl std::fmt::Debug for ItemsPage {
@@ -146,18 +134,18 @@ impl SyncFolderItems {
     /// The server's answer. A state the server no longer knows is [`Error::Server`] of
     /// `InvalidSyncState`.
     ///
-    /// **A page is whole or it is an error.** The answer's new state says "everything up to here
-    /// has been taken in", so a change that was left out would be lost for good. Every change is
-    /// taken in, however many the server gave (the size of the answer and its nodes are held
-    /// already, as the answer is parsed, and a server that ignores `MaxChangesReturned` has said its
-    /// state covers them all); one that can't be taken in makes the page [`Error::Unreadable`], with
-    /// nothing of it handed on and no state taken from it, so the folder stays where it was and is
-    /// read again next time. Only a change with no usable id (a `Delete`, a `ReadFlagChange`, an
-    /// item) or no item (a `Create` or an `Update` with nothing in it) can't be taken in: whatever
-    /// else an item lacks (its read state, importance, categories, preview, times) is read as
-    /// nothing said, as a message without it. A `ReadFlagChange` that doesn't say which state it
-    /// is carries nothing to lose, and is passed over. A kind of change this program doesn't know
-    /// is passed over too (E7).
+    /// **A page is never refused for being too big, and nothing the server sent is dropped.** A
+    /// server that ignores `MaxChangesReturned` sends more than was asked; every change is applied
+    /// all the same, however many there are (the answer itself is already held to the request's
+    /// size, so the count is finite). Refusing or cutting such a page would either leave the
+    /// folder stuck at it for ever, since the state it gives never advances, or lose changes the
+    /// state says were taken in. A change that has no usable id (a `Delete`, a `ReadFlagChange`, an
+    /// item) or no item (a `Create` or an `Update` with nothing in it) still makes the page
+    /// [`Error::Unreadable`], so nothing is applied from a page whose state would hide a broken
+    /// change. Whatever else an item lacks (its read state, importance, categories, preview, times)
+    /// is read as nothing said, as a message without it. A `ReadFlagChange` that doesn't say which
+    /// state it is carries nothing to lose, and is passed over. A kind of change this program
+    /// doesn't know is passed over too (E7).
     ///
     /// **A page of read states longer than one page takes in is still a page**, and the newest of
     /// its states are the ones kept: a server working through a long list of them hands over the
@@ -177,15 +165,10 @@ impl SyncFolderItems {
         // a read-state change is an id and a flag. A server that is working through a long list of
         // read states gives more of those than were asked for; they are still taken in, since the
         // state it hands back says everything up to here has been given.)
-        let mut items = 0usize;
         for change in changes.children.iter().filter(|c| *c.namespace == *TYPES) {
             let id = || change.child_in(TYPES, "ItemId").and_then(|id| id.attribute("Id")).filter(|id| valid_id(id));
             match change.name.as_str() {
                 "Create" | "Update" => {
-                    items = items.saturating_add(1);
-                    if items > MAX_PAGE {
-                        return Err(unreadable("a page", "more items in it than are taken in", ""));
-                    }
                     let item = change.children.iter().find(|c| *c.namespace == *TYPES);
                     // (The subject, when the answer has one, is what the owner can find it by: an
                     // item with no usable id is named by it in Send/Receive Progress, never in the
@@ -195,10 +178,6 @@ impl SyncFolderItems {
                     page.messages.push(read.ok_or_else(|| unreadable(&change.name, "an item with no usable id", &subject))?);
                 }
                 "Delete" => {
-                    items = items.saturating_add(1);
-                    if items > MAX_PAGE {
-                        return Err(unreadable("a page", "more items in it than are taken in", ""));
-                    }
                     page.removed.push(id().ok_or_else(|| unreadable("Delete", "no usable item id", ""))?.to_owned());
                 }
                 "ReadFlagChange" => {
@@ -210,16 +189,6 @@ impl SyncFolderItems {
                 }
                 _ => {}
             }
-        }
-        // (A server working through a long list of read states sends the ones it already sent at the
-        // front of every new page, so one page can carry more of them than a page takes in. The
-        // ones at the front are the repeats the folder already has; the tail is what is new. So the
-        // page keeps the newest of them, and its state — which says all of them were given — is
-        // taken in all the same: refusing the page would leave the folder stuck at it, read again
-        // with the same state and refused again for as long as the list is long.)
-        if page.read.len() > MAX_PAGE_FLAGS {
-            page.read_left_out = page.read.len().saturating_sub(MAX_PAGE_FLAGS);
-            page.read = page.read.get(page.read_left_out..).map_or(Vec::new(), |tail| tail.to_vec());
         }
         Ok(page)
     }

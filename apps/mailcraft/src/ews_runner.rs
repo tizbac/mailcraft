@@ -843,8 +843,8 @@ fn sync_error_text(answer: &BadAnswer, account: mailcraft_model::Id, email: &str
     text.push_str(&format!("Account: {} ({account})\n", email.trim()));
     text.push_str(&format!("Operation: {}\n", answer.operation.trim()));
     text.push_str(&format!("HTTP status: {}\n", answer.status));
-    if answer.cut {
-        text.push_str("The answer was longer than 1 MiB; only its beginning is here.\n");
+    if !answer.reason.trim().is_empty() {
+        text.push_str(&format!("Why it was dropped: {}\n", answer.reason.trim()));
     }
     text.push_str("It may contain mail. It is kept only on this computer, and is never sent or logged.\n");
     text.push_str("\n----- the server's answer -----\n");
@@ -875,18 +875,18 @@ fn write_sync_error(dir: &Path, answer: &BadAnswer, account: mailcraft_model::Id
 /// (A failure to list or remove is ignored: it is a diagnostic, not the mailbox.)
 fn prune_sync_errors(folder: &Path) {
     let Ok(entries) = std::fs::read_dir(folder) else { return };
-    let mut files: Vec<(PathBuf, u64)> = entries
+    let mut files: Vec<(SystemTime, PathBuf, u64)> = entries
         .filter_map(Result::ok)
         .filter_map(|entry| {
             let meta = entry.metadata().ok()?;
-            meta.is_file().then(|| (entry.path(), meta.len()))
+            meta.is_file().then(|| (meta.modified().unwrap_or(UNIX_EPOCH), entry.path(), meta.len()))
         })
         .collect();
-    // (Named with the second they were written in: the name sorts oldest first.)
-    files.sort_by(|a, b| a.0.cmp(&b.0));
-    let mut total: u64 = files.iter().map(|(_, size)| *size).sum();
+    // (Oldest first: the one just written is never the one dropped, however large it is.)
+    files.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+    let mut total: u64 = files.iter().map(|(_, _, size)| *size).sum();
     while files.len() > MAX_SYNC_ERRORS || (total > MAX_SYNC_ERROR_BYTES && files.len() > 1) {
-        let (path, size) = files.remove(0);
+        let (_, path, size) = files.remove(0);
         if std::fs::remove_file(&path).is_ok() {
             total = total.saturating_sub(size);
         }
