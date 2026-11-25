@@ -59,13 +59,15 @@ use crate::remote_tasks::{TasksDownload, TasksUpload, TasksUploaded};
 /// an id and a change key in one opaque string).
 pub const MAX_EWS_ID: usize = 1024;
 
-/// Most messages one page of an answer holds.
-pub const MAX_EWS_PAGE_MESSAGES: usize = 2000;
+/// A hard guard on the messages one page of an answer may hold, for a broken host: not a page
+/// size. Whatever a server sends within one answer is applied, however many changes it is (the
+/// answer itself is held to the request's size), so this is far above anything a 16 MiB answer
+/// could carry and is never reached by a working host.
+pub const MAX_EWS_PAGE_MESSAGES: usize = 1_000_000;
 
-/// Most read-state changes one page of an answer holds: an id and a flag, no text, so a server
-/// working through a long list of them (Grommunio sends the read states it already sent along with
-/// each new page) can give thousands of those at once while its items stay within what was asked.
-pub const MAX_EWS_PAGE_READ: usize = 20_000;
+/// A hard guard on the read-state changes one page may hold, for a broken host: not a page size.
+/// A server working through a long list of them gives many at once, and every one is applied.
+pub const MAX_EWS_PAGE_READ: usize = 1_000_000;
 
 /// Most pages one piece of an answer holds.
 pub const MAX_EWS_PAGES: usize = 10_000;
@@ -526,14 +528,10 @@ pub struct UnreadableChange {
     pub subject: String,
 }
 
-/// The most of a server's answer that is kept for the owner to look at when it couldn't be used:
-/// one mebibyte. A larger answer is cut there, and [`BadAnswer::cut`] says so.
-pub const MAX_BAD_ANSWER: usize = 1024 * 1024;
-
-/// The server's answer that couldn't be used, kept so the owner can see what went wrong: the
-/// operation, the HTTP status, and the body (a document, or what a proxy sent instead), at most
-/// [`MAX_BAD_ANSWER`] bytes. It may hold message text, so a host writes it only to the owner's
-/// own data folder, never a log line, and never sends it anywhere.
+/// The server's answer that couldn't be used, kept whole so the owner can see what went wrong:
+/// the operation, the HTTP status, and the body (a document, or what a proxy sent instead). It
+/// may hold message text, so a host writes it only to the owner's own data folder, never a log
+/// line, and never sends it anywhere.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct BadAnswer {
@@ -542,21 +540,22 @@ pub struct BadAnswer {
     pub operation: String,
     /// The HTTP status the server answered with.
     pub status: u16,
+    /// Why MailCraft dropped it, in safe words: not a document that could be read, not the answer
+    /// to the request, an HTTP status the service doesn't use. Empty when not said.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub reason: String,
     /// The answer's body, as text (bytes that are not UTF-8 are replaced).
     pub body: String,
-    /// The answer was longer than [`MAX_BAD_ANSWER`] and the body is only its beginning.
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub cut: bool,
 }
 
 impl BadAnswer {
     /// Whether this is within what is kept, or why not.
     pub fn check(&self) -> Result<(), &'static str> {
-        if self.body.len() > MAX_BAD_ANSWER {
-            return Err("holds a server answer larger than is kept");
-        }
         if self.operation.len() > 64 || !self.operation.bytes().all(|b| b.is_ascii_alphanumeric()) {
             return Err("names an operation that can't be one");
+        }
+        if self.reason.len() > 200 || self.reason.chars().any(char::is_control) {
+            return Err("says why it was dropped at too great a length");
         }
         Ok(())
     }

@@ -41,9 +41,13 @@ document that could be read, it wasn't the answer to the request, it came with a
 service doesn't use, it was lost, or it was larger than MailCraft reads. The other folders are
 read all the same, and the log keeps its place in the run rather than its name. Three folders in a
 row that can't be read end the run there. When an answer couldn't be used, the whole answer as it
-came (up to 1 MiB) is written beside the mailbox in `sync-errors/`, owner-only, and the line says
+came is written beside the mailbox in `sync-errors/`, owner-only, and the line says
 where: it is what tells a broken server from a proxy's sign-in page in one look. That file may
 hold mail, stays on this computer, and is never sent or put in a log line.
+
+A server that ignores the size asked for and sends more changes in one page gives all of them:
+nothing is dropped, and the folder is never left stuck at a page it can never take in. A change
+with no usable id is still refused for that folder, since the state it came with would hide it.
 
 ## Grommunio
 

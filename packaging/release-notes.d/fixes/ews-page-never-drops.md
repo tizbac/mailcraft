@@ -1,0 +1,1 @@
+- **An Exchange page bigger than MailCraft once took in is applied whole.** A server that ignores the page size no longer risks leaving a folder stuck at that page for ever: every change it sends is applied, the sync state goes on, and nothing is dropped.

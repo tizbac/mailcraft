@@ -1,0 +1,1 @@
+| 2026-11-25 | An Exchange page of any size is applied whole (messages, deletes and read states alike): a folder is never left stuck at a page it can never take in, and nothing the server sent is dropped |

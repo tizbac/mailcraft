@@ -226,8 +226,6 @@ pub(crate) struct Run<'a, E: HttpExchange> {
     pub(crate) flag_lacking: bool,
     /// A read-state change that said no state was passed over: said once a run, with no id.
     pub(crate) read_unsaid: bool,
-    /// A page carried more read states than a page takes in: said once a run, with how many.
-    pub(crate) read_overflow: bool,
     /// The ids of the server's other own folders ([`OWN`]) it has, as far as it said (#779): a
     /// change of one is never sent.
     pub(crate) own: HashSet<String>,
@@ -257,7 +255,6 @@ impl<'a, E: HttpExchange> Run<'a, E> {
             shape: Shape::Full,
             flag_lacking: false,
             read_unsaid: false,
-            read_overflow: false,
             own: HashSet::new(),
             reread_folders: false,
             needs_change_key: false,
@@ -372,6 +369,7 @@ impl<E: HttpExchange> Run<'_, E> {
             let name = operation.name();
             let local = name.rsplit(':').next().unwrap_or(name);
             answer.operation = local.chars().filter(|c| c.is_ascii_alphanumeric()).take(64).collect();
+            answer.reason = fault.words();
             self.bad_answer = Some(answer);
         }
         fault
@@ -865,11 +863,8 @@ impl<E: HttpExchange> Run<'_, E> {
                         );
                     }
                     if out.unread.len() < MAX_FOLDERS {
-                        let answer = self.take_bad_answer();
-                        if out.bad_answer.is_none() {
-                            out.bad_answer = answer.clone();
-                        }
-                        out.unread.push(UnreadFolder { folder: folder.clone(), code, why, answer });
+                        // (The answer stays with its folder: no copy of a body that may be large.)
+                        out.unread.push(UnreadFolder { folder: folder.clone(), code, why, answer: self.take_bad_answer() });
                     }
                     failed_in_a_row = failed_in_a_row.saturating_add(1);
                     if failed_in_a_row >= MAX_IN_A_ROW {
@@ -905,13 +900,6 @@ impl<E: HttpExchange> Run<'_, E> {
                     if page.read_unsaid > 0 && !self.read_unsaid {
                         self.read_unsaid = true;
                         log::info!("ews mail: the server gave a read-state change that says no state; it is passed over");
-                    }
-                    if page.read_left_out > 0 && !self.read_overflow {
-                        self.read_overflow = true;
-                        log::warn!(
-                            "ews mail: a page carried {} read-state changes more than a page takes in; the newest are kept, the rest are left out, and the folder goes on from the state the server gave",
-                            page.read_left_out
-                        );
                     }
                     page
                 }

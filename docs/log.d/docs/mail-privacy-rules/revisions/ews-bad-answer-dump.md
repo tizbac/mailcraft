@@ -1,1 +1,1 @@
-| 2026-11-25 | minor | An Exchange answer that couldn't be used is written owner-only to `sync-errors/` beside the mailbox (at most 1 MiB, 20 files, 20 MiB), may hold mail, and is never logged or sent |
+| 2026-11-25 | minor | An Exchange answer that couldn't be used is written owner-only to `sync-errors/` beside the mailbox (whole, with at most 20 files and 20 MiB of older ones), may hold mail, and is never logged or sent |
