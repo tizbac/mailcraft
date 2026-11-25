@@ -80,9 +80,9 @@ use mailcraft_model::remote::EventZones;
 use mailcraft_model::remote::{
     CalendarsDownload, CategoriesDownload, ContactChange, ContactChangeKind, ContactOp, ContactsDownload, ContactsUpload, ContactsUploaded,
     EventChange, EventChangeKind, EventCheck, EventFields, EventOp, EventOutcome, EventReminder, EventRepeat, EventResult, EventTime, EventWall,
-    EventsDownload, EventsUpload, EventsUploaded, FavoritesDownload, FavoritesOutcome, MAX_CHECK_AGE, MAX_CHECK_TRIES, MAX_CONTACT_CHANGES, MAX_CONTACTS,
-    MAX_EVENT_CHANGES, MAX_EVENT_CHECKS, MAX_EVENT_OPS, MAX_EVENTS, MAX_FAVORITE_DEPTH, MAX_KEY, RemoteContact, RemoteEvent, RemoteEventKind,
-    RemoteFavorite, clean_key, id_tag,
+    EventsDownload, EventsUpload, EventsUploaded, FavoritesDownload, FavoritesOutcome, MAX_CHECK_AGE, MAX_CHECK_TRIES, MAX_CONTACT_CHANGES,
+    MAX_CONTACTS, MAX_EVENT_CHANGES, MAX_EVENT_CHECKS, MAX_EVENT_OPS, MAX_EVENTS, MAX_FAVORITE_DEPTH, MAX_KEY, RemoteContact, RemoteEvent,
+    RemoteEventKind, RemoteFavorite, clean_key, id_tag,
 };
 use mailcraft_model::zoned;
 use mailcraft_model::{

@@ -381,7 +381,8 @@ impl<E: HttpExchange> Run<'_, E> {
         owner_address: Option<&str>,
     ) -> Result<ContactsDownload, Asked> {
         let (_, folders) = self.directory_folders(Kind::Contacts, mailbox).await?;
-        let mut download = ContactsDownload { account, email: email.to_owned(), complete: true, books: Vec::new(), contacts: Vec::new() };
+        let mut download =
+            ContactsDownload { account, email: email.to_owned(), complete: true, books: Vec::new(), contacts: Vec::new(), ..Default::default() };
         for folder in folders.iter().take(mailcraft_model::remote::MAX_REMOTE_CALENDARS) {
             let book = clean_name(&folder.display_name, owner_address);
             download.books.push(RemoteAddressBook { id: folder.id.as_str().to_owned(), name: book.clone(), rights: folder.rights });

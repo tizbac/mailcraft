@@ -352,7 +352,9 @@ fn new(s: &mut Session, v: &Value) -> CmdResult {
     }
     c.uid = super::remote::new_token(0, s.rev() ^ s.now().unsigned_abs().rotate_left(56));
     let id = s.mailbox.add_contact(c);
-    contacts_remote::note_contact(&mut s.mailbox, id, None)?;
+    if book.is_none() {
+        contacts_remote::note_contact(&mut s.mailbox, id, None)?;
+    }
     s.mailbox.contact_place = Some(folder);
     s.sel.contact = Some(id);
     reveal(s, id);
@@ -373,7 +375,9 @@ fn edit(s: &mut Session, v: &Value) -> CmdResult {
         c.categories = super::category::spelled_all(s, c.origin.account, &c.categories, &had, c.origin.account)?;
     }
     *s.mailbox.contact_mut(id)? = c.clone();
-    contacts_remote::note_contact(&mut s.mailbox, id, server)?;
+    if c.book_id.is_empty() {
+        contacts_remote::note_contact(&mut s.mailbox, id, server)?;
+    }
     remote::note_book_contact_changed(&mut s.mailbox, &c, ContactChangeKind::Update);
     Ok(json!({"id": id}))
 }
@@ -420,8 +424,11 @@ fn delete(s: &mut Session, v: &Value) -> CmdResult {
     let order = sorted(s, &s.view.people_search);
     let at = order.iter().position(|x| *x == id);
     let server = contacts_remote::server_copy(&s.mailbox, id);
+    let in_a_book = s.mailbox.contact(id).is_some_and(|c| !c.book_id.is_empty());
     s.mailbox.remove_contact(id)?;
-    contacts_remote::note_contact(&mut s.mailbox, id, server)?;
+    if !in_a_book {
+        contacts_remote::note_contact(&mut s.mailbox, id, server)?;
+    }
     if s.sel.contact == Some(id) {
         s.sel.contact = at.and_then(|i| order.get(i + 1).or_else(|| i.checked_sub(1).and_then(|j| order.get(j)))).copied();
     }
@@ -540,7 +547,9 @@ fn categorize(s: &mut Session, v: &Value) -> CmdResult {
     }
     let categories = c.categories.clone();
     let contact = c.clone();
-    contacts_remote::note_contact(&mut s.mailbox, id, server)?;
+    if contact.book_id.is_empty() {
+        contacts_remote::note_contact(&mut s.mailbox, id, server)?;
+    }
     remote::note_book_contact_changed(&mut s.mailbox, &contact, ContactChangeKind::Update);
     Ok(json!({"id": id, "categories": categories}))
 }
