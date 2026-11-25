@@ -130,6 +130,7 @@ fn base(s: &Session, account: Id) -> Result<EwsMailRequest, CmdError> {
         trusted: server.trusted.clone(),
         // (A shared mailbox is read at its own address with the owner's server.)
         mailbox: if a.is_shared() { a.email.clone() } else { String::new() },
+        sent_no_copy: !s.prefs.sent_copy,
         ..Default::default()
     })
 }

@@ -31,6 +31,9 @@ use crate::clipboard_mime::{HTML_MIMES, IMAGE_MIMES, MAX_HTML_BYTES, MAX_PICTURE
 
 /// The most HTML one paste takes, in bytes (the engine's own limit).
 const MAX_HTML: usize = 4 << 20;
+/// The most "XML Spreadsheet" data one paste takes (the engine's own limit for a paste).
+#[cfg(windows)]
+const MAX_SPREADSHEET: usize = 4 << 20;
 
 /// The system's clipboard. `display` is the window's `wl_display` when it runs under Wayland.
 pub fn board(display: Option<std::ptr::NonNull<std::ffi::c_void>>) -> Option<Box<dyn RichClipboard>> {
@@ -82,6 +85,17 @@ impl RichClipboard for Board {
             log::warn!("the clipboard took no HTML: {e}");
         }
         r
+    }
+
+    /// Excel's "XML Spreadsheet" data, when it is on the clipboard: Windows carries it beside
+    /// "HTML Format", and a copy may carry only it. Read through `clipboard-win`, which names the
+    /// registered format; `arboard` reads "HTML Format" alone.
+    #[cfg(windows)]
+    fn spreadsheet(&self) -> Option<String> {
+        use clipboard_win::{formats::RawData, get_clipboard, register_format};
+        let format = register_format("XML Spreadsheet")?;
+        let bytes: Vec<u8> = get_clipboard(RawData(format.get())).ok()?;
+        spreadsheet_text(bytes)
     }
 
     fn html(&self) -> Option<String> {
@@ -142,28 +156,54 @@ impl RichClipboard for Board {
     }
 }
 
+/// The text of Excel's "XML Spreadsheet" data: UTF-8 as Excel writes it, else UTF-16 with a byte
+/// order mark. Too much for a paste, or no text at all, is none.
+#[cfg(windows)]
+fn spreadsheet_text(bytes: Vec<u8>) -> Option<String> {
+    if bytes.len() > MAX_SPREADSHEET {
+        return None;
+    }
+    let text = match bytes.as_slice() {
+        [0xFF, 0xFE, rest @ ..] => {
+            let units: Vec<u16> = rest.chunks_exact(2).map(|b| u16::from_le_bytes([b[0], b[1]])).take(MAX_SPREADSHEET / 2).collect();
+            String::from_utf16(&units).ok()?
+        }
+        [0xFE, 0xFF, rest @ ..] => {
+            let units: Vec<u16> = rest.chunks_exact(2).map(|b| u16::from_be_bytes([b[0], b[1]])).take(MAX_SPREADSHEET / 2).collect();
+            String::from_utf16(&units).ok()?
+        }
+        _ => String::from_utf8(bytes).ok()?,
+    };
+    (!text.trim().is_empty()).then_some(text)
+}
+
 /// The HTML to paste out of what the clipboard held: none when it comes to nothing or to more
 /// than the engine takes.
 fn html_of(html: &str) -> Option<String> {
     let html = fragment(html);
-    (!html.trim().is_empty() && html.len() <= MAX_HTML).then(|| html.to_string())
+    (!html.trim().is_empty() && html.len() <= MAX_HTML).then_some(html)
 }
 
 /// The HTML itself out of what a clipboard hands over. Windows' "HTML Format" can come with its
 /// header (`Version:0.9 StartHTML:… <html>… <!--StartFragment-->…<!--EndFragment-->…`): then
 /// what was copied is the fragment between the markers, else everything from the first tag.
-fn fragment(html: &str) -> &str {
+/// The HTML itself out of what a clipboard hands over. Windows' "HTML Format" can come with its
+/// header (`Version:0.9 StartHTML:… <html>… <!--StartFragment-->…<!--EndFragment-->…`): then
+/// what was copied is the fragment between the markers, else everything from the first tag.
+/// `arboard` has already followed the offsets on Windows, so what it hands over is the fragment
+/// alone, with no markers and no `<table>`: a spreadsheet's rows are put back in one (below).
+fn fragment(html: &str) -> String {
     if !html.starts_with("Version:") {
-        return html;
+        return with_table(html);
     }
     const START: &str = "<!--StartFragment-->";
     const END: &str = "<!--EndFragment-->";
     let Some(start) = html.find(START) else {
-        return html.find('<').and_then(|i| html.get(i..)).unwrap_or_default();
+        return with_table(html.find('<').and_then(|i| html.get(i..)).unwrap_or_default());
     };
     let from = start + START.len();
     let Some(to) = html.get(from..).and_then(|rest| rest.find(END)).map(|i| from + i) else {
-        return html.find('<').and_then(|i| html.get(i..)).unwrap_or_default();
+        return with_table(html.find('<').and_then(|i| html.get(i..)).unwrap_or_default());
     };
     let inner = html.get(from..to).unwrap_or_default();
     // A spreadsheet's Copy is the one case where the fragment is not a whole thing of its own:
@@ -180,10 +220,20 @@ fn fragment(html: &str) -> &str {
             (from_back..from).rev().find(|&i| tag_at(html, i, "table") && !tagged(html.get(i + 6..from).unwrap_or_default(), "/table"))
         {
             let close = (to..html.len()).find(|&i| tag_at(html, i, "/table")).map_or(to, |i| i + 8);
-            return html.get(open..close).unwrap_or(inner);
+            return with_table(html.get(open..close).unwrap_or(inner));
         }
     }
-    inner
+    with_table(inner)
+}
+
+/// `html` with a `<table>` of its own when it is a run of loose rows (Excel's "HTML Format" as
+/// `arboard` hands it over on Windows: the marker and the `<table>` around the rows are gone).
+fn with_table(html: &str) -> String {
+    if !tagged(html, "table") && (tagged(html, "tr") || tagged(html, "td") || tagged(html, "th")) {
+        format!("<table>{html}</table>")
+    } else {
+        html.to_string()
+    }
 }
 
 /// Whether `haystack` holds a `<name>` tag, in any case.
@@ -223,6 +273,18 @@ mod tests {
     }
 
     #[test]
+    fn a_spreadsheet_fragment_without_its_table_is_put_back_in_one() {
+        // What `arboard` hands over on Windows: it follows the offsets, so the markers and the
+        // `<table>`/`<colgroup>` Excel wrote outside them are gone, leaving loose rows.
+        let rows = "<col width=69><tr><td>a</td></tr><tr><td>b</td></tr>";
+        assert_eq!(fragment(rows), format!("<table>{rows}</table>"));
+        assert_eq!(fragment("<tr><td>a</td></tr>"), "<table><tr><td>a</td></tr></table>");
+        // A fragment that is already a table, or no table at all, is left as it is.
+        assert_eq!(fragment("<table><tr><td>a</td></tr></table>"), "<table><tr><td>a</td></tr></table>");
+        assert_eq!(fragment("<b>x</b>"), "<b>x</b>");
+    }
+
+    #[test]
     fn a_spreadsheet_copy_keeps_the_table_its_rows_sit_in() {
         // Excel's "HTML Format" for a copied range: the `<table>` and its `<colgroup>` are outside
         // the markers, which hold only the rows. Word puts the element inside them, and nothing is
@@ -236,15 +298,18 @@ mod tests {
         assert!(said.ends_with("</table>"), "{said}");
         assert!(said.contains("<col width=69 span=2><tr><td>Part</td>"), "{said}");
         assert_eq!(fragment("Version:1.0\r\n<!--StartFragment--><p>Hello</p><!--EndFragment-->"), "<p>Hello</p>");
-        // Rows with no table round them at all stay as they were.
-        assert_eq!(fragment("Version:1.0\r\n<!--StartFragment--><tr><td>a</td></tr><!--EndFragment-->"), "<tr><td>a</td></tr>");
+        // Rows with no table round them are put in one (as `arboard` hands a range over).
+        assert_eq!(fragment("Version:1.0\r\n<!--StartFragment--><tr><td>a</td></tr><!--EndFragment-->"), "<table><tr><td>a</td></tr></table>");
         // A table closed before the fragment is not the rows' own.
         assert_eq!(
             fragment("Version:1.0\r\n<table><tr><td>x</td></tr></table><!--StartFragment--><tr><td>a</td></tr><!--EndFragment-->"),
-            "<tr><td>a</td></tr>"
+            "<table><tr><td>a</td></tr></table>"
         );
         // In any case the tags are read, and the scan stops at the end of the fragment.
-        assert_eq!(fragment("Version:1.0\r\n<TABLE><tr><td>x</td></TABLE><!--StartFragment--><TD>a</TD><!--EndFragment-->"), "<TD>a</TD>");
+        assert_eq!(
+            fragment("Version:1.0\r\n<TABLE><tr><td>x</td></TABLE><!--StartFragment--><TD>a</TD><!--EndFragment-->"),
+            "<table><TD>a</TD></table>"
+        );
     }
 
     /// The real clipboard of the machine the test runs on: HTML put there comes back, and its

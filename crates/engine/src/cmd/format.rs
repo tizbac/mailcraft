@@ -99,7 +99,7 @@ pub fn specs() -> Vec<CommandSpec> {
             .when_writing(needs_doc),
         CommandSpec::new("edit.paste", "Paste", "Message › Clipboard", paste)
             .pure()
-            .params(r#"{"html"?: string, "text"?: string} — over the selection; supported HTML formatting includes bold, italic, underline, font, size, colours, links, lists and a paragraph's indent and alignment. The HTML composer keeps bounded tables as selectable objects. Tables flatten to text in plain-text messages and signatures. HTML that comes to no text gives way to `text`; text alone that is a spreadsheet's Copy (two or more rows of lines with the same number of tab-separated cells) becomes a table in an HTML message. Nothing to paste changes nothing"#)
+            .params(r#"{"html"?: string, "spreadsheet"?: string (Excel's "XML Spreadsheet" clipboard data, made into a table), "text"?: string} — over the selection; supported HTML formatting includes bold, italic, underline, font, size, colours, links, lists and a paragraph's indent and alignment. The HTML composer keeps bounded tables as selectable objects. Tables flatten to text in plain-text messages and signatures. HTML that comes to no text gives way to `text`; text alone that is a spreadsheet's Copy (two or more rows of lines with the same number of tab-separated cells) becomes a table in an HTML message. Nothing to paste changes nothing"#)
             .when_writing(needs_doc),
         CommandSpec::new("insert.table", "Table", "Insert › Tables", insert_table)
             .pure()
@@ -472,8 +472,18 @@ pub(crate) const MAX_PASTE: usize = 4 << 20;
 fn paste(s: &mut Session, v: &Value) -> CmdResult {
     let plain = s.doc().is_some_and(|(_, plain)| plain);
     let (html, text) = (p::str(v, "html"), p::str(v, "text"));
+    // Excel's own clipboard data, when there is no HTML beside it: its cells made into a table
+    // (a range copied on Windows carries both, but a copy may carry only this).
+    let html = match html {
+        Some(html) => Some(html.to_owned()),
+        None => match p::str(v, "spreadsheet") {
+            Some(xml) if xml.len() <= MAX_PASTE => super::spreadsheet::to_html(xml),
+            Some(_) => return Err(fail("that is too much to paste into one message")),
+            None => None,
+        },
+    };
     if html.is_none() && text.is_none() {
-        return Err(bad("`html` or `text` (string) is required"));
+        return Err(bad("`html`, `spreadsheet` or `text` (string) is required"));
     }
     let too_much = || fail("that is too much to paste into one message");
     // The HTML when there is some, reduced to the set; when it comes to nothing at all (a picture
@@ -484,9 +494,9 @@ fn paste(s: &mut Session, v: &Value) -> CmdResult {
         Some(html) if html.len() > MAX_PASTE => return Err(too_much()),
         Some(html) => {
             let rich = if !plain && s.signature_edit.is_none() {
-                mailcraft_mime_model::rich::from_html_for_compose(html)
+                mailcraft_mime_model::rich::from_html_for_compose(&html)
             } else {
-                mailcraft_mime_model::rich::from_html(html)
+                mailcraft_mime_model::rich::from_html(&html)
             };
             Some(if plain { RichText::from_plain(&rich.text()) } else { rich }).filter(|rich| !rich.is_empty())
         }

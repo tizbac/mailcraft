@@ -470,6 +470,11 @@ msgid "A JMAP account's mail can't be snoozed yet."
 msgstr "La posta di un account JMAP non può ancora essere posticipata."
 
 #. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "A Microsoft Graph or JMAP account's server files its own copy; MailCraft can't turn that off yet."
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/reading/warnings.rs
 #, fuzzy
 msgid "A brand's name on another address."
@@ -8318,6 +8323,11 @@ msgstr "Continua ad attendere"
 #, fuzzy
 msgid "Keep a calendar from the web up to date here: its address ends in .ics or starts with webcal://"
 msgstr "Tieni qui aggiornato un calendario dal web: il suo indirizzo termina con .ics o inizia con webcal://"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Keep a copy of sent messages in Sent Items"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountDialogs.kt

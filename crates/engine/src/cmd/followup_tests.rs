@@ -637,7 +637,7 @@ fn a_reminder_of_an_imap_message_counts_from_when_the_server_took_it() {
     let (mut w, id) = sent_through_outbox(mailcraft_model::AccountKind::Imap);
     assert_eq!(w.m(id).follow_up.unwrap().at, NOON + 4 * DAY, "from the click while it waits");
     let result = mailcraft_model::sync::SyncResult { sent: vec![id], ..Default::default() };
-    super::account::file_sent(&mut w.s.mailbox, w.account, &result, false, NOON + 2 * DAY);
+    super::account::file_sent(&mut w.s.mailbox, w.account, &result, false, true, NOON + 2 * DAY);
     assert_eq!(w.m(id).folder, w.sent);
     assert_eq!(w.m(id).follow_up.unwrap().at, NOON + 6 * DAY);
     // A message that waits in the Outbox never fires, however late.
@@ -821,7 +821,7 @@ fn a_follow_up_on_a_delayed_message_counts_from_when_it_goes_and_a_cancelled_one
     // It goes at its time (a run later, here): the two days count from that moment.
     let went = NOON + 3 * DAY + 120;
     let result = mailcraft_model::sync::SyncResult { sent: vec![id], ..Default::default() };
-    assert_eq!(super::account::file_sent(&mut s.mailbox, a, &result, false, went), 1);
+    assert_eq!(super::account::file_sent(&mut s.mailbox, a, &result, false, true, went), 1);
     assert_eq!(s.mailbox.message(id).unwrap().follow_up.unwrap().at, went + 2 * DAY);
     at(&mut s, went + 2 * DAY - 1);
     assert_eq!(s.run("mail.settleReminders", &json!({})).unwrap()["raised"], json!([]));

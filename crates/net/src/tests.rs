@@ -2182,6 +2182,16 @@ fn a_run_that_is_called_off_stops_before_the_next_command_and_says_goodbye() {
 }
 
 #[test]
+fn no_copy_of_sent_mail_is_kept_when_the_owner_asks_so() {
+    let imap = two_way(true, true);
+    let smtp = Fake::smtp(smtp_world());
+    let folders = synced_folders(&imap);
+    let result = sync(&SyncRequest { outbox: vec![hello()], sent_no_copy: true, ..request(account(Some(&imap), Some(&smtp)), folders) });
+    assert_eq!((result.sent.len(), result.filed.len()), (1, 0));
+    assert!(changes(&imap).iter().all(|c| !c.starts_with("APPEND")), "nothing went to Sent Items: {:?}", changes(&imap));
+}
+
+#[test]
 fn a_sent_copy_is_unread_when_the_owner_chose_it() {
     let imap = two_way(true, true);
     let smtp = Fake::smtp(smtp_world());

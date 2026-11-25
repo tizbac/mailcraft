@@ -132,6 +132,10 @@ pub struct SyncRequest {
     /// read, as Outlook does.
     #[serde(skip_serializing_if = "is_false")]
     pub sent_unread: bool,
+    /// No copy of what is sent is put in Sent Items (`file.options` `sentCopy`, off): the server's
+    /// `APPEND` is not made. Off (the default): the copy is kept.
+    #[serde(skip_serializing_if = "is_false")]
+    pub sent_no_copy: bool,
     /// How many of each folder's newest messages to have here (older ones come down when this
     /// grows); 0 means no limit.
     pub max_per_folder: u32,

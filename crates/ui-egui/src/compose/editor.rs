@@ -1028,30 +1028,34 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
                 // menu read when its Paste was chosen stands for the clipboard (`crate::text_menu`);
                 // its Paste Text Only read no HTML, and the text comes alone.
                 Event::Paste(text) => {
-                    let (html, image) = match crate::text_menu::taken_paste(&ctx, id) {
-                        Some(found) => (found.html, None),
+                    let (html, spreadsheet, image) = match crate::text_menu::taken_paste(&ctx, id) {
+                        Some(found) => (found.html, None, None),
                         None => {
                             let board = app.services.clipboard.as_ref();
                             let html = board.and_then(|b| b.html()).filter(|h| !h.trim().is_empty());
+                            // A spreadsheet copied on Windows may carry only its "XML Spreadsheet"
+                            // data (or its HTML may come to nothing): the engine makes a table of it.
+                            let spreadsheet = html.is_none().then(|| board.and_then(|b| b.spreadsheet())).flatten();
                             // Into the message, a picture only when nothing else is on the clipboard (#547),
                             // or when the HTML is that picture alone: a browser's Copy Image puts an
                             // `<img>` of its web address beside the picture itself, which would paste
                             // as a link and a caption (#1217).
                             let alone = html.as_deref().is_some_and(pictures_only) && board.is_some_and(|b| b.has_image());
-                            let image = (alone || (text.is_empty() && (which == Which::Signature || html.is_none())))
+                            let image = (alone || (text.is_empty() && (which == Which::Signature || (html.is_none() && spreadsheet.is_none()))))
                                 .then(|| board.and_then(|b| b.image()))
                                 .flatten();
-                            (html, image)
+                            (html, spreadsheet, image)
                         }
                     };
-                    match (image, html) {
-                        (Some(png), _) => {
+                    match (image, html, spreadsheet) {
+                        (Some(png), _, _) => {
                             let command = if which == Which::Signature { "signature.picture.add" } else { "insert.picture" };
                             ask(command, json!({"data": crate::files::base64_lite::encode(&png), "file": "picture.png"}))
                         }
-                        (None, Some(html)) => ask("edit.paste", json!({"html": html, "text": text})),
-                        (None, None) if !text.is_empty() => ask("edit.paste", json!({"text": text})),
-                        (None, None) => None,
+                        (None, Some(html), _) => ask("edit.paste", json!({"html": html, "text": text})),
+                        (None, None, Some(xml)) => ask("edit.paste", json!({"spreadsheet": xml, "text": text})),
+                        (None, None, None) if !text.is_empty() => ask("edit.paste", json!({"text": text})),
+                        (None, None, None) => None,
                     }
                 }
                 // A picture alone on the clipboard, as the system hands one over for Ctrl+V: a picture

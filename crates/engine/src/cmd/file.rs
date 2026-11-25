@@ -39,7 +39,7 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("file.exportContacts", "Export Contacts", "File › Open & Export", export_contacts).pure().params(r#"{"ids"?: [number], "path"?: string} — .vcf"#),
         CommandSpec::new("file.info", "Info", "File › Info", info).pure(),
         CommandSpec::new("file.options", "Options", "File", options).pure().params(
-            r#"{"clock"?: "auto" (the interface language's) | "12" | "24" (independent of the language), "twelveHour"?: bool, "weekStart"?: "sun"|"mon"|…, "workDays"?: ["mon",…], "workStart"?: 0-23, "workEnd"?: 1-24, "markReadOnOpen"?: bool, "sentUnread"?: bool (keep the copy of a message that is sent in Sent Items unread), "sentFolders"?: [{"address": string, "folder": number | null (the folder that keeps what is sent from that address; null: the account's own Sent Items)}], "defaultReminder"?: minutes | null, "quoteOnReply"?: bool, "autoLists"?: bool, "previewLines"?: 0-3, "syncLimit"?: number, "syncMinutes"?: 0-1440 (0: only when asked), "importMaxFileMb"?: 1-16384 (the most one imported file may be), "importMaxMessages"?: 1-10000000 (the most one imported mbox file brings in), "importTreeMaxMb"?: 1-65536 (the most one folder import may be), "importTreeMaxMessages"?: 1-10000000 (the most one folder import brings in), "saveMessageFormat"?: "eml"|"msg" (what File › Save As writes by default)}"#,
+            r#"{"clock"?: "auto" (the interface language's) | "12" | "24" (independent of the language), "twelveHour"?: bool, "weekStart"?: "sun"|"mon"|…, "workDays"?: ["mon",…], "workStart"?: 0-23, "workEnd"?: 1-24, "markReadOnOpen"?: bool, "sentCopy"?: bool (keep a copy of a message that is sent in Sent Items; on unless turned off), "sentUnread"?: bool (keep that copy unread), "sentFolders"?: [{"address": string, "folder": number | null (the folder that keeps what is sent from that address; null: the account's own Sent Items)}], "defaultReminder"?: minutes | null, "quoteOnReply"?: bool, "autoLists"?: bool, "previewLines"?: 0-3, "syncLimit"?: number, "syncMinutes"?: 0-1440 (0: only when asked), "importMaxFileMb"?: 1-16384 (the most one imported file may be), "importMaxMessages"?: 1-10000000 (the most one imported mbox file brings in), "importTreeMaxMb"?: 1-65536 (the most one folder import may be), "importTreeMaxMessages"?: 1-10000000 (the most one folder import brings in), "saveMessageFormat"?: "eml"|"msg" (what File › Save As writes by default)}"#,
         ),
     ]
 }
@@ -588,6 +588,9 @@ fn options(s: &mut Session, v: &Value) -> CmdResult {
     }
     if let Some(b) = p::bool(v, "markReadOnOpen") {
         prefs.mark_read_on_open = b;
+    }
+    if let Some(b) = p::bool(v, "sentCopy") {
+        prefs.sent_copy = b;
     }
     if let Some(b) = p::bool(v, "sentUnread") {
         prefs.sent_unread = b;

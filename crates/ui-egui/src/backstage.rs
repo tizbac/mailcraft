@@ -1150,6 +1150,13 @@ fn options(app: &mut MailApp, ui: &mut Ui, t: &Tokens) {
         ))
         .color(t.text_dim),
     );
+    let mut sent_copy = prefs.sent_copy;
+    let copy = ui
+        .checkbox(&mut sent_copy, tl!("Keep a copy of sent messages in Sent Items"))
+        .on_hover_text(tl!("A Microsoft Graph or JMAP account's server files its own copy; MailCraft can't turn that off yet."));
+    if copy.changed() {
+        set(app, json!({"sentCopy": sent_copy}));
+    }
     let mut sent_unread = prefs.sent_unread;
     if ui.checkbox(&mut sent_unread, tl!("Keep the copy of a sent message unread in Sent Items")).changed() {
         set(app, json!({"sentUnread": sent_unread}));
