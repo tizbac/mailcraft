@@ -2765,6 +2765,11 @@ msgstr "粗体"
 msgid "Bookmark"
 msgstr "书签"
 
+#. interface, ribbon
+#: crates/ui-egui/src/ribbon.rs crates/ui-egui/src/signatures.rs
+msgid "Borders"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/ribbon.rs
 #, fuzzy
@@ -3212,6 +3217,11 @@ msgstr "抄送：{names}"
 #, fuzzy
 msgid "Celebrate"
 msgstr "庆祝"
+
+#. command label, interface, ribbon
+#: crates/engine/src/cmd/format.rs crates/ui-egui/src/dialogs.rs crates/ui-egui/src/ribbon.rs
+msgid "Cell Borders"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs crates/ui-egui/src/security.rs
@@ -16134,6 +16144,11 @@ msgstr "并排"
 msgid "Side-by-Side"
 msgstr "并排"
 
+#. interface
+#: crates/ui-egui/src/dialogs.rs
+msgid "Sides with a line:"
+msgstr ""
+
 #. command label, ribbon
 #: crates/engine/src/cmd/signing.rs crates/ui-egui/src/ribbon.rs
 msgid "Sign"
@@ -21654,6 +21669,11 @@ msgstr "是否在线举行由组织者决定。"
 msgid "Which keys your GnuPG trusts fully, last read: {when}. It is read again when MailCraft comes back to the front, and by Refresh."
 msgstr "GnuPG 完全信任的密钥，上次读取时间：{when}。MailCraft 重新回到前台时以及点击“刷新”时会重新读取。"
 
+#. interface
+#: crates/ui-egui/src/signatures.rs
+msgid "Which sides the clicked table cell has a line on"
+msgstr ""
+
 #. ribbon
 #: crates/ui-egui/src/ribbon.rs
 #, fuzzy
@@ -25513,6 +25533,16 @@ msgstr "邮箱文件旁没有可用于其副本的空闲名称"
 #, fuzzy
 msgid "there is no search"
 msgstr "没有搜索任务"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "there is no such cell in that table"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "there is no table there"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/account.rs

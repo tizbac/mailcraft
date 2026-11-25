@@ -2768,6 +2768,11 @@ msgstr "Félkövér"
 msgid "Bookmark"
 msgstr "Könyvjelző"
 
+#. interface, ribbon
+#: crates/ui-egui/src/ribbon.rs crates/ui-egui/src/signatures.rs
+msgid "Borders"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/ribbon.rs
 #, fuzzy
@@ -3215,6 +3220,11 @@ msgstr "Másolat: {names}"
 #, fuzzy
 msgid "Celebrate"
 msgstr "Ünneplés"
+
+#. command label, interface, ribbon
+#: crates/engine/src/cmd/format.rs crates/ui-egui/src/dialogs.rs crates/ui-egui/src/ribbon.rs
+msgid "Cell Borders"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs crates/ui-egui/src/security.rs
@@ -16135,6 +16145,11 @@ msgstr ""
 msgid "Side-by-Side"
 msgstr "Oldalsó"
 
+#. interface
+#: crates/ui-egui/src/dialogs.rs
+msgid "Sides with a line:"
+msgstr ""
+
 #. command label, ribbon
 #: crates/engine/src/cmd/signing.rs crates/ui-egui/src/ribbon.rs
 msgid "Sign"
@@ -21674,6 +21689,11 @@ msgstr "Hogy online tartják-e, azt a szervezőnek kell megmondania."
 msgid "Which keys your GnuPG trusts fully, last read: {when}. It is read again when MailCraft comes back to the front, and by Refresh."
 msgstr "Ami a GnuPG-d teljes bizalmát adja, utolsó olvasat: {when}. Újra olvasható, amikor MailCraft visszajön a frontra, és a Refresh."
 
+#. interface
+#: crates/ui-egui/src/signatures.rs
+msgid "Which sides the clicked table cell has a line on"
+msgstr ""
+
 #. ribbon
 #: crates/ui-egui/src/ribbon.rs
 #, fuzzy
@@ -25532,6 +25552,16 @@ msgstr "nincs szabad fájlnév a postafiók mellett létrehozandó másolathoz"
 #, fuzzy
 msgid "there is no search"
 msgstr "Nincs keresés"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "there is no such cell in that table"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "there is no table there"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/account.rs

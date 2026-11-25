@@ -939,6 +939,10 @@ fn switched(p: &serde_json::Value, now: bool) -> Result<bool, String> {
 #[serde(default, rename_all = "camelCase")]
 pub struct UiState {
     pub tab: String,
+    /// The table cell the owner last clicked, as (the table's place in the text, row, cell): the
+    /// one the Borders dialog changes. Not kept between runs.
+    #[serde(skip)]
+    pub table_cell: Option<(usize, usize, usize)>,
     pub backstage: bool,
     pub backstage_page: String,
     pub ribbon_collapsed: bool,
@@ -1095,6 +1099,7 @@ impl Default for UiState {
     fn default() -> Self {
         UiState {
             tab: "Home".into(),
+            table_cell: None,
             backstage: false,
             backstage_page: "info".into(),
             ribbon_collapsed: false,

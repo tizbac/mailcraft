@@ -202,3 +202,20 @@ fn neither_opens_without_a_message() {
     assert!(app.run("insert.dateTime", json!({})).is_err());
     assert!(app.dialog.is_none());
 }
+
+#[test]
+fn the_borders_dialog_opens_for_the_clicked_table_cell() {
+    let mut app = writing();
+    app.execute("insert.table", json!({"rows": 2, "columns": 2})).unwrap();
+    let from = {
+        let body = &app.session.compose.as_ref().unwrap().body;
+        (0..body.text().len()).find(|at| body.text().table_at(*at).is_some()).expect("the table")
+    };
+    app.ui.table_cell = Some((from, 0, 0));
+    app.execute("ui.dialog", json!({"name": "tableBorders"})).unwrap();
+    match &app.dialog {
+        Some(crate::dialogs::Dialog::TableBorders { from: at, row: 0, cell: 0, top: true, right: true, bottom: true, left: true }) if *at == from => {
+        }
+        other => panic!("the cell's borders were not asked about: {:?}", other.is_some()),
+    }
+}

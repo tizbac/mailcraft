@@ -2760,6 +2760,11 @@ msgstr "Gras"
 msgid "Bookmark"
 msgstr "Signet"
 
+#. interface, ribbon
+#: crates/ui-egui/src/ribbon.rs crates/ui-egui/src/signatures.rs
+msgid "Borders"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/ribbon.rs
 #, fuzzy
@@ -3206,6 +3211,11 @@ msgstr "Cc : {names}"
 #, fuzzy
 msgid "Celebrate"
 msgstr "Fêter"
+
+#. command label, interface, ribbon
+#: crates/engine/src/cmd/format.rs crates/ui-egui/src/dialogs.rs crates/ui-egui/src/ribbon.rs
+msgid "Cell Borders"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs crates/ui-egui/src/security.rs
@@ -16071,6 +16081,11 @@ msgstr ""
 msgid "Side-by-Side"
 msgstr "Côte à côte"
 
+#. interface
+#: crates/ui-egui/src/dialogs.rs
+msgid "Sides with a line:"
+msgstr ""
+
 #. command label, ribbon
 #: crates/engine/src/cmd/signing.rs crates/ui-egui/src/ribbon.rs
 msgid "Sign"
@@ -21588,6 +21603,11 @@ msgstr "C'est à son organisateur de décider si elle a lieu en ligne."
 msgid "Which keys your GnuPG trusts fully, last read: {when}. It is read again when MailCraft comes back to the front, and by Refresh."
 msgstr "Les clés auxquelles votre GnuPG fait entièrement confiance, lues pour la dernière fois : {when}. Elles sont relues quand MailCraft revient au premier plan, et par Actualiser."
 
+#. interface
+#: crates/ui-egui/src/signatures.rs
+msgid "Which sides the clicked table cell has a line on"
+msgstr ""
+
 #. ribbon
 #: crates/ui-egui/src/ribbon.rs
 msgid "Who has answered, and how"
@@ -25440,6 +25460,16 @@ msgstr "aucun nom libre pour la copie de la boîte aux lettres à côté"
 #, fuzzy
 msgid "there is no search"
 msgstr "aucune recherche en cours"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "there is no such cell in that table"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "there is no table there"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/account.rs

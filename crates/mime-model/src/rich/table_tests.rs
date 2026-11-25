@@ -169,6 +169,7 @@ fn undo_charges_shared_table_storage_once() {
         rowspan: 1,
         background: None,
         alignment: CellAlignment::Left,
+        borders: mailcraft_model::rich::CellBorders::ALL,
     };
     let table = std::sync::Arc::new(PastedTable::new(1, vec![vec![cell]]).unwrap());
     let mut body = RichBody::new(RichText::from_paragraphs(vec![Paragraph::new(vec![Run::table(table)], ListKind::None)]));

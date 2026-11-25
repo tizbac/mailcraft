@@ -101,6 +101,13 @@ pub fn specs() -> Vec<CommandSpec> {
             .pure()
             .params(r#"{"html"?: string, "spreadsheet"?: string (Excel's "XML Spreadsheet" clipboard data, made into a table), "text"?: string} — over the selection; supported HTML formatting includes bold, italic, underline, font, size, colours, links, lists and a paragraph's indent and alignment. The HTML composer keeps bounded tables as selectable objects. Tables flatten to text in plain-text messages and signatures. HTML that comes to no text gives way to `text`; text alone that is a spreadsheet's Copy (two or more rows of lines with the same number of tab-separated cells) becomes a table in an HTML message. Nothing to paste changes nothing"#)
             .when_writing(needs_doc),
+        CommandSpec::new("table.cellBorders", "Cell Borders", "Insert › Tables", cell_borders)
+            .pure()
+            .params(r#"{"from": number (the table's place in the text), "row": number, "cell": number (both 0-based)} — the sides that cell has a line on: {"top", "right", "bottom", "left"}"#)
+            .when_writing(needs_html),
+        CommandSpec::new("table.borders", "Cell Borders", "Insert › Tables", table_borders)
+            .params(r#"{"from": number (the table's place in the text), "row": number, "cell": number (both 0-based), "top"?: bool, "right"?: bool, "bottom"?: bool, "left"?: bool} — the sides that cell has a line on; the rest stay as they are"#)
+            .when_writing(needs_html),
         CommandSpec::new("insert.table", "Table", "Insert › Tables", insert_table)
             .pure()
             .params(r#"{"rows"?: number, "columns"?: number} (default: 3 rows, 3 columns) — an empty grid at the caret, in an HTML message"#)
@@ -538,6 +545,50 @@ fn pasted_text(text: &str, plain: bool, signature: bool) -> RichText {
     }
 }
 
+/// The sides a table cell has a line on, as the window's selected cell names it.
+fn cell_borders(s: &mut Session, v: &Value) -> CmdResult {
+    let (from, row, cell) = cell_of(s, v)?;
+    let table = s.doc().and_then(|(body, _)| body.text().table_at(from)).ok_or_else(|| fail("there is no table there"))?;
+    let borders = table.borders(row, cell).ok_or_else(|| fail("there is no such cell in that table"))?;
+    Ok(cell_answer(from, row, cell, borders))
+}
+
+/// Turn some of a table cell's sides on or off.
+fn table_borders(s: &mut Session, v: &Value) -> CmdResult {
+    let (from, row, cell) = cell_of(s, v)?;
+    let before = s
+        .doc()
+        .and_then(|(body, _)| body.text().table_at(from))
+        .and_then(|table| table.borders(row, cell))
+        .ok_or_else(|| fail("there is no such cell in that table"))?;
+    let mut borders = before;
+    for (key, side) in [("top", &mut borders.top), ("right", &mut borders.right), ("bottom", &mut borders.bottom), ("left", &mut borders.left)] {
+        if let Some(on) = p::bool(v, key) {
+            *side = on;
+        }
+    }
+    edit(s, &json!({"from": from}), |body| {
+        let table = body.text_mut().table_at_mut(from).ok_or_else(|| ModelError::Invalid("there is no table there".into()))?;
+        if table.set_borders(row, cell, borders) { Ok(()) } else { Err(ModelError::Invalid("there is no such cell in that table".into())) }
+    })?;
+    Ok(cell_answer(from, row, cell, borders))
+}
+
+/// `from`, `row` and `cell` of a table cell, as the window names it.
+fn cell_of(s: &Session, v: &Value) -> Result<(usize, usize, usize), CmdError> {
+    let from = position(v, "from")?.ok_or_else(|| bad("`from` (number) is required"))?;
+    let n = |key: &str| p::u64(v, key).and_then(|n| usize::try_from(n).ok()).ok_or_else(|| bad(format!("`{key}` is a number of a row or a cell")));
+    let (row, cell) = (n("row")?, n("cell")?);
+    if s.doc().is_none() {
+        return Err(fail("no message is being written"));
+    }
+    Ok((from, row, cell))
+}
+
+fn cell_answer(from: usize, row: usize, cell: usize, borders: mailcraft_model::rich::CellBorders) -> Value {
+    json!({"from": from, "row": row, "cell": cell, "top": borders.top, "right": borders.right, "bottom": borders.bottom, "left": borders.left})
+}
+
 /// Insert › Table: an empty grid at the caret, as a pasted one is.
 fn insert_table(s: &mut Session, v: &Value) -> CmdResult {
     let (rows, columns) = (cells(v, "rows")?, cells(v, "columns")?);
@@ -571,6 +622,7 @@ fn empty_cell() -> TableCell {
         rowspan: 1,
         background: None,
         alignment: CellAlignment::Left,
+        borders: mailcraft_model::rich::CellBorders::ALL,
     }
 }
 

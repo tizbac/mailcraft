@@ -193,6 +193,16 @@ pub enum Dialog {
         rows: usize,
         columns: usize,
     },
+    /// The sides the selected table cell has a line on; runs `table.borders`.
+    TableBorders {
+        from: usize,
+        row: usize,
+        cell: usize,
+        top: bool,
+        right: bool,
+        bottom: bool,
+        left: bool,
+    },
     Symbol(crate::symbol::Symbol),
 }
 
@@ -351,6 +361,7 @@ impl Dialog {
             Dialog::ViewSource(_) => "viewSource",
             Dialog::Security(d) => d.name(),
             Dialog::InsertTable { .. } => "insertTable",
+            Dialog::TableBorders { .. } => "tableBorders",
             Dialog::Symbol(_) => "symbol",
             Dialog::FindReplace(d) => {
                 if d.replace {
@@ -466,6 +477,12 @@ impl Dialog {
                     rows: at("rows").unwrap_or(3).clamp(1, mailcraft_model::rich::MAX_PASTED_ROWS),
                     columns: at("columns").unwrap_or(3).clamp(1, mailcraft_model::rich::MAX_PASTED_COLUMNS),
                 }
+            }
+            "tableBorders" => {
+                // (The cell the owner last clicked; a click elsewhere forgets it.)
+                let (from, row, cell) = app.ui.table_cell?;
+                let borders = app.session.doc().and_then(|(body, _)| body.text().table_at(from)).and_then(|table| table.borders(row, cell))?;
+                Dialog::TableBorders { from, row, cell, top: borders.top, right: borders.right, bottom: borders.bottom, left: borders.left }
             }
             "password" => Dialog::Password { account: id("account")?, password: String::new(), shown: false },
             // Opened by name (`ui.dialog`, which an agent may run), it has nothing waiting for its
@@ -3232,6 +3249,31 @@ pub fn show(app: &mut MailApp, ctx: &egui::Context) {
             close |= !open;
             if (submit || enter) && !close {
                 if let Err(e) = app.execute("insert.table", json!({"rows": *rows, "columns": *columns})) {
+                    app.status(e);
+                }
+                close = true;
+            }
+            if close {
+                app.want_body_focus();
+            }
+        }
+        Dialog::TableBorders { from, row, cell, top, right, bottom, left } => {
+            let mut submit = false;
+            let open = window(ctx, tl!("Cell Borders"), 260.0, |ui| {
+                ui.label(tl!("Sides with a line:"));
+                for (label, side) in [("Top", &mut *top), ("Right", &mut *right), ("Bottom", &mut *bottom), ("Left", &mut *left)] {
+                    ui.checkbox(side, tl!(label));
+                }
+                ui.add_space(6.0);
+                button_row(ui, |ui| {
+                    submit |= primary_button(ui, tl!("OK"), true).clicked();
+                    close |= plain_button(ui, tl!("Cancel")).clicked();
+                });
+            });
+            close |= !open;
+            if (submit || enter) && !close {
+                let params = json!({"from": *from, "row": *row, "cell": *cell, "top": *top, "right": *right, "bottom": *bottom, "left": *left});
+                if let Err(e) = app.execute("table.borders", params) {
                     app.status(e);
                 }
                 close = true;

@@ -128,6 +128,11 @@ impl RichBody {
         &self.text
     }
 
+    /// The text to change (the caret and selection stay as they are).
+    pub fn text_mut(&mut self) -> &mut RichText {
+        &mut self.text
+    }
+
     /// The text without formatting (positions count its characters).
     pub fn plain(&self) -> String {
         self.text.text()

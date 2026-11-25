@@ -543,6 +543,38 @@ pub struct TableCell {
     pub rowspan: u16,
     pub background: Option<String>,
     pub alignment: CellAlignment,
+    /// The sides of the cell that have a line. All of them, as every cell of a grid had until the
+    /// owner chose otherwise; a file from before this has them all.
+    #[serde(default)]
+    pub borders: CellBorders,
+}
+
+/// The sides of a table cell that have a line, top, right, bottom and left.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CellBorders {
+    pub top: bool,
+    pub right: bool,
+    pub bottom: bool,
+    pub left: bool,
+}
+
+impl Default for CellBorders {
+    fn default() -> Self {
+        Self::ALL
+    }
+}
+
+impl CellBorders {
+    pub const ALL: CellBorders = CellBorders { top: true, right: true, bottom: true, left: true };
+    pub const NONE: CellBorders = CellBorders { top: false, right: false, bottom: false, left: false };
+
+    pub fn all(self) -> bool {
+        self == Self::ALL
+    }
+
+    pub fn none(self) -> bool {
+        self == Self::NONE
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -649,11 +681,29 @@ impl PastedTable {
                         rowspan: 1,
                         background: None,
                         alignment: CellAlignment::Left,
+                        borders: CellBorders::ALL,
                     })
                     .collect()
             })
             .collect();
         PastedTable::new(u16::try_from(width).ok()?, cells)
+    }
+
+    /// The sides a cell at `row`, `cell` (its place in that row) has a line on; `None` when there
+    /// is no such cell.
+    pub fn borders(&self, row: usize, cell: usize) -> Option<CellBorders> {
+        self.rows.get(row)?.get(cell).map(|c| c.borders)
+    }
+
+    /// Set the sides a cell at `row`, `cell` has a line on. Whether there was such a cell.
+    pub fn set_borders(&mut self, row: usize, cell: usize, borders: CellBorders) -> bool {
+        match self.rows.get_mut(row).and_then(|r| r.get_mut(cell)) {
+            Some(c) => {
+                c.borders = borders;
+                true
+            }
+            None => false,
+        }
     }
 
     pub fn columns(&self) -> u16 {
@@ -1030,6 +1080,37 @@ impl RichText {
             out.push(Paragraph::default());
         }
         RichText { paragraphs: out }
+    }
+
+    /// The table at character `at` (the object's place in the text), if there is one.
+    pub fn table_at(&self, at: usize) -> Option<&PastedTable> {
+        let mut seen = 0usize;
+        for p in &self.paragraphs {
+            for run in &p.runs {
+                let len = run.text.chars().count().max(1);
+                if let Some(table) = run.table.as_deref().filter(|_| at >= seen && at < seen + len) {
+                    return Some(table);
+                }
+                seen = seen.saturating_add(len);
+            }
+        }
+        None
+    }
+
+    /// The table at character `at`, to change (the one that is there is changed in place when it
+    /// is shared by no undo step).
+    pub fn table_at_mut(&mut self, at: usize) -> Option<&mut PastedTable> {
+        let mut seen = 0usize;
+        for p in &mut self.paragraphs {
+            for run in &mut p.runs {
+                let len = run.text.chars().count().max(1);
+                if at >= seen && at < seen.saturating_add(len) {
+                    return run.table.as_mut().map(std::sync::Arc::make_mut);
+                }
+                seen = seen.saturating_add(len);
+            }
+        }
+        None
     }
 
     pub fn paragraphs(&self) -> &[Paragraph] {

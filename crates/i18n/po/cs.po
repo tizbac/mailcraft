@@ -2762,6 +2762,11 @@ msgstr "Tučné"
 msgid "Bookmark"
 msgstr "Záložka"
 
+#. interface, ribbon
+#: crates/ui-egui/src/ribbon.rs crates/ui-egui/src/signatures.rs
+msgid "Borders"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/ribbon.rs
 #, fuzzy
@@ -3209,6 +3214,11 @@ msgstr "Kopie: {names}"
 #, fuzzy
 msgid "Celebrate"
 msgstr "Oslava"
+
+#. command label, interface, ribbon
+#: crates/engine/src/cmd/format.rs crates/ui-egui/src/dialogs.rs crates/ui-egui/src/ribbon.rs
+msgid "Cell Borders"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs crates/ui-egui/src/security.rs
@@ -16165,6 +16175,11 @@ msgstr ""
 msgid "Side-by-Side"
 msgstr "Vedle sebe"
 
+#. interface
+#: crates/ui-egui/src/dialogs.rs
+msgid "Sides with a line:"
+msgstr ""
+
 #. command label, ribbon
 #: crates/engine/src/cmd/signing.rs crates/ui-egui/src/ribbon.rs
 msgid "Sign"
@@ -21727,6 +21742,11 @@ msgstr "Zda se koná online, určuje organizátor."
 msgid "Which keys your GnuPG trusts fully, last read: {when}. It is read again when MailCraft comes back to the front, and by Refresh."
 msgstr "Kterým klíčům vaše GnuPG plně důvěřuje, naposledy načteno: {when}. Znovu se načte, když se MailCraft vrátí do popředí, a tlačítkem Aktualizovat."
 
+#. interface
+#: crates/ui-egui/src/signatures.rs
+msgid "Which sides the clicked table cell has a line on"
+msgstr ""
+
 #. ribbon
 #: crates/ui-egui/src/ribbon.rs
 #, fuzzy
@@ -25590,6 +25610,16 @@ msgstr "pro kopii poštovní schránky vedle ní není volný název"
 #, fuzzy
 msgid "there is no search"
 msgstr "není žádné hledání"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "there is no such cell in that table"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "there is no table there"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/account.rs

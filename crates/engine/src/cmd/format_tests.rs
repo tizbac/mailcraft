@@ -768,3 +768,28 @@ fn replace_exact_checks_the_old_word_and_keeps_its_style_and_list() {
     assert_eq!(mine(&s), "oggi sopratutto");
     assert_eq!(compose(&s).body.selection(), Selection::caret(0));
 }
+
+#[test]
+fn a_table_cells_sides_can_be_chosen_and_are_what_is_sent() {
+    let mut s = session();
+    run(&mut s, "mail.new", json!({}));
+    run(&mut s, "insert.table", json!({"rows": 2, "columns": 2}));
+    let table = |s: &Session| compose(s).body.text().paragraphs().iter().find_map(|p| p.runs.iter().find_map(|r| r.table.clone())).expect("a table");
+    // The top-left cell keeps only its right and left sides.
+    let said = run(&mut s, "table.borders", json!({"from": 0, "row": 0, "cell": 0, "top": false, "bottom": false}));
+    assert_eq!(
+        (said["top"].as_bool(), said["right"].as_bool(), said["bottom"].as_bool(), said["left"].as_bool()),
+        (Some(false), Some(true), Some(false), Some(true))
+    );
+    let grid = table(&s);
+    let borders = grid.borders(0, 0).expect("the cell");
+    assert_eq!((borders.top, borders.right, borders.bottom, borders.left), (false, true, false, true));
+    // The other cells are as they were.
+    assert!(grid.borders(0, 1).is_some_and(|b| b.all()));
+    // The sides are written for the recipient, and the other cells keep the table's own frame.
+    let html = mailcraft_mime_model::rich::to_html(compose(&s).body.text());
+    assert!(html.contains("border-top:0;border-right:1px solid;border-bottom:0;border-left:1px solid;"), "{html}");
+    // Read back, and the sides are as they were.
+    let said = run(&mut s, "table.cellBorders", json!({"from": 0, "row": 0, "cell": 0}));
+    assert_eq!((said["top"].as_bool(), said["bottom"].as_bool()), (Some(false), Some(false)));
+}

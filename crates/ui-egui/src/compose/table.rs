@@ -9,7 +9,7 @@ use egui::{
     text::{Galley, LayoutJob},
     vec2,
 };
-use mailcraft_model::rich::{CellAlignment, PastedTable, Style};
+use mailcraft_model::rich::{CellAlignment, CellBorders, PastedTable, Style};
 
 use crate::theme::Tokens;
 
@@ -20,6 +20,10 @@ struct Cell {
     rect: Rect,
     text: Arc<Galley>,
     background: Option<Color32>,
+    borders: CellBorders,
+    /// Its row and its place in that row, as the model names it.
+    row: usize,
+    column: usize,
 }
 
 pub(super) struct TableLayout {
@@ -49,7 +53,7 @@ impl TableLayout {
         let mut fonts = crate::fonts::Chooser::new(ctx);
         for (row_index, row) in table.rows().iter().enumerate() {
             let mut column = 0;
-            for cell in row {
+            for (cell_index, cell) in row.iter().enumerate() {
                 while occupied.get(column).is_some_and(|end| *end > row_index) {
                     column += 1;
                 }
@@ -102,7 +106,7 @@ impl TableLayout {
                     *slot = (*slot).max(end_row);
                     *width = width.max(per_column);
                 }
-                cells.push((row_index, end_row, column, end_column, job, background));
+                cells.push((row_index, cell_index, end_row, column, end_column, job, background, cell.borders));
                 column = end_column;
             }
         }
@@ -120,7 +124,7 @@ impl TableLayout {
         };
         let xs = edges(&widths);
         let mut laid = Vec::new();
-        for (row, end_row, column, end_column, mut job, background) in cells {
+        for (row, cell_index, end_row, column, end_column, mut job, background, borders) in cells {
             let (Some(&left), Some(&right)) = (xs.get(column), xs.get(end_column)) else { continue };
             job.wrap.max_width = (right - left - 2.0 * PADDING).max(1.0);
             let text = ctx.fonts_mut(|f| f.layout_job(job));
@@ -129,20 +133,25 @@ impl TableLayout {
             if let Some(last) = spanned.last_mut() {
                 *last += missing;
             }
-            laid.push((row, end_row, left, right, text, background));
+            laid.push((row, cell_index, end_row, left, right, text, background, borders));
         }
         let ys = edges(&heights);
         let cells = laid
             .into_iter()
-            .filter_map(|(row, end_row, left, right, text, background)| {
+            .filter_map(|(row, cell_index, end_row, left, right, text, background, borders)| {
                 let rect = Rect::from_min_max(pos2(left, *ys.get(row)?), pos2(right, *ys.get(end_row)?));
-                Some(Cell { rect, text, background })
+                Some(Cell { rect, text, background, borders, row, column: cell_index })
             })
             .collect();
         Self { size: vec2(total * scale, heights.iter().sum()), cells, plain: None }
     }
 
-    pub fn paint(&self, painter: &Painter, at: Pos2, tokens: &Tokens) {
+    /// The row and the cell's place in it under `at`, measured from the table's own top left.
+    pub fn cell_at(&self, at: Vec2) -> Option<(usize, usize)> {
+        self.cells.iter().find(|cell| cell.rect.contains(at.to_pos2())).map(|cell| (cell.row, cell.column))
+    }
+
+    pub fn paint(&self, painter: &Painter, at: Pos2, tokens: &Tokens, selected: Option<(usize, usize)>) {
         if let Some(text) = &self.plain {
             painter.galley(at, text.clone(), tokens.text);
             return;
@@ -152,7 +161,28 @@ impl TableLayout {
             if let Some(background) = cell.background {
                 painter.rect_filled(rect, 0.0, background);
             }
-            painter.rect_stroke(rect, 0.0, Stroke::new(1.0, tokens.border), StrokeKind::Inside);
+            if selected == Some((cell.row, cell.column)) {
+                painter.rect_filled(rect, 0.0, tokens.selection);
+            }
+            // Each side the owner kept is a line of its own; a cell with all of them is the old
+            // whole frame.
+            let line = Stroke::new(1.0, tokens.border);
+            if cell.borders.all() {
+                painter.rect_stroke(rect, 0.0, line, StrokeKind::Inside);
+            } else {
+                if cell.borders.top {
+                    painter.line_segment([rect.left_top(), rect.right_top()], line);
+                }
+                if cell.borders.right {
+                    painter.line_segment([rect.right_top(), rect.right_bottom()], line);
+                }
+                if cell.borders.bottom {
+                    painter.line_segment([rect.left_bottom(), rect.right_bottom()], line);
+                }
+                if cell.borders.left {
+                    painter.line_segment([rect.left_top(), rect.left_bottom()], line);
+                }
+            }
             let x = match cell.text.job.halign {
                 egui::Align::Min => rect.left() + PADDING,
                 egui::Align::Center => rect.center().x,

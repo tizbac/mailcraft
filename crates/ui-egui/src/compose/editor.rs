@@ -492,6 +492,16 @@ impl Layout {
         p.tables.iter().find(|b| b.rect.contains(local)).map(|b| p.start + b.local)
     }
 
+    /// The table cell under a point of the body: the table's place in the text, the row and the
+    /// cell's place in that row.
+    fn table_cell_hit(&self, at: Vec2) -> Option<(usize, usize, usize)> {
+        let p = self.para_at_y(at.y)?;
+        let local = pos2(at.x - p.indent(), at.y - p.top);
+        let b = p.tables.iter().find(|b| b.rect.contains(local))?;
+        let (row, cell) = b.grid.cell_at((local - b.rect.min.to_vec2()).to_vec2())?;
+        Some((p.start + b.local, row, cell))
+    }
+
     /// The picture that is the selection, alone: its id and where it is in the body.
     fn selected_picture(&self, sel: Selection) -> Option<(u32, Rect)> {
         if sel.end() != sel.start() + 1 {
@@ -863,6 +873,10 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
         let at = layout.hit(pointer - origin);
         let on = layout.char_under(pointer - origin).unwrap_or(at);
         let (pressed, shift) = ui.input(|i| (i.pointer.primary_pressed(), i.modifiers.shift));
+        if pressed {
+            // The cell a click lands in, for the Borders dialog; a click anywhere else forgets it.
+            app.ui.table_cell = layout.table_cell_hit(pointer - origin);
+        }
         let object = if pressed && !shift {
             layout.picture_hit(pointer - origin).map(|(place, _, _)| place).or_else(|| layout.table_hit(pointer - origin))
         } else {
@@ -1149,7 +1163,9 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
         }
         for table in &p.tables {
             let rect = table.rect.translate(at.to_vec2());
-            table.grid.paint(painter, rect.min, &t);
+            let place = p.start + table.local;
+            let selected = app.ui.table_cell.filter(|(there, _, _)| *there == place).map(|(_, row, cell)| (row, cell));
+            table.grid.paint(painter, rect.min, &t, selected);
             let index = p.start + table.local;
             if sel.start() <= index && sel.end() > index {
                 painter.rect_stroke(rect, 0.0, Stroke::new(2.0, fill), egui::StrokeKind::Inside);

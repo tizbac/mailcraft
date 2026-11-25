@@ -350,6 +350,10 @@ fn rich(app: &mut MailApp, ui: &mut Ui, t: &Tokens) {
             app.signature_note = None;
             let _ = app.run("ui.dialog", json!({"name": "insertTable"}));
         }
+        if ui.button(tl!("Borders")).on_hover_text(tl!("Which sides the clicked table cell has a line on")).clicked() {
+            app.signature_note = None;
+            let _ = app.run("ui.dialog", json!({"name": "tableBorders"}));
+        }
         if ui.button(tl!("Insert Picture")).clicked() {
             app.signature_note = None;
             let _ = app.run("signature.picture.add", json!({}));
