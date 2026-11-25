@@ -1304,6 +1304,11 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
             pen.line(&[(7.5, 4.5), (7.5, 15.5)]);
             pen.line(&[(12.5, 4.5), (12.5, 15.5)]);
         }
+        // Insert › Table › Cell Borders: a cell with a frame of its own inside the table's.
+        "tableBorders" => {
+            pen.rect(2.5, 4.5, 17.5, 15.5, c);
+            pen.rect(6.0, 7.5, 14.0, 13.0, c);
+        }
         // A password's eye (#438): open, a click shows the password; struck through, it hides
         // it again.
         "showPassword" | "hidePassword" => {
@@ -1524,6 +1529,7 @@ pub const NAMES: &[&str] = &[
     "numbering",
     "insertLink",
     "table",
+    "tableBorders",
     "clearFormatting",
     "formatHtml",
     "formatPlain",

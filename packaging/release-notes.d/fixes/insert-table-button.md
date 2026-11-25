@@ -1,0 +1,1 @@
+- **Insert › Table is easy to find while writing.** The composer's Insert tab keeps the Table button's name in the simplified ribbon (it was an unnamed grid icon beside another), and Cell Borders has a drawing of its own.

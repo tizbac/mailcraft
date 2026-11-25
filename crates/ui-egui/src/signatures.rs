@@ -346,6 +346,14 @@ fn rich(app: &mut MailApp, ui: &mut Ui, t: &Tokens) {
         if ui.add(egui::Button::selectable(look.link, tl!("Link"))).clicked() {
             let _ = app.run("compose.link", json!({}));
         }
+        if ui.button(tl!("Table")).on_hover_text(tl!("Insert a table at the caret")).clicked() {
+            app.signature_note = None;
+            let _ = app.run("ui.dialog", json!({"name": "insertTable"}));
+        }
+        if ui.button(tl!("Borders")).on_hover_text(tl!("Which sides the clicked table cell has a line on")).clicked() {
+            app.signature_note = None;
+            let _ = app.run("ui.dialog", json!({"name": "tableBorders"}));
+        }
         if ui.button(tl!("Insert Picture")).clicked() {
             app.signature_note = None;
             let _ = app.run("signature.picture.add", json!({}));

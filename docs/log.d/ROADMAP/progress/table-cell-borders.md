@@ -1,0 +1,1 @@
+| 2026-11-25 | A table cell's four sides can each be on or off: clicking a cell selects it, Insert › Table › Borders (and the signature editor's Borders button) sets them, and `table.cellBorders`/`table.borders` do the same for scripts; the sides are written per cell as `border-<side>` |
