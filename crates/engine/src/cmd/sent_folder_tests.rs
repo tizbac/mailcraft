@@ -72,3 +72,37 @@ fn a_server_copy_takes_the_read_state_chosen_for_it_when_it_comes_down() {
     let copy = s.mailbox.add_message(copy).unwrap();
     assert!(!s.mailbox.message(copy).unwrap().read, "the server's copy is taken as unread");
 }
+
+#[test]
+fn no_copy_of_a_local_send_is_kept() {
+    let mut s = session();
+    let account = s.mailbox.accounts.first().map(|a| a.id).unwrap();
+    run(&mut s, "file.options", json!({"sentCopy": false}));
+    run(&mut s, "mail.new", json!({"account": account, "to": "maya@example.org", "subject": "Gone", "body": "No copy"}));
+    let id = run(&mut s, "compose.send", json!({}))["id"].as_u64().unwrap();
+    assert!(s.mailbox.message(id).is_none(), "nothing is kept of what was sent");
+}
+
+#[test]
+fn a_sent_message_leaves_the_outbox_without_a_sent_copy() {
+    use mailcraft_model::sync::SyncResult;
+    let mut s = session();
+    let account = s.mailbox.accounts.first().map(|a| a.id).unwrap();
+    let outbox = s.mailbox.folder_of_kind(account, mailcraft_model::FolderKind::Outbox).unwrap();
+    let id = s
+        .mailbox
+        .add_message(mailcraft_model::Message {
+            account,
+            folder: outbox,
+            message_id: "<no-copy@example.org>".into(),
+            from: mailcraft_model::Address::new("Me", &s.mailbox.account(account).unwrap().email),
+            to: vec![mailcraft_model::Address::new("Maya", "maya@example.org")],
+            subject: "Gone".into(),
+            date: NOW,
+            ..Default::default()
+        })
+        .unwrap();
+    let result = SyncResult { sent: vec![id], ..Default::default() };
+    assert_eq!(super::account::file_sent(&mut s.mailbox, account, &result, false, false, NOW), 1);
+    assert!(s.mailbox.message(id).is_none(), "it left the Outbox and no copy was kept");
+}

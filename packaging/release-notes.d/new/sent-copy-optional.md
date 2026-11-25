@@ -1,0 +1,1 @@
+- **A copy of what is sent can be turned off.** File › Options › Sent Items has Keep a copy of sent messages in Sent Items, on by default; turned off, Exchange uses `SendOnly`, IMAP appends nothing, and a local account keeps nothing. Whether the copy is read or unread, and in which folder, is still chosen there.

@@ -15,6 +15,8 @@ mailcraft-i18n = { workspace = true }
 mailcraft-model = { workspace = true }
 mailcraft-names = { workspace = true }
 mailcraft-html = { workspace = true }
+# Excel's "XML Spreadsheet" clipboard data read into an HTML table (`cmd::spreadsheet`).
+quick-xml = { workspace = true }
 # Format characters made visible in View Source (`cmd::source`).
 mailcraft-mime = { workspace = true }
 mailcraft-mime-model = { workspace = true }

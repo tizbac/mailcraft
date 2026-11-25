@@ -469,6 +469,11 @@ msgid "A JMAP account's mail can't be snoozed yet."
 msgstr "Egy JMAP-fiók levele még nem szivároghat ki."
 
 #. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "A Microsoft Graph or JMAP account's server files its own copy; MailCraft can't turn that off yet."
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/reading/warnings.rs
 #, fuzzy
 msgid "A brand's name on another address."
@@ -8237,6 +8242,11 @@ msgstr "Folyton várj!"
 #, fuzzy
 msgid "Keep a calendar from the web up to date here: its address ends in .ics or starts with webcal://"
 msgstr "Tartson itt naprakészen egy weben lévő naptárat: a címe .ics-re végződik, vagy webcal://-lal kezdődik"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Keep a copy of sent messages in Sent Items"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountDialogs.kt

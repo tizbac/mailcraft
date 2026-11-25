@@ -381,7 +381,7 @@ fn send_outbox(run: &mut Run) -> Vec<Message> {
         match outcome {
             Ok(()) => {
                 run.out.sent.push(message.id);
-                if filed_there {
+                if filed_there && !request.sent_no_copy {
                     run.out.filed.push(message.id);
                 }
                 sent.push(message.into_owned());
@@ -471,7 +471,18 @@ fn microsoft_loopback_allowed() -> bool {
 /// read. The mailbox here was told to expect the copies when the messages went; a copy that
 /// didn't get there is said (`unfiled`). A server without a mailbox for sent mail gets none: the
 /// copy here is the one there is. Returns whether the connection is still good.
-fn file_sent(imap: &mut Imap<Stream<'_>>, plan: &[(&Mailbox, FolderKind)], sent: &[Message], sent_unread: bool, result: &mut SyncResult) -> bool {
+fn file_sent(
+    imap: &mut Imap<Stream<'_>>,
+    plan: &[(&Mailbox, FolderKind)],
+    sent: &[Message],
+    sent_unread: bool,
+    sent_no_copy: bool,
+    result: &mut SyncResult,
+) -> bool {
+    if sent_no_copy {
+        // Nothing is kept on the server: the messages went, and there is no copy to file.
+        return true;
+    }
     let Some((mailbox, _)) = plan.iter().find(|(_, kind)| *kind == FolderKind::Sent) else {
         result.unfiled.extend(sent.iter().map(|m| m.id));
         return true;
@@ -724,7 +735,7 @@ fn exchange<'a>(run: &mut Run<'a>, sent: &[Message], host: Host) -> Option<Imap<
     imap.get_mut().watch(None);
     if !owed.is_empty() {
         run.hand_over_in(&imap, SyncStep::new(SyncStage::Filing, "", 0, 0));
-        if !file_sent(&mut imap, &plan, sent, request.sent_unread, &mut run.out) {
+        if !file_sent(&mut imap, &plan, sent, request.sent_unread, request.sent_no_copy, &mut run.out) {
             return None;
         }
     }

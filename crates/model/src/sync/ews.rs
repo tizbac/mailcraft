@@ -360,6 +360,10 @@ pub struct EwsMailRequest {
     /// with the owner's sign-in. Empty for the account itself.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub mailbox: String,
+    /// No copy of what is sent is to be filed in Sent Items (`file.options` `sentCopy`, off): the
+    /// message goes with `SendOnly`, and the server keeps none.
+    #[serde(skip_serializing_if = "is_false")]
+    pub sent_no_copy: bool,
     /// Read the server's folder hierarchy in this run (`SyncFolderHierarchy` from `hierarchy`): the
     /// first run, a run that reads every folder, and the run after one that brought no folders.
     #[serde(skip_serializing_if = "is_false")]

@@ -1028,6 +1028,7 @@ pub fn sync_request(s: &Session, account: Id) -> Result<SyncRequest, CmdError> {
         outbox,
         max_per_folder: s.prefs.sync_limit,
         sent_unread: s.prefs.sent_unread,
+        sent_no_copy: !s.prefs.sent_copy,
         ops,
         places,
         gmail_moves,
@@ -1569,9 +1570,9 @@ fn take_in_news(s: &mut Session, account: Id, result: &mut SyncResult) -> (Count
     let clock = s.rule_clock();
     // What the account had before the run's new mail, as an earlier piece of it found it.
     let had = s.run_had.remove(&account);
-    let sent_unread = s.prefs.sent_unread;
+    let (sent_unread, sent_copy) = (s.prefs.sent_unread, s.prefs.sent_copy);
     let mb = &mut s.mailbox;
-    let sent = file_sent(mb, account, result, sent_unread, clock.now);
+    let sent = file_sent(mb, account, result, sent_unread, sent_copy, clock.now);
     // Handed to the outgoing server, and the answer lost: it may have gone (AU3-26). (The run
     // said already that it couldn't send it.)
     let mut said = Vec::new();
@@ -1692,10 +1693,22 @@ impl OnServer {
 /// each): a message of the account's that is in Sent Items and not on the server yet is marked
 /// all the same. One whose copy didn't get to the server after all (`unfiled`) is no longer
 /// expected there. Returns how many were sent.
-pub(super) fn file_sent(mb: &mut Mailbox, account: Id, result: &SyncResult, sent_unread: bool, now: i64) -> usize {
-    let (Some(outbox), Some(sent_items)) = (mb.folder_of_kind(account, FolderKind::Outbox), mb.folder_of_kind(account, FolderKind::Sent)) else {
-        return 0;
-    };
+pub(super) fn file_sent(mb: &mut Mailbox, account: Id, result: &SyncResult, sent_unread: bool, sent_copy: bool, now: i64) -> usize {
+    let Some(outbox) = mb.folder_of_kind(account, FolderKind::Outbox) else { return 0 };
+    // No copy is kept: what is sent leaves the Outbox for good.
+    if !sent_copy {
+        let mut gone = 0;
+        for id in &result.sent {
+            if mb.message(*id).is_some_and(|m| m.account == account && m.folder == outbox) {
+                mb.mark_answered(*id);
+                if mb.remove_message(*id).is_ok() {
+                    gone += 1;
+                }
+            }
+        }
+        return gone;
+    }
+    let Some(sent_items) = mb.folder_of_kind(account, FolderKind::Sent) else { return 0 };
     let mut moved = 0;
     for id in &result.sent {
         // The server took it: what it answers or forwards is marked so now (#154).

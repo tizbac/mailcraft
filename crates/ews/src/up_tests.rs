@@ -475,12 +475,16 @@ fn message(to: &str, bcc: &str) -> Box<Message> {
 fn a_shared_mailboxs_drafts_and_sent_copy_are_filed_in_it() {
     use crate::compose::{CreateDraft, DraftContent, FindDraft, SendMessage};
     let address = "<t:EmailAddress>team@example.org</t:EmailAddress>";
-    let sent = SendMessage::new(&message("zoe@example.org", ""), "team@example.org", "").unwrap().element().write();
+    let sent = SendMessage::new(&message("zoe@example.org", ""), "team@example.org", "", false).unwrap().element().write();
     assert!(sent.contains(address), "{sent}");
     // A folder the owner chose for this address keeps the copy; empty keeps the account's own.
-    let filed = SendMessage::new(&message("zoe@example.org", ""), "team@example.org", "F-ARCHIVE").unwrap().element().write();
+    let filed = SendMessage::new(&message("zoe@example.org", ""), "team@example.org", "F-ARCHIVE", false).unwrap().element().write();
     assert!(filed.contains("<t:FolderId Id=\"F-ARCHIVE\""), "{filed}");
     assert!(!filed.contains("t:DistinguishedFolderId"), "{filed}");
+    // No copy kept: `SendOnly`, and no folder to save it in at all.
+    let only = SendMessage::new(&message("zoe@example.org", ""), "team@example.org", "", true).unwrap().element().write();
+    assert!(only.contains("MessageDisposition=\"SendOnly\""), "{only}");
+    assert!(!only.contains("SavedItemFolderId"), "{only}");
     let draft = CreateDraft::new(None, DraftContent::default()).in_mailbox("team@example.org").element().write();
     assert!(draft.contains(address), "{draft}");
     let find = FindDraft::new(None, "mark").in_mailbox("team@example.org").element().write();

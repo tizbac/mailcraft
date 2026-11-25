@@ -1784,6 +1784,11 @@ pub(super) fn send_now(s: &mut Session) -> CmdResult {
             delivered += 1;
         }
     }
+    // No copy is kept of what is sent, when the owner asked so: the message here goes once it
+    // has been delivered (a local account's is the only copy there is).
+    if !queued && !s.prefs.sent_copy {
+        let _ = s.mailbox.remove_message(id);
+    }
     s.compose = None;
     s.undo_send = by_wait.then_some(id);
     // (This command's own step is pushed once it returns.)

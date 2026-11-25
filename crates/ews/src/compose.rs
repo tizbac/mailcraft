@@ -382,6 +382,8 @@ pub struct SendMessage {
     /// The folder of the account that keeps the copy, by server id (`file.options`
     /// `sentFolders`): empty for the account's own Sent Items.
     sent_folder: String,
+    /// No copy is kept (`file.options` `sentCopy`, off): the message goes with `SendOnly`.
+    sent_no_copy: bool,
 }
 
 impl std::fmt::Debug for SendMessage {
@@ -394,7 +396,7 @@ impl SendMessage {
     /// Writes `message` as it goes, filing its sent copy in the mailbox at `mailbox` when that is
     /// not the account's own (a shared mailbox, at its address). Not a message that can go (no
     /// recipient, an address that isn't one, too large) is said so, and nothing is sent.
-    pub fn new(message: &Message, mailbox: &str, sent_folder: &str) -> Result<Self, Unsendable> {
+    pub fn new(message: &Message, mailbox: &str, sent_folder: &str, sent_no_copy: bool) -> Result<Self, Unsendable> {
         if mailcraft_mime_model::signature_missing(message) {
             return Err(Unsendable::NotSigned);
         }
@@ -421,17 +423,23 @@ impl SendMessage {
         if mime.len() > MAX_MIME {
             return Err(Unsendable::TooLarge);
         }
-        Ok(Self { mime, mailbox: mailbox.trim().to_owned(), sent_folder: sent_folder.trim().to_owned() })
+        Ok(Self { mime, mailbox: mailbox.trim().to_owned(), sent_folder: sent_folder.trim().to_owned(), sent_no_copy })
     }
 
     /// The operation: `SavedItemFolderId` and `Items` with the MIME content.
     pub fn element(&self) -> Element {
         let message = Element::new("t:Message").child(Element::new("t:MimeContent").attr("CharacterSet", "UTF-8").text(&base64(&self.mime)));
-        Element::new("m:CreateItem")
-            .attr("MessageDisposition", "SendAndSaveCopy")
+        let mut operation = Element::new("m:CreateItem").attr("MessageDisposition", if self.sent_no_copy { "SendOnly" } else { "SendAndSaveCopy" });
+        if !self.sent_no_copy {
             // The folder the owner chose for this address, or the account's own Sent Items.
-            .child(folder_ref_in("m:SavedItemFolderId", "sentitems", Some(self.sent_folder.as_str()).filter(|id| !id.is_empty()), &self.mailbox))
-            .child(Element::new("m:Items").child(message))
+            operation = operation.child(folder_ref_in(
+                "m:SavedItemFolderId",
+                "sentitems",
+                Some(self.sent_folder.as_str()).filter(|id| !id.is_empty()),
+                &self.mailbox,
+            ));
+        }
+        operation.child(Element::new("m:Items").child(message))
     }
 
     /// Whether the server took it (a send has no item to name: the copy is filed in Sent Items).

@@ -16,7 +16,8 @@ the owner has Send As or Send on Behalf permission there, and its copy is filed 
 Items; without it the message is held with the reason, never sent from another address.
 What is sent from an address is filed in that account's own Sent Items, or in the folder File ›
 Options › Sent Items names for the address (an Exchange server account's own folder, a shared
-mailbox's Sent Items say); the copy is kept read, or unread when the owner asks for that. Where a
+mailbox's Sent Items say); the copy is kept read, or unread when the owner asks for that, and none
+is kept at all when the owner turns that off (`SendOnly`). Where a
 server files its own copy (Microsoft Graph, JMAP), it is set read or unread here when the copy
 comes down, and the change goes up with the next run.
 

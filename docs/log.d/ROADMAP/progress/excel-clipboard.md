@@ -1,0 +1,1 @@
+| 2026-11-25 | A range copied from Excel pastes as a table on Windows: the HTML fragment `arboard` hands over is wrapped back in the table Excel wrote outside it, and the "XML Spreadsheet" clipboard data is read as a table when no HTML comes |
