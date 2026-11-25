@@ -608,12 +608,22 @@ pub struct FullCounts {
 /// [`FullCounts`] of `account` at `now`, in one pass over the mailbox. Older mail isn't counted:
 /// it stays as its headers and preview (#143).
 pub fn full_counts(mb: &Mailbox, account: Id, now: Timestamp) -> FullCounts {
+    full_counts_with(mb, account, now, &HashSet::new())
+}
+
+/// [`full_counts`] without the messages the background has passed over (`passed_over`, by
+/// account and server id): they are not waiting for the background, so that a bar of what it is
+/// downloading can end. (Opening one still asks for it.)
+pub fn full_counts_with(mb: &Mailbox, account: Id, now: Timestamp, passed_over: &HashSet<(Id, String)>) -> FullCounts {
     let limit = keeps_whole(mb, account);
     let window = OfflineWindow::of(mb, now);
     let mut counts = FullCounts::default();
     for m in mb.messages.values().filter(|m| m.account == account && (m.server.is_some() || m.unfetched) && window.within(m)) {
         counts.all = counts.all.saturating_add(1);
         if still_to_fetch(mb, m) {
+            if m.server.as_ref().is_some_and(|server| passed_over.iter().any(|(a, id)| *a == account && id == &server.id)) {
+                continue;
+            }
             let size = m.server.as_ref().map_or(0, |s| s.size);
             counts.waiting = counts.waiting.saturating_add(1);
             counts.large = counts.large.saturating_add(usize::from(limit.is_some_and(|limit| size > limit)));
