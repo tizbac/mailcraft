@@ -67,9 +67,9 @@ impl Client {
         Version::from_index(self.version.load(Ordering::Relaxed))
     }
 
-    /// The answer that couldn't be used, once ([`Client::remember_bad`]): a body is kept only
-    /// when an answer could not be used, at most [`mailcraft_model::sync::MAX_BAD_ANSWER`] bytes,
-    /// and the run says where it was written. Never a log line: it may hold mail.
+    /// The answer that couldn't be used, once ([`Client::remember_bad`]): the whole body is kept
+    /// (the HTTP client has already held it to the request's own limit), and the run says where
+    /// it was written. Never a log line: it may hold mail.
     pub fn take_bad_answer(&self) -> Option<mailcraft_model::sync::BadAnswer> {
         self.bad.lock().ok().and_then(|mut bad| bad.take())
     }
@@ -77,11 +77,11 @@ impl Client {
     /// Keeps `response` as the answer a parse could not use. The operation is filled in by the
     /// caller, which knows what it asked.
     fn remember_bad(&self, response: &HttpResponse) {
-        let body = response.body();
-        let cut = body.len() > mailcraft_model::sync::MAX_BAD_ANSWER;
-        let shown = String::from_utf8_lossy(body.get(..body.len().min(mailcraft_model::sync::MAX_BAD_ANSWER)).unwrap_or_default());
+        // (The whole answer, as it came: the HTTP client already held it to this request's own
+        // limit, so it is finite; a body that is not text has its bad bytes replaced.)
+        let body = String::from_utf8_lossy(response.body()).into_owned();
         if let Ok(mut bad) = self.bad.lock() {
-            *bad = Some(mailcraft_model::sync::BadAnswer { operation: String::new(), status: response.status(), body: shown.into_owned(), cut });
+            *bad = Some(mailcraft_model::sync::BadAnswer { operation: String::new(), status: response.status(), reason: String::new(), body });
         }
     }
 

@@ -84,10 +84,10 @@ fn a_change_with_no_usable_id_or_item_makes_the_page_no_page() {
 }
 
 #[test]
-fn a_page_larger_than_the_model_takes_in_is_no_page() {
-    let changes: String =
-        (0..mailcraft_model::sync::MAX_EWS_PAGE_MESSAGES + 1).map(|n| format!("<t:Create>{}</t:Create>", bare(&format!("ID{n}")))).collect();
-    assert!(matches!(page(&changes, 512).unwrap_err(), Error::Unreadable(_)));
+fn a_page_larger_than_one_used_to_take_in_is_taken_whole() {
+    let changes: String = (0..2_100).map(|n| format!("<t:Create>{}</t:Create>", bare(&format!("ID{n}")))).collect();
+    let got = page(&changes, 512).unwrap_or_else(|why| panic!("2,100 items are a page: {why:?}"));
+    assert_eq!((got.messages.len(), got.last), (2_100, true));
 }
 
 #[test]
@@ -98,52 +98,48 @@ fn a_page_of_read_state_changes_by_the_thousand_is_still_a_page() {
     let changes: String =
         (0..12_000).map(|n| format!("<t:ReadFlagChange><t:ItemId Id=\"ID{n}\"/><t:IsRead>true</t:IsRead></t:ReadFlagChange>")).collect();
     let got = page(&changes, 512).unwrap_or_else(|why| panic!("12,000 read states are a page: {why:?}"));
-    assert_eq!((got.read.len(), got.read_left_out, got.messages.len(), got.last), (12_000, 0, 0, true));
+    assert_eq!((got.read.len(), got.messages.len(), got.last), (12_000, 0, true));
 }
 
 #[test]
-fn a_page_of_read_states_past_the_cap_keeps_the_newest_and_goes_on() {
+fn a_page_of_read_states_past_the_old_cap_is_taken_whole() {
     // (The same server sends the read states it already sent at the front of every page, so a page
-    // can carry far more of them than a page takes in. Refusing it would leave the folder stuck at
-    // that page for good; instead the newest are kept and the repeats at the front are left out,
-    // and the state the server gave is taken in all the same.)
-    let past = mailcraft_model::sync::MAX_EWS_PAGE_READ;
-    let changes: String = (0..past + 10_000)
+    // can carry far more of them than was once taken in. Every one is applied, and the state the
+    // server gave is taken with them: nothing the server sent is dropped and the folder goes on.)
+    let many = 25_000usize;
+    let changes: String = (0..many)
         .map(|n| {
             format!("<t:ReadFlagChange><t:ItemId Id=\"R{n}\"/><t:IsRead>{}</t:IsRead></t:ReadFlagChange>", if n % 2 == 0 { "true" } else { "false" })
         })
         .collect();
-    let got = page(&changes, 512).unwrap_or_else(|why| panic!("a page of {past} plus 10,000 read states is still a page: {why:?}"));
-    assert_eq!((got.read.len(), got.read_left_out, got.last), (past, 10_000, true));
+    let got = page(&changes, 512).unwrap_or_else(|why| panic!("a page of {many} read states is still a page: {why:?}"));
+    assert_eq!((got.read.len(), got.last), (many, true));
     assert_eq!(got.state, "S-NEW");
-    // (The tail, the states the folder hasn't had yet, is what is kept.)
     assert_eq!(
         (got.read.first().map(|r| r.id.clone()), got.read.last().map(|r| r.id.clone())),
-        (Some(format!("R{}", 10_000)), Some(format!("R{}", past + 9_999)))
+        (Some("R0".to_owned()), Some(format!("R{}", many - 1)))
     );
-    assert!(got.read.iter().all(|r| r.id.starts_with('R')));
-    // (Items beside them are still items: they count against their own cap, not the read states'.)
+    // (Items beside them are still items: each kind is applied, not counted against the other.)
     let mixed: String = (0..1_000)
         .map(|n| format!("<t:Create>{}</t:Create>", bare(&format!("ID{n}"))))
-        .chain((0..past + 5_000).map(|n| format!("<t:ReadFlagChange><t:ItemId Id=\"R{n}\"/><t:IsRead>true</t:IsRead></t:ReadFlagChange>")))
+        .chain((0..many + 5_000).map(|n| format!("<t:ReadFlagChange><t:ItemId Id=\"R{n}\"/><t:IsRead>true</t:IsRead></t:ReadFlagChange>")))
         .collect();
     let got = page(&mixed, 512).unwrap_or_else(|why| panic!("items with a long list of read states is a page: {why:?}"));
-    assert_eq!((got.messages.len(), got.read.len(), got.read_left_out), (1_000, past, 5_000));
+    assert_eq!((got.messages.len(), got.read.len()), (1_000, many + 5_000));
 }
 
 #[test]
-fn a_page_of_more_items_than_are_taken_in_is_no_page() {
-    let changes: String =
-        (0..mailcraft_model::sync::MAX_EWS_PAGE_MESSAGES + 1).map(|n| format!("<t:Create>{}</t:Create>", bare(&format!("ID{n}")))).collect();
-    let why = page(&changes, 200).err();
-    assert!(why.is_some(), "more items than a page takes in is refused");
-    // (Read states beside them don't count against the items' cap.)
-    let mixed: String = (0..mailcraft_model::sync::MAX_EWS_PAGE_MESSAGES)
+fn a_page_of_more_items_than_the_old_limit_is_taken_whole() {
+    let changes: String = (0..2_100).map(|n| format!("<t:Create>{}</t:Create>", bare(&format!("ID{n}")))).collect();
+    let got = page(&changes, 200).unwrap_or_else(|why| panic!("2,100 items are a page: {why:?}"));
+    assert_eq!(got.messages.len(), 2_100);
+    // (Read states beside them are applied too.)
+    let mixed: String = (0..2_100)
         .map(|n| format!("<t:Create>{}</t:Create>", bare(&format!("ID{n}"))))
         .chain((0..5_000).map(|n| format!("<t:ReadFlagChange><t:ItemId Id=\"R{n}\"/><t:IsRead>false</t:IsRead></t:ReadFlagChange>")))
         .collect();
     let got = page(&mixed, 200).unwrap_or_else(|why| panic!("items with read states beside them is a page: {why:?}"));
-    assert_eq!((got.messages.len(), got.read.len()), (mailcraft_model::sync::MAX_EWS_PAGE_MESSAGES, 5_000));
+    assert_eq!((got.messages.len(), got.read.len()), (2_100, 5_000));
 }
 
 /// An item with more recipients or categories than the reader keeps says so (#566): a rule then
