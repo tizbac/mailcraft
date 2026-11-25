@@ -36,9 +36,14 @@ A message bigger than that is passed over by a batch of fetches rather than stop
 rest of the batch comes, the reading pane says the message is bigger than the account downloads in
 full and names both sizes, and it is asked for again when the owner opens it. A folder the server
 won't read at all is named in Send/Receive problems, with the server's response code when it gave
-one (`ErrorAccessDenied`, say) or, when it gave none, that its answer couldn't be used or was
-larger than MailCraft reads; the other folders are read all the same, and the log keeps its place
-in the run rather than its name. Three folders in a row that can't be read end the run there.
+one (`ErrorAccessDenied`, say) or, when it gave none, which way its answer failed: it wasn't a
+document that could be read, it wasn't the answer to the request, it came with an HTTP status the
+service doesn't use, it was lost, or it was larger than MailCraft reads. The other folders are
+read all the same, and the log keeps its place in the run rather than its name. Three folders in a
+row that can't be read end the run there. When an answer couldn't be used, the whole answer as it
+came (up to 1 MiB) is written beside the mailbox in `sync-errors/`, owner-only, and the line says
+where: it is what tells a broken server from a proxy's sign-in page in one look. That file may
+hold mail, stays on this computer, and is never sent or put in a log line.
 
 ## Grommunio
 

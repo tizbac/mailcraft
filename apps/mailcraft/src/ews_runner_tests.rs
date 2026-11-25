@@ -193,3 +193,40 @@ fn a_pieces_time_goes_to_what_it_brings_and_its_requests_are_those_since_the_pie
     let second = lap.take(SyncPhase::NewMail, 9);
     assert_eq!((second.phases[0].phase, second.requests(), lap.phase), (SyncPhase::NewMail, 4, SyncPhase::NewMail));
 }
+
+#[test]
+fn an_answer_that_could_not_be_used_is_written_with_what_was_asked() {
+    let dir = tempfile::tempdir().unwrap();
+    let answer = BadAnswer { operation: "SyncFolderItems".into(), status: 200, body: "<html><body>Sign in</body></html>".into(), cut: false };
+    let path = write_sync_error(dir.path(), &answer, 3, "ada@example.org", SystemTime::UNIX_EPOCH + Duration::from_secs(1)).unwrap();
+    assert_eq!(path.file_name().and_then(|name| name.to_str()), Some("exchange-1-3.txt"));
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.contains("Account: ada@example.org (3)"), "{text}");
+    assert!(text.contains("Operation: SyncFolderItems"), "{text}");
+    assert!(text.contains("HTTP status: 200"), "{text}");
+    assert!(text.contains("<html><body>Sign in</body></html>"), "{text}");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+    }
+}
+
+#[test]
+fn an_answer_cut_to_the_cap_says_so() {
+    let answer = BadAnswer { operation: "GetItem".into(), status: 500, body: "<x/>".into(), cut: true };
+    let text = sync_error_text(&answer, 1, "ada@example.org");
+    assert!(text.contains("longer than 1 MiB"), "{text}");
+}
+
+#[test]
+fn the_oldest_dumps_are_dropped_beyond_the_cap() {
+    let dir = tempfile::tempdir().unwrap();
+    let answer = BadAnswer { operation: "SyncFolderItems".into(), status: 200, body: "x".into(), ..Default::default() };
+    for second in 0..(MAX_SYNC_ERRORS as u64 + 3) {
+        write_sync_error(dir.path(), &answer, 1, "ada@example.org", SystemTime::UNIX_EPOCH + Duration::from_secs(second)).unwrap();
+    }
+    let left = std::fs::read_dir(dir.path().join(SYNC_ERRORS)).unwrap().filter_map(Result::ok).count();
+    assert_eq!(left, MAX_SYNC_ERRORS);
+    assert!(!dir.path().join(SYNC_ERRORS).join("exchange-0-1.txt").exists(), "the oldest went");
+}

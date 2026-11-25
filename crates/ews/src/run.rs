@@ -47,8 +47,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use mailcraft_model::FolderKind;
 use mailcraft_model::sync::{
-    EwsFetchRequest, EwsFolderDeltas, EwsMailRequest, EwsMailResult, EwsMessagePage, EwsScope, FolderChange, GraphFetchResult, GraphFetched,
-    GraphFolder, GraphMessage, GraphProgress, MAX_THREAD_ASKS, ThreadOf, UnreadFolder, UnreadWhy, UnreadableChange,
+    BadAnswer, EwsFetchRequest, EwsFolderDeltas, EwsMailRequest, EwsMailResult, EwsMessagePage, EwsScope, FolderChange, GraphFetchResult,
+    GraphFetched, GraphFolder, GraphMessage, GraphProgress, MAX_THREAD_ASKS, ThreadOf, UnreadFolder, UnreadWhy, UnreadableChange,
 };
 
 use crate::client::Client;
@@ -80,11 +80,38 @@ const MAX_IN_A_ROW: usize = 3;
 /// at a hundred to a request.
 const MAX_RECIPIENT_ASKS: usize = 20;
 
+/// Why the server's answer couldn't be used: a kind, never any text the server wrote
+/// (docs/mail-privacy-rules.md). It says enough to tell a malformed answer from an unexpected
+/// one, and from an HTTP status the service does not use.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Fault {
+    /// Not a document that can be read: not XML, cut short, nested without end.
+    Malformed,
+    /// A document, but not the answer to this request (wrong namespace, a missing element,
+    /// fewer answers than questions, a value that is not one).
+    Unexpected,
+    /// An HTTP status the Exchange service does not use.
+    Status(u16),
+}
+
+impl Fault {
+    /// A few safe words for the log and the owner.
+    pub(crate) fn words(&self) -> String {
+        match self {
+            Self::Malformed => "the server's answer wasn't a document that could be read".to_owned(),
+            Self::Unexpected => "the server's answer wasn't the answer to the request".to_owned(),
+            Self::Status(code) => format!("the server answered with HTTP status {code}"),
+        }
+    }
+}
+
 /// Why a request didn't give an answer: the run has to stop, or the server answered with a code.
 pub(crate) enum Asked {
     Stop(Stop),
     Code(ResponseCode),
-    /// The answer wasn't one that could be read.
+    /// The server's answer couldn't be used, for the kind of reason in [`Fault`].
+    Unusable(Fault),
+    /// A change wasn't the kind this code expected (a fault here, not the server's).
     Bad,
     /// The server's answer is larger than this program reads: one message more of than a request
     /// may take. It is the message's own, not the run's: the rest of a batch goes on, and the
@@ -159,6 +186,8 @@ struct Outcome {
     /// The folders (their server ids) that couldn't be read at all, with the server's code or why
     /// it gave none.
     unread: Vec<UnreadFolder>,
+    /// The last answer that couldn't be used, for the host to write where the owner can see it.
+    bad_answer: Option<Box<BadAnswer>>,
 }
 
 impl Outcome {
@@ -213,6 +242,9 @@ pub(crate) struct Run<'a, E: HttpExchange> {
     /// The mailbox the run reads, when it is not the account's own: a shared mailbox, at its
     /// address. Empty for the account itself.
     pub(crate) mailbox: String,
+    /// The answer that couldn't be used, when one couldn't (the client keeps its body): handed
+    /// to the result, and written by the host to the owner's data folder.
+    pub(crate) bad_answer: Option<BadAnswer>,
 }
 
 impl<'a, E: HttpExchange> Run<'a, E> {
@@ -231,6 +263,7 @@ impl<'a, E: HttpExchange> Run<'a, E> {
             needs_change_key: false,
             recipients_unsaid: false,
             mailbox: String::new(),
+            bad_answer: None,
         }
     }
 }
@@ -274,6 +307,8 @@ impl<E: HttpExchange> Run<'_, E> {
             if self.cancel.load(Ordering::Relaxed) {
                 return Err(Asked::Stop(Stop::Cancelled));
             }
+            // (The answer is this request's: an earlier one that couldn't be used is not it.)
+            let _ = self.client.take_bad_answer();
             let called = match (once, whole) {
                 (true, _) => self.client.call_once(self.exchange, operation).await,
                 (_, true) => self.client.call_whole(self.exchange, operation).await,
@@ -320,9 +355,31 @@ impl<E: HttpExchange> Run<'_, E> {
                 Error::Status(_) | Error::Malformed | Error::TooLarge | Error::Unexpected if once => return Err(Asked::Lost),
                 Error::TooLarge => return Err(Asked::TooLarge),
                 Error::Unreadable(why) => return Err(Asked::Unreadable(why)),
-                _ => return Err(Asked::Bad),
+                // The answer came, but it is not one this program can use: say which way, so the
+                // owner can tell a broken document from one to the wrong request or a stray status.
+                Error::Malformed => return Err(Asked::Unusable(self.bad(operation, Fault::Malformed))),
+                Error::Unexpected => return Err(Asked::Unusable(self.bad(operation, Fault::Unexpected))),
+                Error::Status(code) => return Err(Asked::Unusable(self.bad(operation, Fault::Status(code)))),
             }
         }
+    }
+
+    /// Keeps the answer the client could not use, naming the operation that asked, and gives the
+    /// fault back for [`Asked::Unusable`]. Never a log line: the body may hold mail.
+    fn bad(&mut self, operation: &Element, fault: Fault) -> Fault {
+        if let Some(mut answer) = self.client.take_bad_answer() {
+            // (The element may be namespace-qualified: keep the local name alone.)
+            let name = operation.name();
+            let local = name.rsplit(':').next().unwrap_or(name);
+            answer.operation = local.chars().filter(|c| c.is_ascii_alphanumeric()).take(64).collect();
+            self.bad_answer = Some(answer);
+        }
+        fault
+    }
+
+    /// Takes the answer that couldn't be used, if there is one, for the result it belongs to.
+    pub(crate) fn take_bad_answer(&mut self) -> Option<Box<BadAnswer>> {
+        self.bad_answer.take().map(Box::new)
     }
 }
 
@@ -573,7 +630,26 @@ pub async fn sync_mail<E: HttpExchange>(
     if let Err(stop) = run.all(request, &mut out, emit).await {
         match stop {
             Asked::Stop(why) => out.stop(why),
-            Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable(_) => {
+            // The server's own short code, never its words.
+            Asked::Code(code) => {
+                out.incomplete = true;
+                out.line(&format!("The server refused the request ({code})"));
+            }
+            Asked::Unusable(fault) => {
+                out.incomplete = true;
+                out.bad_answer = run.take_bad_answer();
+                out.line(&format!("The server's answer couldn't be used: {}", fault.words()));
+            }
+            Asked::Lost => {
+                out.incomplete = true;
+                out.line("The server's answer was lost; a later Send/Receive asks again");
+            }
+            Asked::Unreadable(_) => {
+                out.incomplete = true;
+                out.line("A change in the server's answer couldn't be taken in");
+            }
+            // (A fault here, not the server's: never left without a word.)
+            Asked::Bad => {
                 out.incomplete = true;
                 out.line("The server's answer couldn't be used");
             }
@@ -631,6 +707,7 @@ pub async fn sync_mail<E: HttpExchange>(
         blocked: out.blocked,
         unreadable: out.unreadable,
         unread: out.unread,
+        bad_answer: out.bad_answer,
         threads,
         ..base(request)
     });
@@ -762,22 +839,37 @@ impl<E: HttpExchange> Run<'_, E> {
                             };
                             (named, UnreadWhy::Code)
                         }
+                        Asked::Unusable(Fault::Malformed) => (String::new(), UnreadWhy::Malformed),
+                        Asked::Unusable(Fault::Unexpected) => (String::new(), UnreadWhy::Unexpected),
+                        Asked::Unusable(Fault::Status(status)) => (String::new(), UnreadWhy::Status(status)),
+                        Asked::Lost => (String::new(), UnreadWhy::Lost),
                         Asked::TooLarge => (String::new(), UnreadWhy::TooLarge),
-                        _ => (String::new(), UnreadWhy::Answer),
+                        // (A fault here, not the server's: say the answer couldn't be used.)
+                        _ => (String::new(), UnreadWhy::Unexpected),
                     };
                     if !code.is_empty() {
                         log::warn!("ews mail: folder {} of {} couldn't be read: the server said {}", number, folders, code);
-                    } else if why == UnreadWhy::TooLarge {
-                        log::warn!(
-                            "ews mail: folder {} of {} couldn't be read: the server's answer was larger than MailCraft reads",
-                            number,
-                            folders
-                        );
                     } else {
-                        log::warn!("ews mail: folder {} of {} couldn't be read: the server's answer couldn't be used", number, folders);
+                        log::warn!(
+                            "ews mail: folder {} of {} couldn't be read: {}",
+                            number,
+                            folders,
+                            match why {
+                                UnreadWhy::Malformed => "the server's answer wasn't a document that could be read".to_owned(),
+                                UnreadWhy::Unexpected => "the server's answer wasn't the answer to the request".to_owned(),
+                                UnreadWhy::Status(status) => format!("the server answered with HTTP status {status}"),
+                                UnreadWhy::Lost => "the server's answer was lost".to_owned(),
+                                UnreadWhy::TooLarge => "the server's answer was larger than MailCraft reads".to_owned(),
+                                UnreadWhy::Code => "the server's answer couldn't be used".to_owned(),
+                            }
+                        );
                     }
                     if out.unread.len() < MAX_FOLDERS {
-                        out.unread.push(UnreadFolder { folder: folder.clone(), code, why });
+                        let answer = self.take_bad_answer();
+                        if out.bad_answer.is_none() {
+                            out.bad_answer = answer.clone();
+                        }
+                        out.unread.push(UnreadFolder { folder: folder.clone(), code, why, answer });
                     }
                     failed_in_a_row = failed_in_a_row.saturating_add(1);
                     if failed_in_a_row >= MAX_IN_A_ROW {
@@ -965,7 +1057,7 @@ pub async fn fetch_messages<E: HttpExchange>(
                 out.failed.push(id.clone());
                 out.too_large.push(id.clone());
             }
-            Err(Asked::Code(_) | Asked::Bad | Asked::Lost | Asked::Unreadable(_)) => out.failed.push(id.clone()),
+            Err(Asked::Code(_) | Asked::Unusable(_) | Asked::Bad | Asked::Lost | Asked::Unreadable(_)) => out.failed.push(id.clone()),
             Err(Asked::Stop(stop)) => {
                 if let Stop::Busy(seconds) = stop {
                     out.busy_for = Some(seconds.max(1));

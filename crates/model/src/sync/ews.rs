@@ -235,6 +235,9 @@ pub struct EwsDirectoryResult {
     /// Problems worth telling the owner; empty when all went well.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub errors: Vec<String>,
+    /// The server's answer that couldn't be used, for the owner to look at.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bad_answer: Option<Box<BadAnswer>>,
     /// The server said it was busy and to stay away this many seconds.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub busy_for: Option<u32>,
@@ -258,6 +261,9 @@ impl EwsDirectoryResult {
         }
         if self.errors.len() > MAX_EWS_ERRORS || self.errors.iter().any(|e| e.chars().take(MAX_EWS_ERROR + 1).count() > MAX_EWS_ERROR) {
             return Err("has a problem told at too great a length");
+        }
+        if let Some(answer) = &self.bad_answer {
+            answer.check()?;
         }
         if crate::EwsServer::check_fingerprint(&self.untrusted).is_err() {
             return Err("has a certificate fingerprint that can't be one");
@@ -520,8 +526,45 @@ pub struct UnreadableChange {
     pub subject: String,
 }
 
+/// The most of a server's answer that is kept for the owner to look at when it couldn't be used:
+/// one mebibyte. A larger answer is cut there, and [`BadAnswer::cut`] says so.
+pub const MAX_BAD_ANSWER: usize = 1024 * 1024;
+
+/// The server's answer that couldn't be used, kept so the owner can see what went wrong: the
+/// operation, the HTTP status, and the body (a document, or what a proxy sent instead), at most
+/// [`MAX_BAD_ANSWER`] bytes. It may hold message text, so a host writes it only to the owner's
+/// own data folder, never a log line, and never sends it anywhere.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct BadAnswer {
+    /// The SOAP operation whose answer it was (`SyncFolderItems`, `GetItem`, …).
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub operation: String,
+    /// The HTTP status the server answered with.
+    pub status: u16,
+    /// The answer's body, as text (bytes that are not UTF-8 are replaced).
+    pub body: String,
+    /// The answer was longer than [`MAX_BAD_ANSWER`] and the body is only its beginning.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub cut: bool,
+}
+
+impl BadAnswer {
+    /// Whether this is within what is kept, or why not.
+    pub fn check(&self) -> Result<(), &'static str> {
+        if self.body.len() > MAX_BAD_ANSWER {
+            return Err("holds a server answer larger than is kept");
+        }
+        if self.operation.len() > 64 || !self.operation.bytes().all(|b| b.is_ascii_alphanumeric()) {
+            return Err("names an operation that can't be one");
+        }
+        Ok(())
+    }
+}
+
 /// Why a folder couldn't be read at all in a run: the server gave a response code (kept
-/// apart as its short identifier, never its words), or it gave none that could be used.
+/// apart as its short identifier, never its words), or it gave none, and then what went wrong
+/// with its answer — a kind, never its text.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum UnreadWhy {
@@ -529,8 +572,15 @@ pub enum UnreadWhy {
     /// when it gave one that can't be named.
     #[default]
     Code,
-    /// The server's answer couldn't be read as an answer.
-    Answer,
+    /// The answer wasn't a document that could be read (not XML, cut short, nested without end).
+    Malformed,
+    /// The answer was a document, but not the answer to the request (wrong namespace, a missing
+    /// element, fewer answers than questions, a value that is not one).
+    Unexpected,
+    /// The server answered with an HTTP status the Exchange service does not use.
+    Status(u16),
+    /// The request may have gone out and its answer was lost.
+    Lost,
     /// The server's answer was larger than MailCraft reads.
     TooLarge,
 }
@@ -554,6 +604,9 @@ pub struct UnreadFolder {
     pub code: String,
     #[serde(skip_serializing_if = "UnreadWhy::is_code")]
     pub why: UnreadWhy,
+    /// The server's answer itself when it couldn't be used, for the owner to look at.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub answer: Option<Box<BadAnswer>>,
 }
 
 /// What a run for an Exchange server account brought back, or a piece of it.
@@ -620,6 +673,9 @@ pub struct EwsMailResult {
     /// Problems worth telling the owner; empty when all went well.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub errors: Vec<String>,
+    /// The server's answer that couldn't be used, for the owner to look at.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bad_answer: Option<Box<BadAnswer>>,
     /// The server said it was busy and to stay away this many seconds (`ErrorServerBusy`): all
     /// work for the account waits that long.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -741,6 +797,12 @@ impl EwsMailResult {
             || self.unread.iter().any(|u| !id_ok(&u.folder) || u.code.len() > MAX_EWS_CODE || !u.code.bytes().all(|b| b.is_ascii_alphanumeric()))
         {
             return Err("has a folder that couldn't be read that can't be told");
+        }
+        if let Some(answer) = &self.bad_answer {
+            answer.check()?;
+        }
+        if self.unread.iter().any(|u| u.answer.as_ref().is_some_and(|answer| answer.check().is_err())) {
+            return Err("has a server answer that can't be kept");
         }
         if self.threads.len() > MAX_THREAD_ASKS {
             return Err(TOO_MANY);

@@ -846,6 +846,44 @@ fn a_folder_the_server_will_not_read_is_named_with_its_code_and_the_others_go_on
 }
 
 #[test]
+fn a_folder_whose_answer_is_no_document_is_named_as_a_broken_answer() {
+    let standin = StandIn::new();
+    let (broken, _) = {
+        let mut s = standin.state();
+        s.deliver("inbox", "Kickoff", false);
+        let broken = s.add_folder("Broken");
+        s.deliver(&broken, "Stuck", false);
+        (broken, s.folder_id("inbox").unwrap())
+    };
+    standin.state().bad_sync = vec![broken.clone()];
+    let (pieces, _) = run(&standin, &request());
+    // The folder is named with the kind of failure: its answer wasn't a document at all.
+    let end = last(&pieces);
+    assert_eq!(end.unread.len(), 1);
+    assert_eq!((end.unread[0].folder.as_str(), end.unread[0].why), (broken.as_str(), UnreadWhy::Malformed));
+    assert!(end.unread[0].code.is_empty());
+    // The answer itself is kept for the owner, with the operation that asked and the status.
+    let answer = end.unread[0].answer.as_deref().expect("the answer that couldn't be used is kept");
+    assert_eq!((answer.operation.as_str(), answer.status), ("SyncFolderItems", 200));
+    assert!(answer.body.contains("Sign in"), "{}", answer.body);
+    assert!(end.bad_answer.is_some(), "the run carries it too, for a host to write");
+    // The other folders were read.
+    assert_eq!(subjects(&pieces), ["Kickoff"]);
+    assert!(!end.whole);
+}
+
+#[test]
+fn a_broken_answer_says_which_way_it_could_not_be_used() {
+    let standin = StandIn::new();
+    standin.state().deliver("inbox", "Kickoff", false);
+    standin.state().hostile = Some(Hostile::NotXml);
+    let (pieces, _) = run(&standin, &request());
+    let end = last(&pieces);
+    assert!(end.errors.iter().any(|line| line.contains("wasn't a document that could be read")), "the line says which way: {:?}", end.errors);
+    assert!(!end.whole);
+}
+
+#[test]
 fn three_folders_in_a_row_that_the_server_will_not_read_end_the_run() {
     let standin = StandIn::new();
     let ids = {
