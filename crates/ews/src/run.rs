@@ -47,8 +47,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use mailcraft_model::FolderKind;
 use mailcraft_model::sync::{
-    BadAnswer, EwsFetchRequest, EwsFolderDeltas, EwsMailRequest, EwsMailResult, EwsMessagePage, EwsScope, FolderChange, GraphFetchResult,
-    GraphFetched, GraphFolder, GraphMessage, GraphProgress, MAX_THREAD_ASKS, ThreadOf, UnreadFolder, UnreadWhy, UnreadableChange,
+    BadAnswer, EwsFetchRequest, EwsFolderDeltas, EwsMailRequest, EwsMailResult, EwsMessagePage, EwsScope, FetchFailure, FolderChange,
+    GraphFetchResult, GraphFetched, GraphFolder, GraphMessage, GraphProgress, MAX_THREAD_ASKS, ThreadOf, UnreadFolder, UnreadWhy, UnreadableChange,
 };
 
 use crate::client::Client;
@@ -1044,8 +1044,26 @@ pub async fn fetch_messages<E: HttpExchange>(
                 log::info!("ews mail: a message is larger than MailCraft reads whole; it waits until it is opened");
                 out.failed.push(id.clone());
                 out.too_large.push(id.clone());
+                out.failures.push(FetchFailure { id: id.clone(), why: "it is larger than MailCraft reads whole".to_owned(), ..Default::default() });
             }
-            Err(Asked::Code(_) | Asked::Unusable(_) | Asked::Bad | Asked::Lost | Asked::Unreadable(_)) => out.failed.push(id.clone()),
+            // Why it couldn't be had, in safe words: the server's short code, or which way its
+            // answer failed. The answer itself goes with it when there is one.
+            Err(Asked::Code(code)) => {
+                out.failed.push(id.clone());
+                out.failures.push(FetchFailure { id: id.clone(), why: format!("the server said {code}"), ..Default::default() });
+            }
+            Err(Asked::Unusable(fault)) => {
+                out.failed.push(id.clone());
+                out.failures.push(FetchFailure { id: id.clone(), why: fault.words(), answer: run.take_bad_answer() });
+            }
+            Err(Asked::Lost) => {
+                out.failed.push(id.clone());
+                out.failures.push(FetchFailure { id: id.clone(), why: "the server's answer was lost".to_owned(), ..Default::default() });
+            }
+            Err(Asked::Bad | Asked::Unreadable(_)) => {
+                out.failed.push(id.clone());
+                out.failures.push(FetchFailure { id: id.clone(), why: "the server's answer couldn't be used".to_owned(), ..Default::default() });
+            }
             Err(Asked::Stop(stop)) => {
                 if let Stop::Busy(seconds) = stop {
                     out.busy_for = Some(seconds.max(1));

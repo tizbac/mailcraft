@@ -57,7 +57,10 @@ parser's element guard is far above what a 16 MiB answer can carry. A change wit
 still refused for that folder, since the state it came with would hide it. A message a fetch
 couldn't bring is passed over for the rest of the session, so that it can't hold up the rest:
 raising Download messages in full or Send/Receive asks for it again, and opening it does too. The
-"download x of y" bar counts only what the background can still bring, so it ends.
+"download x of y" bar counts only what the background can still bring, so it ends. The line says
+why a fetch failed in safe words — the server's code, or that its answer wasn't a document that
+could be read, wasn't the answer to the request, or was lost — and the answer itself is saved in
+`sync-errors/` when it couldn't be used, as a folder's is.
 
 ## Grommunio
 

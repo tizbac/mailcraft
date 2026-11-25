@@ -20191,6 +20191,11 @@ msgid "This message couldn't be downloaded. Open it to try again, or use Send/Re
 msgstr ""
 
 #. interface
+#: crates/ui-egui/src/reading.rs
+msgid "This message couldn't be downloaded: {why}. Open it to try again, or use Send/Receive."
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/reading/invitation.rs
 #, fuzzy
 msgid "This message didn't come from the address of the meeting's organizer."

@@ -77,6 +77,16 @@ fn the_offline_line_comes_before_the_size_line() {
 fn a_message_a_fetch_gave_up_on_says_to_open_it_again() {
     let mut app = one_message(5 << 20, DownloadInFull::Everything);
     let account = app.session.mailbox.accounts[0].id;
+    app.session
+        .run(
+            "sync.applyGraphFetch",
+            &serde_json::json!({"result": {"account": account, "failed": ["AAkA1"],
+                "failures": [{"id": "AAkA1", "why": "the server said ErrorAccessDenied"}]}}),
+        )
+        .unwrap();
+    assert_eq!(said(&app), "This message couldn't be downloaded: the server said ErrorAccessDenied. Open it to try again, or use Send/Receive.");
+    // A reason it didn't give is still a line of its own, not the old vague one.
+    app.session.run("sync.retryFailed", &serde_json::json!({})).unwrap();
     app.session.run("sync.applyGraphFetch", &serde_json::json!({"result": {"account": account, "failed": ["AAkA1"]}})).unwrap();
-    assert_eq!(said(&app), "This message couldn't be downloaded. Open it to try again, or use Send/Receive.");
+    assert_eq!(said(&app), "This message couldn't be downloaded: the server wouldn't give it. Open it to try again, or use Send/Receive.");
 }
