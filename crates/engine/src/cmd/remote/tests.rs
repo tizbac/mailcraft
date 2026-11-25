@@ -5,9 +5,9 @@
 
 use mailcraft_model::contact_sync::ContactChangeKind;
 use mailcraft_model::remote::{
-    ContactChangeKind as BookChangeKind, ContactOutcome, ContactsDownload, ContactsUploaded, EventChange, EventChangeKind, EventFields, EventOp, EventOutcome,
-    EventReminder, EventRepeat, EventResult, EventTime, EventWall, EventsDownload, EventsUpload, EventsUploaded, RemoteAddressBook, RemoteContact,
-    RemoteEvent, RemoteEventKind,
+    ContactChangeKind as BookChangeKind, ContactOutcome, ContactsDownload, ContactsUploaded, EventChange, EventChangeKind, EventFields, EventOp,
+    EventOutcome, EventReminder, EventRepeat, EventResult, EventTime, EventWall, EventsDownload, EventsUpload, EventsUploaded, RemoteAddressBook,
+    RemoteContact, RemoteEvent, RemoteEventKind,
 };
 use mailcraft_model::{Address, Attendee, Contact, ContactBook, Event, Freq, Id, Labeled, Origin, Recurrence, Response, Rights, ShowAs};
 use mailcraft_time::{Date, DateTime, Timestamp};
@@ -15,8 +15,9 @@ use proptest::prelude::*;
 use serde_json::{Value, json};
 
 use super::{
-    EventsWaiting, Merged, apply_book_contact_outcomes, apply_book_contacts, apply_contacts, apply_event_outcomes, apply_events, book_contact_upload, event_from_remote,
-    event_upload, events_waiting, forget, keeper, merge_contacts, merge_events, resource_key, retry_event_changes, server_start, server_time,
+    EventsWaiting, Merged, apply_book_contact_outcomes, apply_book_contacts, apply_contacts, apply_event_outcomes, apply_events, book_contact_upload,
+    event_from_remote, event_upload, events_waiting, forget, keeper, merge_contacts, merge_events, resource_key, retry_event_changes, server_start,
+    server_time,
 };
 use crate::cmd::calendar::current_calendar;
 use crate::{CmdError, Session};

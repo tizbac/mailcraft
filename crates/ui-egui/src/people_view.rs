@@ -952,7 +952,8 @@ fn card_account(app: &MailApp, ui: &mut Ui, c: &Contact) {
             ));
         } else if read_only_here(app, c) {
             let why = if c.book_id.is_empty() {
-                tl!("This contacts folder can only be read, so this contact can't be edited or deleted here. Favorite is kept on this computer.").to_string()
+                tl!("This contacts folder can only be read, so this contact can't be edited or deleted here. Favorite is kept on this computer.")
+                    .to_string()
             } else {
                 tl!("The address book this contact came from can only be read: the server hasn't given this account permission to change its contacts.").to_string()
             };
