@@ -140,7 +140,7 @@ fn the_table_button_inserts_a_grid() {
     assert!(app.enabled("insert.table"), "the command is enabled while a message is being written");
     let described = crate::ribbon::describe(&app);
     let item = described.items().find(|item| item.label == "Table").unwrap_or_else(|| panic!("no Table in Insert"));
-    assert_eq!(item.command, Some(("insert.table", json!({}))), "the button runs the command, not a dialog");
+    assert_eq!(item.command, Some(("ui.dialog", json!({"name": "insertTable"}))), "the button asks for a size");
     let mut h = window(app);
     crate::reminders::dismiss(h.state_mut(), None);
     h.state_mut().run("ui.tab", json!({"tab": "Insert"})).unwrap();
@@ -148,6 +148,12 @@ fn the_table_button_inserts_a_grid() {
     h.run_steps(3);
     let rect = h.state().hit.rect("ribbon", crate::ribbon::hit_id("insert.table")).unwrap_or_else(|| panic!("Table isn't drawn in the ribbon"));
     click_at(&mut h, rect.center());
+    assert!(
+        matches!(h.state().dialog, Some(crate::dialogs::Dialog::InsertTable { rows: 3, columns: 3 })),
+        "the button asks how many rows and columns"
+    );
+    h.state_mut().run("ui.closeDialog", json!({})).unwrap();
+    h.state_mut().run("insert.table", json!({"rows": 2, "columns": 3})).unwrap();
     let state = h.state();
     let compose = state.session.compose.as_ref().unwrap_or_else(|| panic!("the message is still being written"));
     let grid = compose
@@ -157,8 +163,8 @@ fn the_table_button_inserts_a_grid() {
         .iter()
         .find_map(|p| p.runs.iter().find_map(|r| r.table.as_ref()))
         .unwrap_or_else(|| panic!("no grid in {:?}", compose.body.plain()));
-    assert_eq!((grid.columns(), grid.rows().len()), (3, 3));
-    assert_eq!(grid.plain(), "\t\t\n\t\t\n\t\t");
+    assert_eq!((grid.columns(), grid.rows().len()), (3, 2));
+    assert_eq!(grid.plain(), "\t\t\n\t\t");
 }
 
 fn click_at(harness: &mut Harness<'static, MailApp>, pos: egui::Pos2) {

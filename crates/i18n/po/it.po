@@ -3825,6 +3825,11 @@ msgid "Colour"
 msgstr "Colore"
 
 #. interface
+#: crates/ui-egui/src/dialogs.rs
+msgid "Columns"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/credits.rs
 #, fuzzy
 msgid "Commits"
@@ -7812,7 +7817,7 @@ msgid "Info and File"
 msgstr "Info e File"
 
 #. interface, ribbon location
-#: crates/engine/src/cmd/calendar/share.rs crates/engine/src/cmd/compose.rs crates/engine/src/cmd/format.rs crates/engine/src/cmd/picture.rs crates/engine/src/cmd/writing_tools.rs crates/ui-egui/src/meeting_dialogs/share.rs crates/ui-egui/src/symbol.rs
+#: crates/engine/src/cmd/calendar/share.rs crates/engine/src/cmd/compose.rs crates/engine/src/cmd/format.rs crates/engine/src/cmd/picture.rs crates/engine/src/cmd/writing_tools.rs crates/ui-egui/src/dialogs.rs crates/ui-egui/src/meeting_dialogs/share.rs crates/ui-egui/src/symbol.rs
 #, fuzzy
 msgid "Insert"
 msgstr "Inserisci"
@@ -7835,8 +7840,8 @@ msgstr "Inserisci collegamento"
 msgid "Insert Picture"
 msgstr "Inserisci immagine"
 
-#. ribbon
-#: crates/ui-egui/src/ribbon.rs
+#. interface, ribbon
+#: crates/ui-egui/src/dialogs.rs crates/ui-egui/src/ribbon.rs
 msgid "Insert Table"
 msgstr ""
 
@@ -7845,6 +7850,11 @@ msgstr ""
 #, fuzzy
 msgid "Insert a picture"
 msgstr "Inserisci un'immagine"
+
+#. interface
+#: crates/ui-egui/src/signatures.rs
+msgid "Insert a table at the caret"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/auto_replies.rs
@@ -14295,6 +14305,11 @@ msgstr "A destra"
 msgid "Right before or after: {items}"
 msgstr "Subito prima o dopo: {items}"
 
+#. interface
+#: crates/ui-egui/src/dialogs.rs
+msgid "Rows"
+msgstr ""
+
 #. command label
 #: crates/engine/src/cmd/rules_remote.rs
 #, fuzzy
@@ -17040,7 +17055,7 @@ msgid "System default"
 msgstr "Predefinito del sistema"
 
 #. command label, interface, ribbon
-#: crates/engine/src/cmd/format.rs crates/ui-egui/src/credits.rs crates/ui-egui/src/ribbon.rs
+#: crates/engine/src/cmd/format.rs crates/ui-egui/src/credits.rs crates/ui-egui/src/ribbon.rs crates/ui-egui/src/signatures.rs
 #, fuzzy
 msgid "Table"
 msgstr "Tabella"

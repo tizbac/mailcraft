@@ -187,6 +187,12 @@ pub enum Dialog {
     /// Find and Replace in the message being written ([`crate::find_replace`]).
     FindReplace(crate::find_replace::FindReplace),
     /// Insert › Symbol ([`crate::symbol`]).
+    /// Insert › Table: how many rows and columns, then `insert.table` (the composer and the
+    /// signature editor alike).
+    InsertTable {
+        rows: usize,
+        columns: usize,
+    },
     Symbol(crate::symbol::Symbol),
 }
 
@@ -344,6 +350,7 @@ impl Dialog {
             Dialog::NameChoice(_) => "checkNames",
             Dialog::ViewSource(_) => "viewSource",
             Dialog::Security(d) => d.name(),
+            Dialog::InsertTable { .. } => "insertTable",
             Dialog::Symbol(_) => "symbol",
             Dialog::FindReplace(d) => {
                 if d.replace {
@@ -451,6 +458,14 @@ impl Dialog {
                 app.session.doc()?;
                 let at = app.session.now();
                 Dialog::DateTime { choices: mailcraft_engine::cmd::writing_tools::date_time_choices(&app.session, at), selected: 0, at }
+            }
+            "insertTable" => {
+                app.session.doc()?;
+                let at = |k: &str| id(k).and_then(|n| usize::try_from(n).ok());
+                Dialog::InsertTable {
+                    rows: at("rows").unwrap_or(3).clamp(1, mailcraft_model::rich::MAX_PASTED_ROWS),
+                    columns: at("columns").unwrap_or(3).clamp(1, mailcraft_model::rich::MAX_PASTED_COLUMNS),
+                }
             }
             "password" => Dialog::Password { account: id("account")?, password: String::new(), shown: false },
             // Opened by name (`ui.dialog`, which an agent may run), it has nothing waiting for its
@@ -3196,6 +3211,34 @@ pub fn show(app: &mut MailApp, ctx: &egui::Context) {
             let mut done = false;
             let open = window(ctx, tl!("Merge Duplicate Contacts"), crate::merge_contacts::WIDTH, |ui| done = dialog.show(app, ui, enter));
             close |= !open || done;
+        }
+        Dialog::InsertTable { rows, columns } => {
+            let mut submit = false;
+            let open = window(ctx, tl!("Insert Table"), 260.0, |ui| {
+                egui::Grid::new("insertTable").num_columns(2).spacing(vec2(18.0, 6.0)).show(ui, |ui| {
+                    ui.label(tl!("Rows"));
+                    ui.add(egui::DragValue::new(rows).range(1..=mailcraft_model::rich::MAX_PASTED_ROWS));
+                    ui.end_row();
+                    ui.label(tl!("Columns"));
+                    ui.add(egui::DragValue::new(columns).range(1..=mailcraft_model::rich::MAX_PASTED_COLUMNS));
+                    ui.end_row();
+                });
+                ui.add_space(6.0);
+                button_row(ui, |ui| {
+                    submit |= primary_button(ui, tl!("Insert"), true).clicked();
+                    close |= plain_button(ui, tl!("Cancel")).clicked();
+                });
+            });
+            close |= !open;
+            if (submit || enter) && !close {
+                if let Err(e) = app.execute("insert.table", json!({"rows": *rows, "columns": *columns})) {
+                    app.status(e);
+                }
+                close = true;
+            }
+            if close {
+                app.want_body_focus();
+            }
         }
         Dialog::Symbol(dialog) => {
             let mut done = false;

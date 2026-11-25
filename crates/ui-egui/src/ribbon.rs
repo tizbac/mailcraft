@@ -1057,7 +1057,7 @@ fn insert() -> Tab {
                 Item::big_menu("signature", "signature", "Signature", "Signature", Menu::Signature).at(0, 3),
             ],
         ),
-        g("Tables", vec![Item::small("table", "Table", "Insert Table", "insert.table", no()).at(1, 5)]),
+        g("Tables", vec![Item::small("table", "Table", "Insert Table", "ui.dialog", json!({"name": "insertTable"})).key("insert.table").at(1, 5)]),
         g(
             "Illustrations",
             vec![

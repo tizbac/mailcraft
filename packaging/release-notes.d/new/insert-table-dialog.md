@@ -1,0 +1,1 @@
+- **Insert › Table asks how many rows and columns**, in the message being written and in the rich signature editor (which has a Table button of its own); the grid goes in at the caret as an ordinary table, and a pasted range still becomes one.
