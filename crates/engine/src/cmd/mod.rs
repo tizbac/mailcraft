@@ -208,6 +208,7 @@ mod snooze_review_tests;
 mod snooze_servers_tests;
 #[cfg(test)]
 mod snooze_tests;
+pub mod spreadsheet;
 pub mod sync_progress;
 pub mod tasks;
 pub mod tasks_remote;

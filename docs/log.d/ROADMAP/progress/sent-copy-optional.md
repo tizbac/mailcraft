@@ -1,0 +1,1 @@
+| 2026-11-25 | File › Options › Sent Items can keep no copy of what is sent (default: keep): Exchange sends `SendOnly`, IMAP appends nothing, and a local account keeps nothing; Microsoft Graph and JMAP servers still file their own copy |

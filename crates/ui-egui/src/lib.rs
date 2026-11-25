@@ -736,6 +736,11 @@ pub trait RichClipboard {
     fn image(&self) -> Option<Vec<u8>> {
         None
     }
+    /// Excel's "XML Spreadsheet" clipboard data (SpreadsheetML), when the clipboard has one: a
+    /// range copied on Windows carries it beside "HTML Format". `edit.paste` makes it a table.
+    fn spreadsheet(&self) -> Option<String> {
+        None
+    }
     /// Whether the clipboard holds a picture, without reading it where that is cheaper.
     fn has_image(&self) -> bool {
         self.image().is_some()

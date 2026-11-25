@@ -1,0 +1,1 @@
+- **A spreadsheet copied from Excel keeps its grid on Windows.** Excel's "HTML Format" reaches MailCraft as the fragment alone (its `<table>` sits outside the fragment and the marker), which was taken as loose rows and came out as plain text; it is put back in a table now. Excel's "XML Spreadsheet" data is read too, for a copy that carries no HTML, and pastes as the same table.

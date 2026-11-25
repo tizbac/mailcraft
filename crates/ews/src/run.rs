@@ -240,6 +240,8 @@ pub(crate) struct Run<'a, E: HttpExchange> {
     /// The mailbox the run reads, when it is not the account's own: a shared mailbox, at its
     /// address. Empty for the account itself.
     pub(crate) mailbox: String,
+    /// No copy of what is sent is to be filed in Sent Items (`SendOnly`).
+    pub(crate) sent_no_copy: bool,
     /// The answer that couldn't be used, when one couldn't (the client keeps its body): handed
     /// to the result, and written by the host to the owner's data folder.
     pub(crate) bad_answer: Option<BadAnswer>,
@@ -260,6 +262,7 @@ impl<'a, E: HttpExchange> Run<'a, E> {
             needs_change_key: false,
             recipients_unsaid: false,
             mailbox: String::new(),
+            sent_no_copy: false,
             bad_answer: None,
         }
     }
@@ -624,6 +627,7 @@ pub async fn sync_mail<E: HttpExchange>(
     let mut run = Run::new(client, exchange, cancel, wait);
     // A shared mailbox is read at its own address, with the owner's sign-in.
     run.mailbox = request.mailbox.trim().to_owned();
+    run.sent_no_copy = request.sent_no_copy;
     let mut out = Outcome::default();
     if let Err(stop) = run.all(request, &mut out, emit).await {
         match stop {

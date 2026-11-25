@@ -946,6 +946,11 @@ pub struct Prefs {
     pub work_end: u8,
     /// Opening a message in the reading pane marks it read.
     pub mark_read_on_open: bool,
+    /// A copy of a message that is sent is kept in Sent Items (`file.options` `sentCopy`). On
+    /// unless the owner turns it off; a server that files its own copy (Microsoft Graph, JMAP)
+    /// cannot be told yet, so its copy stays.
+    #[serde(default = "yes", skip_serializing_if = "is_false")]
+    pub sent_copy: bool,
     /// A copy of a message that is sent is kept in Sent Items marked unread (`file.options`
     /// `sentUnread`). Off: it is marked read, as Outlook does. Local accounts and every account
     /// whose server MailCraft files the copy with (IMAP's APPEND, Exchange's `CreateItem`) are
@@ -1059,6 +1064,10 @@ pub struct Prefs {
     pub save_message_format: SaveMessageFormat,
 }
 
+fn yes() -> bool {
+    true
+}
+
 impl Default for Prefs {
     fn default() -> Self {
         Prefs {
@@ -1070,6 +1079,7 @@ impl Default for Prefs {
             work_start: 8,
             work_end: 17,
             mark_read_on_open: true,
+            sent_copy: true,
             sent_unread: false,
             sent_folder_for: BTreeMap::new(),
             default_reminder: Some(15),

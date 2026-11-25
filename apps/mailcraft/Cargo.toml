@@ -234,3 +234,8 @@ rfd = { workspace = true }
 # being written (egui's own clipboard carries text only). Already in the tree: egui's window
 # layer copies text through it.
 arboard = { version = "3.7", default-features = false, features = ["image-data"] }
+
+[target.'cfg(windows)'.dependencies]
+# Excel's "XML Spreadsheet" clipboard data, which `arboard` has no way to name (`clipboard.rs`):
+# the same crate `arboard` reads "HTML Format" with. MIT OR Apache-2.0.
+clipboard-win = "5.4"

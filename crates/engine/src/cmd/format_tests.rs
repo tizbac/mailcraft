@@ -253,6 +253,23 @@ fn pasted_html_is_reduced_to_the_set() {
 }
 
 #[test]
+fn a_pasted_xml_spreadsheet_becomes_a_table() {
+    let mut s = session();
+    run(&mut s, "mail.new", json!({"to": "maya@lumen.example"}));
+    run(&mut s, "compose.select", json!({"from": 0}));
+    // What Excel puts on the clipboard beside its HTML: a message takes the cells as a table even
+    // when no HTML came with them.
+    let xml = r#"<?xml version="1.0"?><Workbook xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet><Table>
+      <Row><Cell><Data ss:Type="String">Item</Data></Cell><Cell><Data ss:Type="String">Qty</Data></Cell></Row>
+      <Row><Cell><Data ss:Type="String">Screws</Data></Cell><Cell><Data ss:Type="Number">42</Data></Cell></Row>
+    </Table></Worksheet></Workbook>"#;
+    run(&mut s, "edit.paste", json!({"spreadsheet": xml, "text": "Item\tQty\nScrews\t42"}));
+    let t = compose(&s).body.text().clone();
+    assert!(t.paragraphs().iter().flat_map(|p| &p.runs).any(|r| r.table.is_some()), "{:?}", t.to_plain());
+    assert!(t.to_plain().contains("Screws") && t.to_plain().contains("42"), "{:?}", t.to_plain());
+}
+
+#[test]
 fn a_paste_needs_something_to_paste() {
     let mut s = session();
     run(&mut s, "mail.new", json!({}));

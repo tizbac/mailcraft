@@ -464,6 +464,11 @@ msgid "A JMAP account's mail can't be snoozed yet."
 msgstr "JMAP ანგარიშის ფოსტის გადადება ჯერ შეუძლებელია."
 
 #. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "A Microsoft Graph or JMAP account's server files its own copy; MailCraft can't turn that off yet."
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/reading/warnings.rs
 #, fuzzy
 msgid "A brand's name on another address."
@@ -8260,6 +8265,11 @@ msgstr "ლოდინის გაგრძელება"
 #, fuzzy
 msgid "Keep a calendar from the web up to date here: its address ends in .ics or starts with webcal://"
 msgstr "ინტერნეტის კალენდრის აქ განახლება: მისი მისამართი მთავრდება .ics-ით ან იწყება webcal://-ით"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Keep a copy of sent messages in Sent Items"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountDialogs.kt
