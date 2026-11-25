@@ -79,7 +79,10 @@ pub use calendar::{
     OnlineMeeting, OnlineProvider, OpenedAddressBook, OpenedCalendar, Proposal, Recurrence, Response, ResponseOptions, Rights, ShowAs,
 };
 pub use contact::{Contact, ContactBook, ContactKey, KeyKind, Labeled, PostalAddress};
-pub use dav_down::{DavAsk, DavAskCollection, DavCalendar, DavChange, DavDownload, DavKnown, DavListing, DavProblem, DavRead, DavReadState};
+pub use dav_down::{
+    DavAsk, DavAskCollection, DavCalendar, DavChange, DavCreate, DavCreated, DavDownload, DavKnown, DavListing, DavProblem, DavPut, DavRead,
+    DavReadState,
+};
 pub use dav_find::{DavFindFailure, DavFindQuestion, DavFound};
 pub use dav_server::{DavCollectionState, DavServer, origin_of};
 pub use device_limits::{DeviceLimits, PHONE_DEFAULTS, PHONE_DOWNLOAD, PHONE_KEEP, PHONE_STORAGE};
