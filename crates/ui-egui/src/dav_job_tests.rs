@@ -491,4 +491,24 @@ fn a_server_that_took_its_password_keeps_it_when_another_refuses() {
     until_taken_in(&mut a, id);
     assert_eq!(a.dav_password(id, HOME).as_deref(), Some("calendars"), "taken, and still held");
     assert_eq!(a.dav_password(id, OTHER), None, "refused: not held");
+#[test]
+fn a_calendar_servers_calendar_that_takes_new_events_shows_no_lock() {
+    let (mut a, id) = app(false);
+    let calendar =
+        |name: &str, read_only: bool| DavCalendar { href: format!("{HOME}/cal/ada/{name}/"), name: name.into(), read_only, ..Default::default() };
+    let download = DavDownload {
+        account: id,
+        email: "ada@example.org".into(),
+        server: a.execute("sync.davRequest", json!({"account": id})).unwrap()["ask"]["server"].as_str().unwrap().to_string(),
+        listing: Some(DavListing { calendars: vec![calendar("work", false), calendar("shared", true)], complete: true, capped: false }),
+        signed_in: vec![HOME.into()],
+        ..Default::default()
+    };
+    a.execute("sync.applyDav", json!({"result": download})).unwrap();
+    let lock = |name: &str| {
+        let c = a.session.mailbox.calendars.iter().find(|c| c.name == name).unwrap();
+        crate::calendar_view::read_only(&a, c.id)
+    };
+    assert!(!lock("work"), "new events go into it");
+    assert!(lock("shared"), "it can only be read");
 }
