@@ -753,6 +753,7 @@ fn requeue_too_large(s: &mut Session, account: Id) {
     }
     // (What a fetch gave up on under the old limit may be within the new one.)
     s.graph_unfetchable.retain(|(a, _)| *a != account);
+    s.fetch_failed.retain(|(a, _), _| *a != account);
     s.driver.fetch.stuck.remove(&account);
     s.driver.fetch.wake();
     if requeued > 0 {
@@ -2624,6 +2625,7 @@ fn retry_failed(s: &mut Session, v: &Value) -> CmdResult {
     // an older limit): asked for again, now that the owner asked.
     let before = s.graph_unfetchable.len();
     s.graph_unfetchable.retain(|(a, _)| only.is_some_and(|only| *a != only));
+    s.fetch_failed.retain(|(a, _), _| only.is_some_and(|only| *a != only));
     let unfetchable = before.saturating_sub(s.graph_unfetchable.len());
     s.driver.fetch.stuck.clear();
     s.driver.fetch.wake();

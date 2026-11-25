@@ -347,6 +347,11 @@ pub(crate) fn unfetched_said(app: &MailApp, m: &Message) -> String {
             &[("size", &megabytes(size)), ("limit", &megabytes(limit))],
         );
     }
+    if let Some(why) = app.session.fetch_failure(m) {
+        // What the server said or which way its answer failed, in safe words: the answer itself
+        // is in sync-errors/ when it couldn't be used.
+        return crate::i18n::fmt(tl!("This message couldn't be downloaded: {why}. Open it to try again, or use Send/Receive."), &[("why", why)]);
+    }
     if app.session.unfetchable(m) {
         // Its fetch failed this session and the background passes it over: opening it asks again.
         return tl!("This message couldn't be downloaded. Open it to try again, or use Send/Receive.").to_string();

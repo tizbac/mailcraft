@@ -199,7 +199,29 @@ pub(crate) fn bounded_fetch(mut result: GraphFetchResult) -> GraphFetchResult {
         ids.retain(|id| is_id(id));
         ids.truncate(MAX_FETCHED);
     }
-    result.failed.extend(refused);
+    result.failed.extend(refused.iter().cloned());
+    // What the fetch said of each it couldn't bring: its id must be one, its reason is held to a
+    // short safe line, and the answer kept only while it is within what is kept.
+    result.failures.retain_mut(|failure| {
+        if !is_id(&failure.id) {
+            return false;
+        }
+        failure.why = failure.why.chars().filter(|c| !c.is_control()).take(300).collect();
+        if failure.answer.as_ref().is_some_and(|answer| answer.check().is_err()) {
+            failure.answer = None;
+        }
+        true
+    });
+    result.failures.truncate(MAX_FETCHED);
+    for id in &refused {
+        if !result.failures.iter().any(|failure| &failure.id == id) {
+            result.failures.push(mailcraft_model::sync::FetchFailure {
+                id: id.clone(),
+                why: "the server sent no message".to_owned(),
+                ..Default::default()
+            });
+        }
+    }
     result.errors = lines(&result.errors);
     result.busy_for = result.busy_for.map(|seconds| seconds.min(MAX_BUSY));
     result
