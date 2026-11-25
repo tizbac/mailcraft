@@ -307,6 +307,10 @@ impl<E: HttpExchange> Run<'_, E> {
                 }
                 Ok(Some(ChangeOutcome::Refused { why: why(&code) }))
             }
+            Err(Asked::Unusable(fault)) => {
+                self.reread_folders |= matches!(change, FolderChange::Delete { .. });
+                Ok(Some(ChangeOutcome::Refused { why: format!("the server's answer couldn't be used: {}", fault.words()) }))
+            }
             Err(Asked::Bad | Asked::Unreadable(_)) => {
                 self.reread_folders |= matches!(change, FolderChange::Delete { .. });
                 Ok(Some(ChangeOutcome::Refused { why: "the server's answer couldn't be used".to_owned() }))
@@ -816,7 +820,7 @@ fn settle(error: Asked) -> Result<Option<MessageOutcome>, Asked> {
     match error {
         Asked::Code(ResponseCode::ItemNotFound) => Ok(Some(MessageOutcome::Gone)),
         Asked::Code(code) => Ok(Some(MessageOutcome::Refused { status: refused_status(&code) })),
-        Asked::Bad | Asked::Unreadable(_) => Ok(Some(MessageOutcome::Refused { status: 400 })),
+        Asked::Bad | Asked::Unusable(_) | Asked::Unreadable(_) => Ok(Some(MessageOutcome::Refused { status: 400 })),
         Asked::Lost => Ok(None),
         // The change went out and the answer was more than this program reads: nothing is known of
         // it, and it is asked again later.

@@ -58,7 +58,7 @@ fn a_result_round_trips_and_pieces_are_absorbed_in_order() {
         hierarchy: "H1".into(),
         pages: vec![EwsMessagePage { folder: "F1".into(), state: "S1".into(), ..Default::default() }],
         errors: vec!["one".into()],
-        unread: vec![UnreadFolder { folder: "F2".into(), code: "ErrorAccessDenied".into(), why: UnreadWhy::Code }],
+        unread: vec![UnreadFolder { folder: "F2".into(), code: "ErrorAccessDenied".into(), why: UnreadWhy::Code, ..Default::default() }],
         partial: true,
         ..Default::default()
     };
@@ -207,8 +207,8 @@ fn a_missing_or_unknown_field_still_reads() {
 #[test]
 fn a_folder_that_could_not_be_read_round_trips_and_keeps_no_id_in_debug() {
     let unread = vec![
-        UnreadFolder { folder: "F-ONE".into(), code: "ErrorAccessDenied".into(), why: UnreadWhy::Code },
-        UnreadFolder { folder: "F-TWO".into(), why: UnreadWhy::Answer, ..Default::default() },
+        UnreadFolder { folder: "F-ONE".into(), code: "ErrorAccessDenied".into(), why: UnreadWhy::Code, ..Default::default() },
+        UnreadFolder { folder: "F-TWO".into(), why: UnreadWhy::Unexpected, ..Default::default() },
         UnreadFolder { folder: "F-THREE".into(), why: UnreadWhy::TooLarge, ..Default::default() },
     ];
     let result = EwsMailResult { unread: unread.clone(), ..Default::default() };
@@ -217,7 +217,7 @@ fn a_folder_that_could_not_be_read_round_trips_and_keeps_no_id_in_debug() {
     // A code is the default reason and is left out of the JSON; the others are named.
     let code = serde_json::to_string(&unread[0]).unwrap();
     assert!(!code.contains("why"), "{code}");
-    assert!(serde_json::to_string(&unread[1]).unwrap().contains(r#""why":"answer""#));
+    assert!(serde_json::to_string(&unread[1]).unwrap().contains(r#""why":"unexpected""#));
     // Counts only: no folder id and no code in debug output.
     let text = format!("{result:?}");
     assert!(!text.contains("F-ONE") && !text.contains("ErrorAccessDenied"), "{text}");
