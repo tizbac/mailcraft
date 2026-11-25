@@ -1,0 +1,1 @@
+- **Messages left half-downloaded are fetched again.** Raising Download messages in full, Send/Receive, or opening one asks the server again for what a fetch had given up on, and for a message too large under an older limit; the "download x of y" bar now ends instead of waiting for ever on messages the background had passed over.

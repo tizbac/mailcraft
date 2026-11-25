@@ -347,6 +347,10 @@ pub(crate) fn unfetched_said(app: &MailApp, m: &Message) -> String {
             &[("size", &megabytes(size)), ("limit", &megabytes(limit))],
         );
     }
+    if app.session.unfetchable(m) {
+        // Its fetch failed this session and the background passes it over: opening it asks again.
+        return tl!("This message couldn't be downloaded. Open it to try again, or use Send/Receive.").to_string();
+    }
     if app.opened_after_batch(m.id) {
         tl!("This message downloads once the messages being downloaded now are here.").to_string()
     } else {

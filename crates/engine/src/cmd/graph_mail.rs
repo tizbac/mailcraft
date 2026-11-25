@@ -322,7 +322,7 @@ pub fn apply_graph_fetch(s: &mut Session, result: GraphFetchResult) -> CmdResult
         s.mailbox_changed();
     }
     let now = s.now();
-    let counts = graph_down::full_counts(&s.mailbox, account, now);
+    let counts = graph_down::full_counts_with(&s.mailbox, account, now, &s.graph_unfetchable);
     s.sync_progress.counted_as(&s.mailbox, account, counts, now);
     let graph_down::FullCounts { all, waiting, large } = counts;
     Ok(

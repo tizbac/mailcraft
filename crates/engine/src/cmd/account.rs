@@ -694,7 +694,13 @@ fn edit(s: &mut Session, v: &Value) -> CmdResult {
     // A longer one on a device that lists only its window's mail (a phone, MB3.16): its folders
     // are listed afresh, to bring the older mail it now covers.
     let lengthened = a.keep_offline > before.keep_offline && s.mailbox.device_limits.is_some();
+    // A larger Download messages in full: what was too large before, or that a fetch gave up on,
+    // is fetched again now, and the background looks at once rather than after its rest.
+    let (was_limit, now_limit) = (before.download_in_full.whole_limit(), a.download_in_full.whole_limit());
     *s.mailbox.account_mut(id)? = a;
+    if now_limit > was_limit {
+        requeue_too_large(s, id);
+    }
     if shortened {
         s.driver.thinning.now = true;
     }
@@ -722,6 +728,36 @@ fn edit(s: &mut Session, v: &Value) -> CmdResult {
         }
     }
     Ok(json!({"id": id}))
+}
+
+/// The account now downloads larger messages whole than it did: those kept as too large before,
+/// and those a fetch gave up on (`graph_unfetchable`), are asked for again. A message of an
+/// IMAP account is asked for by UID at the next run ([`Message::refetch`]); a Microsoft,
+/// Exchange or JMAP account's is put back among those the background fetches. A message still
+/// larger than the new limit stays as it is.
+fn requeue_too_large(s: &mut Session, account: Id) {
+    let Some(limit) = s.mailbox.owner_of(account).or(s.mailbox.account(account)).map(|a| a.download_in_full.whole_limit()) else { return };
+    let imap = s.mailbox.account(account).is_some_and(|a| a.kind == AccountKind::Imap);
+    let mut requeued = 0usize;
+    for m in
+        s.mailbox.messages.values_mut().filter(|m| m.account == account && m.not_downloaded > 0 && m.not_downloaded <= limit && m.server.is_some())
+    {
+        let m = std::sync::Arc::make_mut(m);
+        m.not_downloaded = 0;
+        if imap {
+            m.refetch = true;
+        } else {
+            m.unfetched = true;
+        }
+        requeued = requeued.saturating_add(1);
+    }
+    // (What a fetch gave up on under the old limit may be within the new one.)
+    s.graph_unfetchable.retain(|(a, _)| *a != account);
+    s.driver.fetch.stuck.remove(&account);
+    s.driver.fetch.wake();
+    if requeued > 0 {
+        s.mailbox_changed();
+    }
 }
 
 /// Every folder the server has of `account`, and of the shared mailboxes opened through it, is
@@ -2584,7 +2620,14 @@ fn retry_failed(s: &mut Session, v: &Value) -> CmdResult {
             cleared += 1;
         }
     }
-    Ok(json!({"cleared": cleared}))
+    // What the background passed over (a message a fetch couldn't bring, or one too large under
+    // an older limit): asked for again, now that the owner asked.
+    let before = s.graph_unfetchable.len();
+    s.graph_unfetchable.retain(|(a, _)| only.is_some_and(|only| *a != only));
+    let unfetchable = before.saturating_sub(s.graph_unfetchable.len());
+    s.driver.fetch.stuck.clear();
+    s.driver.fetch.wake();
+    Ok(json!({"cleared": cleared, "unfetchable": unfetchable}))
 }
 
 fn apply(s: &mut Session, v: &Value) -> CmdResult {
