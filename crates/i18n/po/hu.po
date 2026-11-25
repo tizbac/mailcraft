@@ -475,6 +475,12 @@ msgid "A calendar change couldn't be sent yet and will be tried again: {error}"
 msgstr "A naptárváltást még nem lehetett elküldeni, és újra meg kell próbálni: {error}"
 
 #. what a command says
+#: crates/engine/src/cmd/calendar.rs
+#, fuzzy
+msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."
+msgstr "A naptárkiszolgáló naptára innen fogad találkozókat, megbeszéléseket még nem: a kiszolgáló maga is küldhetne meghívókat. Tartsa a megbeszélést egy ezen a számítógépen lévő naptárban."
+
+#. what a command says
 #: crates/engine/src/cmd/calendar/selection.rs crates/engine/src/cmd/calendar_extra.rs
 #, fuzzy
 msgid "A calendar that only shows when people are busy has no appointment to copy: open one of the calendars that can be read."
@@ -636,6 +642,12 @@ msgstr "Egy találkozót nem lehet más postafiók naptárába átvinni: ez mind
 msgid "A meeting is forwarded to {n} people at most at once."
 msgstr "A {n}-embereknek legfeljebb azonnal küldünk egy találkozót."
 
+#. what a command says
+#: crates/engine/src/cmd/calendar.rs
+#, fuzzy
+msgid "A meeting on a calendar server can't be deleted from here yet: the server could send cancellations by itself."
+msgstr "A naptárkiszolgálón lévő megbeszélés innen még nem törölhető: a kiszolgáló maga is küldhetne lemondásokat."
+
 #. interface
 #: crates/ui-egui/src/reading/invitation.rs
 #, fuzzy
@@ -778,6 +790,12 @@ msgstr "A kiszolgálóhoz nem sikerült biztonságos kapcsolatot létrehozni. Í
 #, fuzzy
 msgid "A series and one of its days are both named; nothing was changed."
 msgstr "Egy sorozat és annak egyik napja is meg van adva; semmi sem változott."
+
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+#, fuzzy
+msgid "A series or a meeting on a calendar server can't be changed from here yet: change it on the server."
+msgstr "A naptárkiszolgálón lévő sorozat vagy megbeszélés innen még nem módosítható: módosítsa a kiszolgálón."
 
 #. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
@@ -1681,6 +1699,12 @@ msgstr "Az alkalmazásazonosító betűk, számjegyek, pontok és műszerfalak"
 #, fuzzy
 msgid "An appointment marked private shows only that you are busy. Nobody invited to anything is named."
 msgstr "Egy privát névvel jelölt találkozó csak azt mutatja, hogy elfoglalt vagy, és senki sem hív meg senkit, akit meghívnak."
+
+#. what a command says
+#: crates/engine/src/cmd/calendar.rs
+#, fuzzy
+msgid "An appointment on a calendar server can't be moved to another calendar from here yet."
+msgstr "A naptárkiszolgálón lévő találkozó innen még nem helyezhető át másik naptárba."
 
 #. interface
 #: crates/ui-egui/src/calendar_view.rs
@@ -11694,6 +11718,12 @@ msgstr "Be"
 msgid "On Wayland, restart MailCraft after enabling this option. A reachable X11/XWayland server and a system tray are required."
 msgstr "Wayland alatt a beállítás bekapcsolása után indítsa újra a MailCraftot. A funkcióhoz elérhető X11/XWayland-kiszolgáló és értesítési terület szükséges."
 
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+#, fuzzy
+msgid "On a calendar server only an appointment's title, time, location, description, reminder, categories and privacy can be changed from here yet: change the rest on the server."
+msgstr "A naptárkiszolgálón egyelőre csak a találkozó címe, ideje, helye, leírása, emlékeztetője, kategóriái és bizalmassága módosítható innen: a többit a kiszolgálón módosítsa."
+
 #. interface
 #: crates/ui-egui/src/forms.rs
 #, fuzzy
@@ -11806,6 +11836,12 @@ msgstr "Ha már működött, a rendszer hiteles boltja legközelebb megtartja."
 #: crates/ui-egui/src/dav_password_ask.rs crates/ui-egui/src/dav_settings.rs
 msgid "Once the server has taken it, MailCraft keeps it in your system's credential store, as File › Options lets it."
 msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/calendar.rs
+#, fuzzy
+msgid "One day of a series on a calendar server can't be deleted from here yet: delete the whole series, or that day on the server."
+msgstr "A naptárkiszolgálón lévő sorozat egyetlen napja innen még nem törölhető: törölje az egész sorozatot, vagy azt a napot a kiszolgálón."
 
 #. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
@@ -17557,8 +17593,14 @@ msgstr "A(z) „{name}” naptár egy weben lévő naptár másolata: itt csak o
 #. what a command says
 #: crates/engine/src/cmd/remote.rs
 #, fuzzy
-msgid "The calendar \"{name}\" is on a calendar server: this version reads it but can't send changes to it yet."
-msgstr "A(z) \"{name}\" naptár egy naptárkiszolgálón van: ez a verzió olvassa, de még nem tud módosításokat küldeni rá."
+msgid "The calendar \"{name}\" is on a calendar server: this version can't send that change to it yet."
+msgstr "A(z) \"{name}\" naptár egy naptárkiszolgálón van: ez a verzió még nem tudja elküldeni neki ezt a módosítást."
+
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+#, fuzzy
+msgid "The calendar \"{name}\" on the calendar server can only be read: the server doesn't let this account change it."
+msgstr "A naptárkiszolgálón lévő \"{name}\" naptár csak olvasható: a kiszolgáló nem engedi, hogy ez a fiók módosítsa."
 
 #. what a command says
 #: crates/engine/src/cmd/remote.rs
@@ -17702,6 +17744,22 @@ msgstr ""
 #: crates/ui-egui/src/dav_password_ask.rs
 msgid "The calendar server needs its password."
 msgstr ""
+
+#. interface
+#: crates/ui-egui/src/dav_job.rs
+#, fuzzy
+msgid "The calendar server didn't take \"{title}\": it is kept in a calendar on this computer."
+msgid_plural "The calendar server didn't take {n} new events: they are kept in a calendar on this computer."
+msgstr[0] "A naptárkiszolgáló nem fogadta el ezt: \"{title}\". Egy ezen a számítógépen lévő naptárban marad."
+msgstr[1] "A naptárkiszolgáló nem fogadott el {n} új eseményt: egy ezen a számítógépen lévő naptárban maradnak."
+
+#. interface
+#: crates/ui-egui/src/dav_job.rs
+#, fuzzy
+msgid "The calendar server kept \"{title}\": it was changed there, or can't be deleted from here. It is shown again."
+msgid_plural "The calendar server kept {n} events: they were changed there, or can't be deleted from here. They are shown again."
+msgstr[0] "A naptárkiszolgáló megtartotta ezt: \"{title}\". Ott módosították, vagy innen nem törölhető. Újra megjelenik."
+msgstr[1] "A naptárkiszolgáló megtartott {n} eseményt: ott módosították őket, vagy innen nem törölhetők. Újra megjelennek."
 
 #. interface
 #: crates/ui-egui/src/dav_job.rs
@@ -27915,6 +27973,10 @@ msgstr "−Bin"
 #, fuzzy
 msgid "−Lines"
 msgstr "−Sorok"
+
+#, fuzzy
+#~ msgid "The calendar \"{name}\" is on a calendar server: this version reads it but can't send changes to it yet."
+#~ msgstr "A(z) \"{name}\" naptár egy naptárkiszolgálón van: ez a verzió olvassa, de még nem tud módosításokat küldeni rá."
 
 #, fuzzy
 #~ msgid "Kept on this phone only: it is not sent to your account."
