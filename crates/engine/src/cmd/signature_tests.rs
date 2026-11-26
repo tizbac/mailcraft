@@ -422,7 +422,8 @@ fn an_html_signature_edited_in_the_message_goes_out_as_edited() {
     run(&mut s, "compose.formatHtml", json!({}));
     let id = run(&mut s, "compose.send", json!({}))["id"].as_u64().unwrap();
     let html = s.mailbox.message(id).unwrap().body.html.clone().unwrap();
-    assert!(html.contains("PhD") && !html.contains("<table"), "{html}");
+    // The copy went out as edited: the signature's own web picture and tracking are not in it.
+    assert!(html.contains("PhD") && !html.contains("logo.example") && !html.contains("track.example"), "{html}");
     // In plain text, the words alone.
     run(&mut s, "mail.new", json!({"to": "maya@lumen.example", "body": "Hello"}));
     run(&mut s, "compose.formatPlain", json!({}));
@@ -497,7 +498,7 @@ fn a_caret_never_stays_in_an_html_signature_that_is_not_shown() {
     run(&mut s, "compose.select", json!({"from": end}));
     run(&mut s, "compose.type", json!({"text": "!"}));
     let c = s.compose.as_ref().unwrap();
-    assert!(c.signature_unedited() && c.body.text().text().starts_with("Hello\n!\nAvery Quinn"), "{:?}", c.body.text().text());
+    assert!(c.signature_unedited() && c.body.text().text().starts_with("Hello\n!\n"), "{:?}", c.body.text().text());
     // Nor does an undo put it back there.
     run(&mut s, "edit.undo", json!({}));
     let c = s.compose.as_ref().unwrap();
@@ -665,4 +666,26 @@ fn a_pasted_signature_embeds_the_pictures_its_html_names_on_the_web() {
     assert!(sig.body().pictures() == [id]);
     let sent = mailcraft_mime_model::rich::signature_html(sig, &|p| format!("p{}", p.id));
     assert!(sent.contains("cid:p1"), "{sent}");
+}
+
+#[test]
+fn an_html_signature_brought_back_to_rich_text_keeps_its_table() {
+    let mut s = session();
+    run(&mut s, "signature.set", json!({"name": "Html", "text": ""}));
+    run(&mut s, "signature.html", json!({"name": "Html", "html": "<p>Hi</p><table><tr><td>One</td><td>Two</td></tr></table>"}));
+    run(&mut s, "signature.open", json!({"name": "Html"}));
+    // The Rich text button: the signature becomes the rich text of what its HTML made.
+    run(&mut s, "signature.html", json!({"html": null}));
+    let from = {
+        let text = s.signature_edit.as_ref().unwrap().body.text();
+        (0..text.len()).find(|at| text.table_at(*at).is_some()).expect("a table in the signature")
+    };
+    assert_eq!(s.signature_edit.as_ref().unwrap().body.text().table_at(from).and_then(|t| t.cell_text(0, 0)).as_deref(), Some("One"));
+    // And its cells are typed in, as a table put there by Insert › Table is.
+    run(&mut s, "table.cellEdit", json!({"from": from, "row": 0, "cell": 0, "at": 0}));
+    run(&mut s, "table.cellType", json!({"text": "x"}));
+    assert_eq!(s.signature_edit.as_ref().unwrap().body.text().table_at(from).and_then(|t| t.cell_text(0, 0)).as_deref(), Some("xOne"));
+    run(&mut s, "signature.save", json!({}));
+    let sig = s.mailbox.signature("Html").unwrap();
+    assert!(sig.body().paragraphs().iter().flat_map(|p| &p.runs).any(|r| r.table.is_some()), "{:?}", sig.plain());
 }

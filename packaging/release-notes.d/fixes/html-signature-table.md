@@ -1,0 +1,1 @@
+- **An HTML signature brought back to rich text keeps its table**, whose cells are then typed in as any table's are, instead of its tables being flattened to text.
