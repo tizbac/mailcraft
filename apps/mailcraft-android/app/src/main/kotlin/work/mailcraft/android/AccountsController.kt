@@ -432,10 +432,9 @@ internal class AccountsController(
         val add = ui.value.add as? AddAccountState.Linchange ?: return
         if (add.working) return
         val email = add.email.trim()
-        val server = add.server.trim().ifEmpty { email.substringAfter('@', "").trim() }
+        val server = add.server.trim()
         val problem = when {
             email.isEmpty() -> "Type the account's address."
-            server.isEmpty() -> "Type the Linchange server's address."
             else -> null
         }
         if (problem != null) {

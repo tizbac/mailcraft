@@ -1,0 +1,1 @@
+- **A Linchange account added on Android finds its server instead of trusting `mail.<domain>`**: the domain's mail exchanger is taken, as the desktop app's discovery does, so a self-hosted server whose name is another one no longer fails with “the name couldn't be looked up”. A server typed with a port keeps it for its page, and mail is read at the server's own 993 and 587.

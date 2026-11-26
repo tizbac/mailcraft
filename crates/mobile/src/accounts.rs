@@ -272,7 +272,11 @@ fn failed(reason: &str) -> SignInOutcome {
 
 /// What waiting for a Linchange application password came to.
 enum Approval {
-    Approved(String),
+    /// The application password, and the mail host it was approved for.
+    Approved {
+        password: String,
+        host: String,
+    },
     NoBrowser,
     Cancelled,
     TimedOut,
@@ -301,6 +305,48 @@ pub(crate) fn linchange_origin(server: &str) -> Option<String> {
         && !host.ends_with('.')
         && host.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '[' | ']' | ':'));
     usable.then(|| format!("https://{host}"))
+}
+
+/// The host in a Linchange origin, without the web port: mail is read at the servers' own 993 and
+/// 587, and a name with a port in it is no name to look up (`mail.example.org:8443`).
+pub(crate) fn linchange_mail_host(origin: &str) -> Option<String> {
+    let authority = origin.trim().strip_prefix("https://")?;
+    let host = match authority.strip_prefix('[') {
+        // An IPv6 literal keeps its address and loses the brackets and the port.
+        Some(rest) => rest.split(']').next().unwrap_or_default(),
+        None => authority.split(':').next().unwrap_or_default(),
+    };
+    (!host.is_empty()).then(|| host.to_string())
+}
+
+/// Whether `origin` is the `mail.<domain>` the Add Account form guesses for an address: the DNS is
+/// then asked for the domain's mail exchangers instead, as the desktop app's discovery does.
+pub(crate) fn linchange_is_guess(email: &str, origin: &str) -> bool {
+    let Some((_, domain)) = email.rsplit_once('@') else { return false };
+    mailcraft_model::provider::linchange_for_domain(domain)
+        .is_some_and(|preset| origin.trim_end_matches('/').eq_ignore_ascii_case(&format!("https://{}", preset.incoming.host)))
+}
+
+/// The web origin and the mail host of a Linchange account: what the owner named, or, for the
+/// form's guess (or no server at all), the domain's first mail exchanger — the server the desktop
+/// app's discovery takes, since Linchange is self-hosted and `mail.<domain>` need not exist.
+/// Blocks on the DNS; runs on the approval's own thread.
+pub(crate) fn linchange_target(email: &str, server: &str) -> Option<(String, String)> {
+    let typed = linchange_origin(server);
+    let guessed = typed.as_deref().is_none_or(|origin| linchange_is_guess(email, origin));
+    let origin = if guessed {
+        email
+            .rsplit_once('@')
+            .map(|(_, domain)| domain.to_ascii_lowercase())
+            .and_then(|domain| mailcraft_net::lookup_mx(&domain).ok())
+            .and_then(|exchangers| exchangers.into_iter().find_map(|host| mailcraft_model::provider::linchange(&host)))
+            .map(|preset| format!("https://{}", preset.incoming.host))
+            .or(typed)
+    } else {
+        typed
+    }?;
+    let host = linchange_mail_host(&origin)?;
+    Some((origin, host))
 }
 
 fn not_granted(reason: &str) -> PermissionOutcome {
@@ -614,14 +660,12 @@ impl Core {
             .map_err(|_| CoreError::Failed { reason: "the address of the approval page could not be made".to_string() })
     }
 
-    /// Remove an account: its mail and what is kept for it on this phone (`account.remove`), and
-    /// its sign-in from the platform's credential store. Nothing on the server is touched. The
-    /// sign-in is removed only once the account is.
     /// Add a Linchange account. The account password and its second factor are typed into
     /// Linchange's own page in the system browser; MailCraft only waits for the application
     /// password that page creates for this phone, and uses it as the account's password for IMAP
-    /// and SMTP. `server` is the Linchange web origin or its host (`mail.example.org`), and
-    /// `description` is what the account page shows for the credential. Call
+    /// and SMTP. `server` is the Linchange web origin or its host (`mail.example.org`), or empty
+    /// (or the form's own `mail.<domain>` guess) to take the domain's mail exchanger, as the
+    /// desktop app does; `description` is what the account page shows for the credential. Call
     /// [`Core::cancel_linchange_sign_in`] to stop waiting.
     pub async fn add_linchange_account(
         &self,
@@ -634,9 +678,11 @@ impl Core {
         if !mailcraft_model::is_valid_email(&email) {
             return Ok(LinchangeOutcome::Failed { reason: "the account's address isn't an e-mail address".to_string() });
         }
-        let Some(server) = linchange_origin(&server) else {
+        // A server the owner cleared is the form's guess: the DNS finds it (below). What is typed
+        // must be an `https://` origin or a host, never plain `http`.
+        if !server.trim().is_empty() && linchange_origin(&server).is_none() {
             return Ok(LinchangeOutcome::Failed { reason: "the Linchange server's address can't be used".to_string() });
-        };
+        }
         if self.closing.load(Ordering::Acquire) {
             return Err(CoreError::Cancelled);
         }
@@ -648,21 +694,27 @@ impl Core {
             }
             *open = Some(cancel.clone());
         }
-        let host = server.strip_prefix("https://").unwrap_or_default().to_string();
         // The approval reaches the server and opens a page: on a thread of its own, never here.
         let platform = self.platform.clone();
         let reply = Queue::<Approval>::new();
         let job_reply = reply.clone();
         let description: String = description.trim().chars().take(200).collect();
+        let job_email = email.clone();
         let job = move || {
-            let approval = match mailcraft_net::start_linchange_app_token(&server, &description) {
+            // The form's `mail.<domain>` guess (or a cleared server) is the domain's mail
+            // exchanger's, found here, since a self-hosted Linchange need not have `mail.<domain>`.
+            let Some((origin, host)) = linchange_target(&job_email, &server) else {
+                job_reply.push(Approval::Failed("the Linchange server couldn't be found for this address".to_string()));
+                return;
+            };
+            let approval = match mailcraft_net::start_linchange_app_token(&origin, &description) {
                 Ok(grant) => {
                     let url = grant.verification_url.clone();
                     if platform.open_sign_in_page(url).is_err() {
                         Approval::NoBrowser
                     } else {
-                        match mailcraft_net::finish_linchange_app_token(&server, &grant, &cancel) {
-                            Ok(password) => Approval::Approved(password),
+                        match mailcraft_net::finish_linchange_app_token(&origin, &grant, &cancel) {
+                            Ok(password) => Approval::Approved { password, host },
                             Err(why) => Approval::of(why),
                         }
                     }
@@ -678,8 +730,8 @@ impl Core {
             reply.next().await.unwrap_or(Approval::Failed("the Linchange approval stopped unexpectedly".to_string()))
         };
         self.signins.linchange.lock().unwrap_or_else(PoisonError::into_inner).take();
-        let password = match approval {
-            Approval::Approved(password) => password,
+        let (password, host) = match approval {
+            Approval::Approved { password, host } => (password, host),
             Approval::NoBrowser => return Ok(LinchangeOutcome::NoBrowser),
             Approval::Cancelled => return Ok(LinchangeOutcome::Cancelled),
             Approval::TimedOut => return Ok(LinchangeOutcome::TimedOut),
@@ -1070,6 +1122,9 @@ impl Core {
         .await
     }
 
+    /// Remove an account: its mail and what is kept for it on this phone (`account.remove`), and
+    /// its sign-in from the platform's credential store. Nothing on the server is touched. The
+    /// sign-in is removed only once the account is.
     pub async fn remove_account(&self, account: u64) -> Result<(), CoreError> {
         // One job: the account goes and, when no other account has its address, so does its sign-in,
         // whatever becomes of the caller (a shutdown between two calls would leave the credential).
