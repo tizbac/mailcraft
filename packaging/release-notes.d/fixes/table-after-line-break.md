@@ -1,0 +1,1 @@
+- **A table can be typed in wherever it stands.** A table after a line break, a paragraph or a signature is now entered at its first cell when Insert › Table makes it, and a click in any of its cells takes the typing there; before, the cell was looked for at a place that counted the line breaks wrongly, so the click said "there is no such cell in the table".

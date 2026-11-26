@@ -835,3 +835,18 @@ fn insert_table_puts_the_caret_in_its_first_cell() {
     assert_eq!(s.table_edit(), None);
     assert!(s.run("table.cellType", &json!({"text": "x"})).is_err(), "no cell is open any more");
 }
+
+/// The same after a line break: the table is in a later paragraph, whose line break counts in
+/// the text's positions (a table found by its block's place was off by one per paragraph before).
+#[test]
+fn a_table_after_a_line_break_is_a_cell_to_type_in() {
+    let mut s = session();
+    run(&mut s, "mail.new", json!({}));
+    run(&mut s, "compose.type", json!({"text": "Hi\n"}));
+    run(&mut s, "insert.table", json!({"rows": 2, "columns": 2}));
+    let (from, row, cell, _) = s.table_edit().expect("the first cell of the table after the line break");
+    assert_eq!((row, cell), (0, 0));
+    run(&mut s, "table.cellType", json!({"text": "x"}));
+    let table = s.compose.as_ref().unwrap().body.text().table_at(from).and_then(|table| table.cell_text(0, 0));
+    assert_eq!(table.as_deref(), Some("x"));
+}

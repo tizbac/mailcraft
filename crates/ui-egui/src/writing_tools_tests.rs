@@ -298,3 +298,28 @@ fn inserting_a_table_puts_the_typing_in_its_first_cell() {
     let cell = h.state().session.compose.as_ref().unwrap().body.text().table_at(from).and_then(|table| table.cell_text(0, 0));
     assert_eq!(cell.as_deref(), Some("t"));
 }
+
+/// A click in a cell takes the keyboard from the line the new message opened on (its To line),
+/// as the owner's first click does: the cell is typed in, and the message around it is not.
+#[test]
+fn a_click_in_a_table_cell_takes_the_keyboard_from_the_recipient_line() {
+    let mut app = MailApp::new(Session::at(mailcraft_engine::sample::mailbox(NOW, 0), NOW, 0), Services::default());
+    app.autosave = false;
+    app.execute("mail.new", json!({})).unwrap();
+    app.execute("compose.set", json!({"body": ""})).unwrap();
+    app.execute("compose.select", json!({"from": 0})).unwrap();
+    app.execute("insert.table", json!({"rows": 2, "columns": 2})).unwrap();
+    let from = {
+        let body = &app.session.compose.as_ref().unwrap().body;
+        (0..body.text().len()).find(|at| body.text().table_at(*at).is_some()).expect("the table")
+    };
+    let mut h = window(app);
+    h.run_steps(3);
+    let body = h.state().hit.rect("composeBody", 0).expect("the body is drawn");
+    click_at(&mut h, body.min + egui::vec2(20.0, 12.0));
+    assert_eq!(h.state().ui.table_caret.map(|(place, _, _, _)| place), Some(from), "the click put the caret in the cell");
+    h.event(egui::Event::Text("k".into()));
+    h.run_steps(3);
+    let cell = h.state().session.compose.as_ref().unwrap().body.text().table_at(from).and_then(|table| table.cell_text(0, 0));
+    assert_eq!(cell.as_deref(), Some("k"), "the letter went into the cell, not the message");
+}
