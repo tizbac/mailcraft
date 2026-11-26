@@ -18,7 +18,6 @@
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-#[cfg(test)]
 use std::sync::{Mutex, PoisonError};
 
 use mailcraft_host::signin::{
@@ -82,6 +81,22 @@ pub enum SignInOutcome {
     /// The organisation's rules, Conditional Access among them, refuse this sign-in: not a fault,
     /// and not something an approval changes.
     OrganisationBlocks,
+    /// No browser could be started for the page.
+    NoBrowser,
+    /// Anything else; `reason` is in the program's words.
+    Failed { reason: String },
+}
+
+/// How adding a Linchange account ended: the owner approved MailCraft on the server's own page
+/// and the account is in, or it didn't.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum LinchangeOutcome {
+    /// Signed in: the account is in the mailbox, with an application password named for this phone.
+    SignedIn { account: u64, email: String, name: String },
+    /// The owner called the approval off.
+    Cancelled,
+    /// The approval wasn't finished in the time it is waited for.
+    TimedOut,
     /// No browser could be started for the page.
     NoBrowser,
     /// Anything else; `reason` is in the program's words.
@@ -157,6 +172,23 @@ pub struct ExchangeAccountSettings {
     pub url: String,
 }
 
+/// Calendars and address books alone, over CalDAV and CardDAV, without mail: the two service homes
+/// the owner types, and the password they sign in with.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct DavAccountSettings {
+    /// What the account is called: an e-mail address, or any other name that isn't empty.
+    pub email: String,
+    /// What the folder pane calls it; empty: [DavAccountSettings::email].
+    pub display_name: String,
+    /// The name the services know the owner by; empty: the account's name.
+    pub username: String,
+    pub password: String,
+    /// The `https://` addresses of its CalDAV homes; empty: no calendars.
+    pub calendar_homes: Vec<String>,
+    /// The `https://` addresses of its CardDAV homes; empty: no address books.
+    pub contact_homes: Vec<String>,
+}
+
 /// An account's settings as the phone's Edit form reads them out: its address and names, its
 /// mail servers (empty for an account kept in step by a provider's API), and an Exchange server
 /// account's Exchange Web Services address. The password is never here.
@@ -169,6 +201,16 @@ pub struct AccountSettings {
     pub outgoing: Option<MailServer>,
     /// An Exchange server account's Exchange Web Services address; empty for another.
     pub url: String,
+    /// A CalDAV and CardDAV account's homes (or another account's services); empty for none.
+    pub calendar_homes: Vec<String>,
+    pub contact_homes: Vec<String>,
+    /// The name the calendar and contacts services know the owner by; empty: the account's login.
+    pub dav_username: String,
+    /// The SHA-256 fingerprint of the one certificate trusted for these services besides the
+    /// system's; empty when none is.
+    pub dav_trusted: String,
+    /// Whether the password for these services is not the account's own.
+    pub dav_separate_password: bool,
 }
 
 /// What the sign-ins of a core hold: the host's (where the redirect lands, and the one that is
@@ -176,6 +218,8 @@ pub struct AccountSettings {
 #[derive(Default)]
 pub(crate) struct SignIns {
     host: signin::SignIns,
+    /// The Linchange approval being waited for, when one is: what Cancel sets.
+    linchange: Mutex<Option<Arc<AtomicBool>>>,
     /// A token server and a page of the tests' own, for a sign-in at them (never in a build that
     /// isn't a test's: nothing sets it).
     #[cfg(test)]
@@ -215,8 +259,48 @@ impl Shed for Checked {
     }
 }
 
+/// (An approval is small, and one at a time.)
+impl Shed for Approval {
+    fn weight(&self) -> Weight {
+        Weight::Actionable
+    }
+}
+
 fn failed(reason: &str) -> SignInOutcome {
     SignInOutcome::Failed { reason: reason.to_string() }
+}
+
+/// What waiting for a Linchange application password came to.
+enum Approval {
+    Approved(String),
+    NoBrowser,
+    Cancelled,
+    TimedOut,
+    Failed(String),
+}
+
+impl Approval {
+    fn of(error: NetError) -> Approval {
+        match error {
+            NetError::SignInCancelled => Approval::Cancelled,
+            NetError::SignInTimedOut => Approval::TimedOut,
+            other => Approval::Failed(other.said().to_string()),
+        }
+    }
+}
+
+/// Linchange's web origin from what the owner typed: the host (or the `https://` origin), checked
+/// as text only. Plain `http` is never taken: a sign-in page and an application password go over
+/// TLS.
+pub(crate) fn linchange_origin(server: &str) -> Option<String> {
+    let text = server.trim().trim_end_matches('/');
+    let host = text.strip_prefix("https://").unwrap_or(text);
+    let usable = !host.is_empty()
+        && host.len() <= 255
+        && !host.starts_with('.')
+        && !host.ends_with('.')
+        && host.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '[' | ']' | ':'));
+    usable.then(|| format!("https://{host}"))
 }
 
 fn not_granted(reason: &str) -> PermissionOutcome {
@@ -533,6 +617,101 @@ impl Core {
     /// Remove an account: its mail and what is kept for it on this phone (`account.remove`), and
     /// its sign-in from the platform's credential store. Nothing on the server is touched. The
     /// sign-in is removed only once the account is.
+    /// Add a Linchange account. The account password and its second factor are typed into
+    /// Linchange's own page in the system browser; MailCraft only waits for the application
+    /// password that page creates for this phone, and uses it as the account's password for IMAP
+    /// and SMTP. `server` is the Linchange web origin or its host (`mail.example.org`), and
+    /// `description` is what the account page shows for the credential. Call
+    /// [`Core::cancel_linchange_sign_in`] to stop waiting.
+    pub async fn add_linchange_account(
+        &self,
+        email: String,
+        display_name: String,
+        server: String,
+        description: String,
+    ) -> Result<LinchangeOutcome, CoreError> {
+        let email: String = email.trim().chars().take(mailcraft_model::MAX_ADDRESS).collect();
+        if !mailcraft_model::is_valid_email(&email) {
+            return Ok(LinchangeOutcome::Failed { reason: "the account's address isn't an e-mail address".to_string() });
+        }
+        let Some(server) = linchange_origin(&server) else {
+            return Ok(LinchangeOutcome::Failed { reason: "the Linchange server's address can't be used".to_string() });
+        };
+        if self.closing.load(Ordering::Acquire) {
+            return Err(CoreError::Cancelled);
+        }
+        let cancel = Arc::new(AtomicBool::new(false));
+        {
+            let mut open = self.signins.linchange.lock().unwrap_or_else(PoisonError::into_inner);
+            if open.is_some() {
+                return Ok(LinchangeOutcome::Failed { reason: "a Linchange approval is already open".to_string() });
+            }
+            *open = Some(cancel.clone());
+        }
+        let host = server.strip_prefix("https://").unwrap_or_default().to_string();
+        // The approval reaches the server and opens a page: on a thread of its own, never here.
+        let platform = self.platform.clone();
+        let reply = Queue::<Approval>::new();
+        let job_reply = reply.clone();
+        let description: String = description.trim().chars().take(200).collect();
+        let job = move || {
+            let approval = match mailcraft_net::start_linchange_app_token(&server, &description) {
+                Ok(grant) => {
+                    let url = grant.verification_url.clone();
+                    if platform.open_sign_in_page(url).is_err() {
+                        Approval::NoBrowser
+                    } else {
+                        match mailcraft_net::finish_linchange_app_token(&server, &grant, &cancel) {
+                            Ok(password) => Approval::Approved(password),
+                            Err(why) => Approval::of(why),
+                        }
+                    }
+                }
+                Err(why) => Approval::of(why),
+            };
+            job_reply.push(approval);
+        };
+        let spawned = std::thread::Builder::new().name("mailcraft-linchange".to_string()).spawn(job);
+        let approval = if spawned.is_err() {
+            Approval::Failed("the Linchange approval couldn't be started".to_string())
+        } else {
+            reply.next().await.unwrap_or(Approval::Failed("the Linchange approval stopped unexpectedly".to_string()))
+        };
+        self.signins.linchange.lock().unwrap_or_else(PoisonError::into_inner).take();
+        let password = match approval {
+            Approval::Approved(password) => password,
+            Approval::NoBrowser => return Ok(LinchangeOutcome::NoBrowser),
+            Approval::Cancelled => return Ok(LinchangeOutcome::Cancelled),
+            Approval::TimedOut => return Ok(LinchangeOutcome::TimedOut),
+            Approval::Failed(reason) => return Ok(LinchangeOutcome::Failed { reason }),
+        };
+        // The application password is the account's password for its mail servers. Nothing of the
+        // account password or the second factor is ever here: it was typed on Linchange's page.
+        let settings = ImapAccountSettings {
+            email: email.clone(),
+            display_name: display_name.trim().chars().take(254).collect(),
+            username: email.clone(),
+            password,
+            incoming: MailServer { host: host.clone(), port: 993, security: "tls".to_string() },
+            outgoing: MailServer { host, port: 587, security: "starttls".to_string() },
+        };
+        match self.add_imap_account(settings).await {
+            Ok(account) => {
+                let name = if display_name.trim().is_empty() { email.clone() } else { display_name.trim().to_string() };
+                Ok(LinchangeOutcome::SignedIn { account, email, name })
+            }
+            Err(CoreError::BadRequest { reason } | CoreError::Failed { reason }) => Ok(LinchangeOutcome::Failed { reason }),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Call off the Linchange approval that is open, if one is: it ends as `Cancelled`.
+    pub fn cancel_linchange_sign_in(&self) {
+        if let Some(cancel) = self.signins.linchange.lock().unwrap_or_else(PoisonError::into_inner).as_ref() {
+            cancel.store(true, Ordering::Relaxed);
+        }
+    }
+
     /// Add a mail account that signs in with a password: IMAP to read, SMTP to send. The
     /// account is checked by the engine (its address, its servers), and its password is kept in
     /// memory for this session and, when the owner lets sign-ins be remembered, in the phone's
@@ -638,6 +817,111 @@ impl Core {
         .await
     }
 
+    /// Add a CalDAV and CardDAV account: calendars and address books alone, with no mail. The homes
+    /// are checked as text by the engine (they must be `https://`), and the password is kept in
+    /// memory for this session and, when the owner lets sign-ins be remembered, in the phone's
+    /// secure store, once for each origin its homes are on. Nothing is fetched here: the
+    /// calendar's job does that.
+    pub async fn add_dav_account(&self, settings: DavAccountSettings) -> Result<u64, CoreError> {
+        let sync = self.sync.clone();
+        let platform = self.platform.clone();
+        let remember = sync.remembers();
+        self.call(move |s| {
+            let email = checked_dav_name(&settings.email)?;
+            let (calendar_homes, contact_homes) = checked_dav_homes(&settings)?;
+            if settings.password.is_empty() || settings.password.len() > 1024 {
+                return Err(CoreError::BadRequest { reason: "the account's password is empty or too long".to_string() });
+            }
+            let username = settings.username.trim().chars().take(254).collect::<String>();
+            let display = settings.display_name.trim().chars().take(254).collect::<String>();
+            let mut params = json!({
+                "email": email,
+                "kind": "dav",
+                "auth": "password",
+                "username": if username.is_empty() { email.clone() } else { username },
+                "dav": {"calendarHomes": calendar_homes, "contactHomes": contact_homes, "separatePassword": true},
+            });
+            if !display.is_empty() {
+                params["displayName"] = json!(display);
+            }
+            let id = s
+                .run("account.add", &params)?
+                .get("id")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| CoreError::Failed { reason: "the account was added but the core didn't say which".to_string() })?;
+            let account = s
+                .mailbox
+                .account(id)
+                .cloned()
+                .ok_or_else(|| CoreError::Failed { reason: "the account was added but is not in the mailbox".to_string() })?;
+            keep_dav_password(sync.as_ref(), platform.as_ref(), &account, &settings.password, remember);
+            Ok(id)
+        })
+        .await
+    }
+
+    /// Change a CalDAV and CardDAV account's settings: its name, its homes and the name that signs
+    /// in, and its password when one is given (an empty one keeps the password it has). What was
+    /// kept of another server is forgotten with it. Nothing is read from the server here.
+    pub async fn edit_dav_account(&self, account: u64, settings: DavAccountSettings) -> Result<(), CoreError> {
+        let sync = self.sync.clone();
+        let platform = self.platform.clone();
+        let remember = sync.remembers();
+        self.call(move |s| {
+            let before =
+                s.mailbox.account(account).cloned().ok_or_else(|| CoreError::BadRequest { reason: "there is no such account".to_string() })?;
+            if before.kind != AccountKind::Dav {
+                return Err(CoreError::BadRequest { reason: "this account isn't a CalDAV and CardDAV account".to_string() });
+            }
+            let email = checked_dav_name(&settings.email)?;
+            let (calendar_homes, contact_homes) = checked_dav_homes(&settings)?;
+            let username = settings.username.trim().chars().take(254).collect::<String>();
+            let params = json!({
+                "id": account,
+                "email": email,
+                "displayName": settings.display_name.trim().chars().take(254).collect::<String>(),
+                "username": username,
+            });
+            s.run("account.edit", &params).map_err(CoreError::from)?;
+            // (What was kept of another server, or for homes that went, is forgotten with it; and
+            // the settings the next read is made under are this session's own generation.)
+            let trusted = before.dav.as_ref().map(|server| server.trusted.clone()).unwrap_or_default();
+            s.run(
+                "account.davSet",
+                &json!({
+                    "id": account,
+                    "calendarHomes": calendar_homes,
+                    "contactHomes": contact_homes,
+                    "username": settings.username.trim(),
+                    "separatePassword": true,
+                    "trusted": trusted,
+                }),
+            )
+            .map_err(CoreError::from)?;
+            let after = s
+                .mailbox
+                .account(account)
+                .cloned()
+                .ok_or_else(|| CoreError::Failed { reason: "the account was changed but is not in the mailbox".to_string() })?;
+            // A password the owner gave is kept for every origin the homes are on.
+            if !settings.password.is_empty() {
+                keep_dav_password(sync.as_ref(), platform.as_ref(), &after, &settings.password, remember);
+            }
+            // (A store that refuses holds nothing; the password stays in memory for this session.)
+            let gone: Vec<String> = mailcraft_host::secrets::dav_secret_keys(&before)
+                .into_iter()
+                .filter(|key| !mailcraft_host::secrets::dav_secret_keys(&after).contains(key))
+                .collect();
+            if let Ok(Some(store)) = platform.secrets() {
+                for key in gone {
+                    let _ = store.delete(key);
+                }
+            }
+            Ok(())
+        })
+        .await
+    }
+
     /// An account's settings, for the Edit form: its address and names, its servers, and an
     /// Exchange server account's Exchange Web Services address. Never its password.
     pub async fn account_settings(&self, account: u64) -> Result<AccountSettings, CoreError> {
@@ -662,6 +946,11 @@ impl Core {
                 incoming: server(&a.incoming),
                 outgoing: server(&a.outgoing),
                 url: a.ews.as_ref().map(|server| server.url.clone()).unwrap_or_default(),
+                calendar_homes: a.dav.as_ref().map(|dav| dav.calendar_homes.clone()).unwrap_or_default(),
+                contact_homes: a.dav.as_ref().map(|dav| dav.contact_homes.clone()).unwrap_or_default(),
+                dav_username: a.dav.as_ref().map(|dav| dav.username.clone()).unwrap_or_default(),
+                dav_trusted: a.dav.as_ref().map(|dav| dav.trusted.clone()).unwrap_or_default(),
+                dav_separate_password: a.dav.as_ref().is_some_and(|dav| dav.separate_password),
             })
         })
         .await
@@ -794,6 +1083,7 @@ impl Core {
             // What was being fetched for it is called off, and nothing it brings is taken in.
             sync.cancel_fetches(Some(account));
             sync.forget_password(account);
+            sync.forget_dav_passwords(account);
             // (Nothing else of the account's is held under its address: a mailbox with another account
             // of the same address keeps it.)
             let still = s.mailbox.accounts.iter().any(|a| a.kind == AccountKind::Microsoft && a.email.trim().eq_ignore_ascii_case(&email));
@@ -803,6 +1093,23 @@ impl Core {
                 return Err(CoreError::Failed {
                     reason: "the account was removed, but its sign-in couldn't be removed from this phone's secure store".to_string(),
                 });
+            }
+            // A calendar and contacts account's passwords are kept per origin: each goes unless
+            // another account still names the same origin and address.
+            if let Some(before) = before.as_ref() {
+                for key in mailcraft_host::secrets::dav_secret_keys(before) {
+                    let still = s.mailbox.accounts.iter().any(|a| mailcraft_host::secrets::dav_secret_keys(a).contains(&key));
+                    if !still
+                        && let Ok(Some(store)) = platform.secrets()
+                        && store.delete(key).is_err()
+                    {
+                        return Err(CoreError::Failed {
+                            reason:
+                                "the account was removed, but its calendar and contacts password couldn't be removed from this phone's secure store"
+                                    .to_string(),
+                        });
+                    }
+                }
             }
             // An account that signed in with a password keeps it under a name of its own; another
             // account with the same servers and address still needs it.
@@ -866,6 +1173,67 @@ impl Core {
 }
 
 /// What the add and check forms must say: the address, the name the servers know, and a password.
+/// A CalDAV and CardDAV account's name: an address, or any other name that isn't empty.
+fn checked_dav_name(name: &str) -> Result<String, CoreError> {
+    let name: String = name.trim().chars().take(254).collect();
+    if name.is_empty() || name.chars().any(char::is_control) {
+        return Err(CoreError::BadRequest { reason: "the account needs a name: an e-mail address, or any other name that isn't empty".to_string() });
+    }
+    Ok(name)
+}
+
+/// The homes the form gives, checked as text: each an `https://` home the model takes, at most
+/// [`DavServer::MAX_HOMES`] of each kind, and at least one in all.
+fn checked_dav_homes(settings: &DavAccountSettings) -> Result<(Vec<String>, Vec<String>), CoreError> {
+    let clean = |homes: &[String]| -> Result<Vec<String>, CoreError> {
+        if homes.len() > mailcraft_model::DavServer::MAX_HOMES {
+            return Err(CoreError::BadRequest {
+                reason: format!("there are at most {} addresses of each kind", mailcraft_model::DavServer::MAX_HOMES),
+            });
+        }
+        let mut out: Vec<String> = Vec::new();
+        for home in homes {
+            let home: String = home.trim().chars().take(mailcraft_model::DavServer::MAX_ADDRESS).collect();
+            if home.is_empty() {
+                continue;
+            }
+            mailcraft_model::DavServer::check_home(&home)
+                .map_err(|why| CoreError::BadRequest { reason: format!("a calendar or contacts address {why}") })?;
+            if !out.contains(&home) {
+                out.push(home);
+            }
+        }
+        Ok(out)
+    };
+    let calendar = clean(&settings.calendar_homes)?;
+    let contacts = clean(&settings.contact_homes)?;
+    if calendar.is_empty() && contacts.is_empty() {
+        return Err(CoreError::BadRequest { reason: "type at least one calendar or contacts address".to_string() });
+    }
+    Ok((calendar, contacts))
+}
+
+/// Hold a DAV account's password for every origin its homes are on: in memory for this session,
+/// and in the credential store when the owner lets sign-ins be remembered.
+fn keep_dav_password(
+    sync: &crate::sync::SyncHost,
+    platform: &dyn crate::platform::Platform,
+    account: &mailcraft_model::Account,
+    password: &str,
+    remember: bool,
+) {
+    let Some(dav) = account.dav.as_ref() else { return };
+    for origin in dav.home_origins() {
+        sync.keep_dav_password(account.id, origin.clone(), password.to_string());
+        if remember
+            && let Ok(Some(store)) = platform.secrets()
+            && let Some(key) = mailcraft_host::secrets::dav_secret_key(account, &origin)
+        {
+            let _ = store.set(key, password.to_string());
+        }
+    }
+}
+
 fn checked_password(settings: &ImapAccountSettings) -> Result<(String, String, String), CoreError> {
     let email = settings.email.trim().chars().take(254).collect::<String>();
     if email.is_empty() {

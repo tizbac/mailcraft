@@ -84,7 +84,7 @@ internal suspend fun loadOutline(
     try {
         val list = core.folders(0uL)
         val accounts = list.accounts
-            .filter { it.kind == "microsoft" || it.kind == "imap" || it.kind == "exchange" }
+            .filter { it.kind == "microsoft" || it.kind == "imap" || it.kind == "exchange" || it.kind == "dav" }
             .map { account ->
             val own = list.folders.filter { it.account == account.id }.map {
                 FolderItem(it.id, it.parent, it.name, it.kind, it.unread)

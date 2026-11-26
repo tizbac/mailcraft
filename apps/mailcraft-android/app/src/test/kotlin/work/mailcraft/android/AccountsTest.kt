@@ -50,6 +50,11 @@ private class FakeApi : AccountsApi {
         incoming = uniffi.mailcraft_mobile.MailServer("imap.example.org", 993u, "tls"),
         outgoing = uniffi.mailcraft_mobile.MailServer("smtp.example.org", 587u, "starttls"),
         url = "",
+        calendarHomes = emptyList(),
+        contactHomes = emptyList(),
+        davUsername = "",
+        davTrusted = "",
+        davSeparatePassword = false,
     )
 
     override suspend fun addImap(settings: uniffi.mailcraft_mobile.ImapAccountSettings): ULong {
@@ -75,6 +80,10 @@ private class FakeApi : AccountsApi {
     override suspend fun editExchange(account: ULong, settings: uniffi.mailcraft_mobile.ExchangeAccountSettings) {
         exchangeEdits.add(account to settings)
     }
+
+    override suspend fun addDav(settings: uniffi.mailcraft_mobile.DavAccountSettings): ULong = 10u
+
+    override suspend fun editDav(account: ULong, settings: uniffi.mailcraft_mobile.DavAccountSettings) = Unit
 
     override suspend fun grant(account: ULong, permission: PermissionKind): GrantResult {
         grants.add(account to permission)

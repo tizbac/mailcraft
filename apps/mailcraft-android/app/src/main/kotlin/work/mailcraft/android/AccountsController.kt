@@ -1,5 +1,7 @@
 // SPDX-FileCopyrightText: MailCraft contributors
 // SPDX-License-Identifier: MIT OR Apache-2.0
+@file:Suppress("LargeClass", "MaxLineLength")
+
 package work.mailcraft.android
 
 import kotlinx.coroutines.CoroutineScope
@@ -8,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uniffi.mailcraft_mobile.CoreException
+import uniffi.mailcraft_mobile.DavAccountSettings
 import uniffi.mailcraft_mobile.ExchangeAccountSettings
 import uniffi.mailcraft_mobile.ImapAccountSettings
 import uniffi.mailcraft_mobile.MailServer
@@ -52,6 +55,13 @@ internal class AccountsController(
         onChooseExchange = ::chooseExchange,
         onExchangeField = ::exchangeField,
         onAddExchange = ::saveExchange,
+        onChooseLinchange = ::chooseLinchange,
+        onLinchangeField = ::linchangeField,
+        onAddLinchange = ::saveLinchange,
+        onCancelLinchange = api::cancelLinchange,
+        onChooseDav = ::chooseDav,
+        onDavField = ::davField,
+        onAddDav = ::saveDav,
         onEditAccount = ::editAccount,
         onSignInAgain = ::signInAgain,
         onAsk = { account, permission -> askFor(account.id, permission) },
@@ -232,6 +242,16 @@ internal class AccountsController(
                             url = settings.url,
                             editing = account.id,
                         )
+                        "dav" -> AddAccountState.Dav(
+                            email = settings.email,
+                            displayName = settings.displayName,
+                            username = settings.username,
+                            calendarHome = settings.calendarHomes.firstOrNull().orEmpty(),
+                            contactHome = settings.contactHomes.firstOrNull().orEmpty(),
+                            otherCalendarHomes = settings.calendarHomes.drop(1),
+                            otherContactHomes = settings.contactHomes.drop(1),
+                            editing = account.id,
+                        )
                         else -> return@update state
                     },
                 )
@@ -377,10 +397,167 @@ internal class AccountsController(
         } ?: state
     }
 
+    /** The form for a Linchange account, its server guessed from the address's domain. */
+    private fun chooseLinchange() = ui.update { state ->
+        val email = (state.add as? AddAccountState.Form)?.email.orEmpty()
+        state.copy(add = AddAccountState.Linchange(email = email, server = linchangeServerFor(email)))
+    }
+
+    /** The Linchange server a domain usually has: `mail.<domain>`, unless that is the domain. */
+    private fun linchangeServerFor(email: String): String {
+        val domain = email.substringAfter('@', "").trim()
+        return if (domain.isEmpty() || domain.startsWith("mail.")) domain else "mail.$domain"
+    }
+
+    private fun linchangeField(field: LinchangeField, typed: String) = ui.update { state ->
+        val add = state.add as? AddAccountState.Linchange ?: return@update state
+        val room = if (field == LinchangeField.Email) MAX_EMAIL else MAX_HOST
+        val value = typed.take(room)
+        state.copy(
+            add = when (field) {
+                LinchangeField.Email -> {
+                    // (The server follows the address until the owner types one of their own.)
+                    val follows = add.server.isBlank() || add.server == linchangeServerFor(add.email) || add.server == add.email.substringAfter('@', "").trim()
+                    add.copy(email = value, server = if (follows) linchangeServerFor(value) else add.server, notice = null)
+                }
+                LinchangeField.DisplayName -> add.copy(displayName = value, notice = null)
+                LinchangeField.Server -> add.copy(server = value, notice = null)
+            },
+        )
+    }
+
+    /** Asks Linchange's page for an application password, then adds the account with it. */
+    @Suppress("CyclomaticComplexMethod")
+    private fun saveLinchange() {
+        val add = ui.value.add as? AddAccountState.Linchange ?: return
+        if (add.working) return
+        val email = add.email.trim()
+        val server = add.server.trim().ifEmpty { email.substringAfter('@', "").trim() }
+        val problem = when {
+            email.isEmpty() -> "Type the account's address."
+            server.isEmpty() -> "Type the Linchange server's address."
+            else -> null
+        }
+        if (problem != null) {
+            ui.update { state ->
+                (state.add as? AddAccountState.Linchange)?.let { state.copy(add = it.copy(notice = Notice.Failed(problem))) } ?: state
+            }
+            return
+        }
+        ui.update { state ->
+            (state.add as? AddAccountState.Linchange)?.let { state.copy(add = it.copy(working = true, notice = null)) } ?: state
+        }
+        scope.launch {
+            val result = api.addLinchange(
+                email = email,
+                displayName = add.displayName.trim(),
+                server = server,
+                description = texts.t("MailCraft on this phone"),
+            )
+            when (result) {
+                is LinchangeResult.SignedIn -> {
+                    changed()
+                    ui.update { it.copy(add = AddAccountState.Done(result.account)) }
+                    scope.launch { signedIn(result.account, KeepChoice(), true) }
+                }
+                LinchangeResult.Cancelled -> failedLinchange(texts.t("The Linchange approval was called off."))
+                LinchangeResult.TimedOut -> failedLinchange(texts.t("The Linchange approval wasn't finished in time. You can try again."))
+                LinchangeResult.NoBrowser -> failedLinchange(texts.t("MailCraft couldn't open a browser for Linchange's page."))
+                is LinchangeResult.Failed -> failedLinchange(result.reason.ifBlank { texts.t("The Linchange approval didn't finish. You can try again.") })
+            }
+        }
+    }
+
+    private fun failedLinchange(reason: String) = ui.update { state ->
+        (state.add as? AddAccountState.Linchange)?.let {
+            state.copy(add = it.copy(working = false, notice = Notice.Failed(reason)))
+        } ?: state
+    }
+
+    /** The form for calendars and address books alone: nothing is guessed, since nothing detects it. */
+    private fun chooseDav() = ui.update { state ->
+        val email = (state.add as? AddAccountState.Form)?.email.orEmpty()
+        state.copy(add = AddAccountState.Dav(email = email))
+    }
+
+    private fun davField(field: DavField, typed: String) = ui.update { state ->
+        val add = state.add as? AddAccountState.Dav ?: return@update state
+        val room = when (field) {
+            DavField.Email -> MAX_EMAIL
+            DavField.Password -> MAX_PASSWORD
+            DavField.CalendarHome, DavField.ContactHome -> MAX_URL
+            else -> MAX_HOST
+        }
+        val value = typed.take(room)
+        state.copy(
+            add = when (field) {
+                DavField.Email -> add.copy(email = value, notice = null)
+                DavField.DisplayName -> add.copy(displayName = value, notice = null)
+                DavField.Username -> add.copy(username = value, notice = null)
+                DavField.Password -> add.copy(password = value, notice = null)
+                DavField.CalendarHome -> add.copy(calendarHome = value, notice = null)
+                DavField.ContactHome -> add.copy(contactHome = value, notice = null)
+            },
+        )
+    }
+
+    /** What the CalDAV and CardDAV form still lacks, or null when it can be sent. */
+    private fun davProblem(add: AddAccountState.Dav): String? = when {
+        add.email.trim().isEmpty() -> "Type the account's name or address."
+        add.calendarHome.trim().isEmpty() && add.contactHome.trim().isEmpty() -> "Type a calendar or contacts address."
+        add.password.isEmpty() && add.editing == null -> "Type the account's password."
+        !add.calendarHome.trim().isEmpty() && !add.calendarHome.trim().startsWith("https://") -> "The calendar address is an https:// address."
+        !add.contactHome.trim().isEmpty() && !add.contactHome.trim().startsWith("https://") -> "The contacts address is an https:// address."
+        else -> null
+    }
+
+    private fun davSettings(add: AddAccountState.Dav) = DavAccountSettings(
+        email = add.email.trim(),
+        displayName = add.displayName.trim(),
+        username = add.username.trim(),
+        password = add.password,
+        calendarHomes = listOfNotNull(add.calendarHome.trim().takeIf { it.isNotEmpty() }) + add.otherCalendarHomes,
+        contactHomes = listOfNotNull(add.contactHome.trim().takeIf { it.isNotEmpty() }) + add.otherContactHomes,
+    )
+
+    /** Add a CalDAV and CardDAV account, or change one the form opened for. */
+    private fun saveDav() {
+        val add = ui.value.add as? AddAccountState.Dav ?: return
+        if (add.working) return
+        val problem = davProblem(add)
+        if (problem != null) {
+            failedDav(problem)
+            return
+        }
+        ui.update { state ->
+            (state.add as? AddAccountState.Dav)?.let { state.copy(add = it.copy(working = true, notice = null)) } ?: state
+        }
+        scope.launch {
+            val editing = add.editing
+            val id = try {
+                if (editing == null) api.addDav(davSettings(add)) else editing.also { api.editDav(it, davSettings(add)) }
+            } catch (e: CoreException) {
+                failedDav(e.what())
+                return@launch
+            }
+            changed()
+            ui.update { it.copy(add = AddAccountState.Done(id)) }
+            scope.launch { signedIn(id, KeepChoice(), editing == null) }
+        }
+    }
+
+    private fun failedDav(reason: String) = ui.update { state ->
+        (state.add as? AddAccountState.Dav)?.let {
+            state.copy(add = it.copy(working = false, notice = Notice.Failed(reason)))
+        } ?: state
+    }
+
     private fun keepOf(add: AddAccountState): KeepChoice = when (add) {
         is AddAccountState.Form -> add.keep
         is AddAccountState.Imap -> KeepChoice()
         is AddAccountState.Exchange -> KeepChoice()
+        is AddAccountState.Linchange -> KeepChoice()
+        is AddAccountState.Dav -> KeepChoice()
         is AddAccountState.Approval -> add.keep
         is AddAccountState.Waiting -> add.keep
         is AddAccountState.Done -> KeepChoice()
@@ -390,6 +567,8 @@ internal class AccountsController(
         is AddAccountState.Form -> add.email
         is AddAccountState.Imap -> add.email
         is AddAccountState.Exchange -> add.email
+        is AddAccountState.Linchange -> add.email
+        is AddAccountState.Dav -> add.email
         is AddAccountState.Approval -> add.email
         is AddAccountState.Waiting, is AddAccountState.Done -> null
     }
@@ -421,8 +600,9 @@ internal class AccountsController(
     }
 
     /** Opens Microsoft's page and waits for the owner. Only from the form or the approval help. */
+    @Suppress("CyclomaticComplexMethod")
     fun signIn() {
-        if (ui.value.add is AddAccountState.Exchange) return
+        if (ui.value.add is AddAccountState.Exchange || ui.value.add is AddAccountState.Linchange || ui.value.add is AddAccountState.Dav) return
         val email = emailOf(ui.value.add) ?: return
         val keep = keepOf(ui.value.add)
         val operation = ++signInOperation
@@ -475,6 +655,7 @@ internal class AccountsController(
     private fun leaveAdd() {
         queued = 0L
         signInOperation++
+        if (ui.value.add is AddAccountState.Linchange) api.cancelLinchange()
         ui.update { it.copy(add = AddAccountState.Form()) }
     }
 

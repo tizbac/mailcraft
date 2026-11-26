@@ -71,9 +71,20 @@ class MailListModelTest {
         assertEquals(SwipeConfig(), SwipeConfig.fromCodes("nonsense", null))
         assertEquals(SwipeAction.Archive, SwipeConfig().start)
         assertEquals(SwipeAction.Delete, SwipeConfig().end)
+        assertTrue(SwipeConfig().enabled)
+        assertEquals(false, SwipeConfig.fromCodes("archive", "delete", enabled = false).enabled)
         val prefs = MemorySwipePrefs()
-        prefs.save(SwipeConfig(SwipeAction.ToggleRead, SwipeAction.Archive))
+        prefs.save(SwipeConfig(SwipeAction.ToggleRead, SwipeAction.Archive, enabled = false))
         assertEquals(SwipeAction.ToggleRead, prefs.load().start)
+        assertEquals(false, prefs.load().enabled)
+    }
+
+    @Test
+    fun foldedAccountsAreKeptAndJunkIsNoAccount() {
+        val prefs = MemoryFolderPrefs()
+        assertTrue(prefs.load().isEmpty())
+        prefs.save(setOf(2uL, 9uL))
+        assertEquals(setOf(2uL, 9uL), prefs.load())
     }
 
     @Test

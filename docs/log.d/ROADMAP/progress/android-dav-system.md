@@ -1,0 +1,1 @@
+| 2026-11-26 | MB3.19: Android calendars and address books from CalDAV and CardDAV, Linchange's application-password sign-in, and the phone's own Calendar and Contacts apps fed by a MailCraft account; swipes can be turned off and account folders fold away |

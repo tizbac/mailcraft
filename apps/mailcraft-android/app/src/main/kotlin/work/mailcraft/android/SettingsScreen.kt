@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: MailCraft contributors
 // SPDX-License-Identifier: MIT OR Apache-2.0
+@file:Suppress("MaxLineLength", "TooManyFunctions")
 @file:OptIn(ExperimentalMaterial3Api::class)
-@file:Suppress("TooManyFunctions")
 
 package work.mailcraft.android
 
@@ -118,7 +118,12 @@ private fun SettingsRows(texts: Texts, data: ShellData, onOpen: (SettingsPage) -
         val summary = when (entry) {
             SettingsPage.Accounts -> accountsSummary(texts, data.accounts.size)
             SettingsPage.Language -> languageName(texts, data.chosenLanguage)
-            SettingsPage.SwipeActions -> "${data.swipe.start.label(texts)} · ${data.swipe.end.label(texts)}"
+            SettingsPage.SwipeActions ->
+                if (data.swipe.enabled) {
+                    "${data.swipe.start.label(texts)} · ${data.swipe.end.label(texts)}"
+                } else {
+                    texts.t("Off")
+                }
             SettingsPage.NotificationButtons -> noticeButtonsSummary(texts, data.noticeButtons)
             SettingsPage.Appearance -> data.readingPrefs.theme.label(texts)
             SettingsPage.Reading -> readingSummary(texts, data.readingPrefs)
@@ -169,6 +174,15 @@ private fun LanguagePage(texts: Texts, chosen: String, onLanguage: (String) -> U
 
 @Composable
 private fun SwipePage(texts: Texts, config: SwipeConfig, onSwipe: (SwipeConfig) -> Unit) {
+    SwitchRow(
+        texts.t("Swipe actions"),
+        texts.t("A swipe on a message archives, deletes or changes it. Turn it off to keep every action in the message's menu."),
+        config.enabled,
+    ) { onSwipe(config.copy(enabled = it)) }
+    if (!config.enabled) {
+        Hint(texts.t("Swiping is off. A message's actions are in its menu, opened by a long press or the button at its end."))
+        return
+    }
     // A row's swipe from its start runs `start`: rightwards in a left-to-right language, leftwards
     // in a right-to-left one, so the headings name the way the finger goes.
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr

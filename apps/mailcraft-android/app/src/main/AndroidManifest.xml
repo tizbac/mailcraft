@@ -25,6 +25,17 @@
     <uses-permission
         android:name="android.permission.FOREGROUND_SERVICE"
         tools:node="remove" />
+    <!-- MailCraft appears in the phone's own Calendar and Contacts apps as an account, and writes
+         what its CalDAV and CardDAV accounts keep there (one way, read-only in those apps). The
+         owner is asked for the calendar and contacts rights when such an account exists. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+    <uses-permission android:name="android.permission.AUTHENTICATE_ACCOUNTS" />
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+    <uses-permission android:name="android.permission.READ_SYNC_SETTINGS" />
+    <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
 
     <application
         android:name=".MailCraftApplication"
@@ -75,6 +86,51 @@
         <receiver
             android:name=".NoticeActionReceiver"
             android:exported="false" />
+
+        <!-- The phone's account type: the calendars and contacts MailCraft keeps, where the
+             system's own Calendar and Contacts apps reach them. Adding one for real happens in
+             MailCraft; the system's "Add account" opens the app. -->
+        <service
+            android:name=".AuthenticatorService"
+            android:exported="true"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="android.accounts.AccountAuthenticator" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accounts.AccountAuthenticator"
+                android:resource="@xml/authenticator" />
+        </service>
+
+        <!-- What the system's Calendar app syncs: one way, from MailCraft to the phone's calendar. -->
+        <service
+            android:name=".CalendarSyncService"
+            android:exported="true"
+            android:permission="android.permission.WRITE_SYNC_SETTINGS">
+            <intent-filter>
+                <action android:name="android.content.SyncAdapter" />
+            </intent-filter>
+            <meta-data
+                android:name="android.content.SyncAdapter"
+                android:resource="@xml/sync_calendar" />
+        </service>
+
+        <!-- The same for the Contacts app, which also reads contacts.xml to show MailCraft among
+             the accounts a contact can come from. -->
+        <service
+            android:name=".ContactsSyncService"
+            android:exported="true"
+            android:permission="android.permission.WRITE_SYNC_SETTINGS">
+            <intent-filter>
+                <action android:name="android.content.SyncAdapter" />
+            </intent-filter>
+            <meta-data
+                android:name="android.content.SyncAdapter"
+                android:resource="@xml/sync_contacts" />
+            <meta-data
+                android:name="android.provider.CONTACTS_STRUCTURE"
+                android:resource="@xml/contacts" />
+        </service>
 
         <activity
             android:name=".MainActivity"

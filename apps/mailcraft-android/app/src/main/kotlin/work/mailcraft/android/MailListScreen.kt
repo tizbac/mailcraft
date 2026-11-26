@@ -191,17 +191,29 @@ private fun LazyItemScope.ListedRow(
 ) {
     Column(modifier = Modifier.animateItem()) {
         row.group?.let { GroupHeader(context.texts, it, row.groupIsCategory) }
-        SwipeableRow(
-            texts = context.texts,
-            row = row,
-            swipe = context.swipe,
-            actions = RowActions(
-                onTriage = { actions.onTriage(it, row) },
-                onMenu = onMenu,
-                onOpen = { actions.onOpen(row) },
-            ),
-            avatar = context.avatars?.let { AvatarState(it[row.id]) },
+        val rowActions = RowActions(
+            onTriage = { actions.onTriage(it, row) },
+            onMenu = onMenu,
+            onOpen = { actions.onOpen(row) },
         )
+        if (context.swipe.enabled) {
+            SwipeableRow(
+                texts = context.texts,
+                row = row,
+                swipe = context.swipe,
+                actions = rowActions,
+                avatar = context.avatars?.let { AvatarState(it[row.id]) },
+            )
+        } else {
+            // No gesture: the row still opens, and its menu holds every action swiping had.
+            MailRowContent(
+                texts = context.texts,
+                row = row,
+                swipe = context.swipe,
+                actions = rowActions,
+                avatar = context.avatars?.let { AvatarState(it[row.id]) },
+            )
+        }
         HorizontalDivider(modifier = Modifier.fillMaxWidth())
     }
 }

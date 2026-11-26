@@ -17,19 +17,30 @@ internal class DeviceSwipePrefs(context: Context) : SwipePrefs {
     private val prefs = runCatching { context.getSharedPreferences(FILE, Context.MODE_PRIVATE) }.getOrNull()
 
     override fun load(): SwipeConfig = runCatching {
-        SwipeConfig.fromCodes(prefs?.getString(START, null), prefs?.getString(END, null))
+        SwipeConfig.fromCodes(
+            start = prefs?.getString(START, null),
+            end = prefs?.getString(END, null),
+            enabled = prefs?.getBoolean(ENABLED, true) ?: true,
+        )
     }.getOrDefault(SwipeConfig())
 
     // (The KTX `edit {}` would be a dependency for one line.)
     @SuppressLint("UseKtx")
     override fun save(config: SwipeConfig) {
-        runCatching { prefs?.edit()?.putString(START, config.start.code)?.putString(END, config.end.code)?.apply() }
+        runCatching {
+            prefs?.edit()
+                ?.putString(START, config.start.code)
+                ?.putString(END, config.end.code)
+                ?.putBoolean(ENABLED, config.enabled)
+                ?.apply()
+        }
     }
 
     private companion object {
         const val FILE = "mail_list"
         const val START = "swipe_start"
         const val END = "swipe_end"
+        const val ENABLED = "swipe_enabled"
     }
 }
 

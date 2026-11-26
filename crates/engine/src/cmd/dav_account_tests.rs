@@ -194,8 +194,44 @@ fn the_settings_survive_the_mailbox_file() {
 fn an_account_that_only_lives_here_has_no_server_to_keep() {
     let (mut s, id) = session();
     set(&mut s, id);
-    s.run("account.edit", &json!({"id": id, "incoming": null, "outgoing": null})).unwrap();
+    s.run("account.edit", &json!({"id": id, "incoming": null, "outgoing": null, "dav": null})).unwrap();
     let a = s.mailbox.account(id).unwrap();
     assert_eq!(a.kind, AccountKind::Local);
     assert!(a.dav.is_none());
+}
+
+#[test]
+fn a_mail_account_that_loses_its_mail_servers_keeps_its_calendars_and_contacts() {
+    let (mut s, id) = session();
+    set(&mut s, id);
+    s.run("account.edit", &json!({"id": id, "incoming": null, "outgoing": null})).unwrap();
+    let a = s.mailbox.account(id).unwrap();
+    assert_eq!(a.kind, AccountKind::Dav);
+    assert!(a.dav.is_some());
+    assert!(s.mailbox.folders.iter().all(|folder| folder.account != id), "it has no mail folders");
+}
+
+#[test]
+fn a_calendars_and_contacts_account_may_be_named_by_something_that_is_not_an_address() {
+    let mut s = Session::empty();
+    s.dav_enabled = true;
+    let id = s
+        .run(
+            "account.add",
+            &json!({
+                "email": "Home calendars",
+                "kind": "dav",
+                "dav": {"calendarHomes": ["https://cloud.example.org/cal/"], "contactHomes": ["https://cloud.example.org/cards/"]},
+            }),
+        )
+        .unwrap()["id"]
+        .as_u64()
+        .unwrap();
+    let a = s.mailbox.account(id).unwrap();
+    assert_eq!((a.kind, a.name.as_str()), (AccountKind::Dav, "Home calendars"));
+    assert!(s.mailbox.folders.iter().all(|folder| folder.account != id));
+    // A kind that has mail still needs an address.
+    let said =
+        s.run("account.add", &json!({"email": "not an address", "kind": "imap", "incoming": {"host": "imap.example.org"}})).unwrap_err().to_string();
+    assert!(said.contains("isn't an e-mail address"), "{said}");
 }

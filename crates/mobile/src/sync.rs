@@ -202,6 +202,8 @@ pub(crate) struct Inner {
     run_mark: Option<InboxMark>,
     /// A round is under way (the owner's, or one the clock started).
     pub(crate) active: bool,
+    /// The round under way is a CalDAV and CardDAV one alone: it ends when that read's answer is in.
+    pub(crate) dav_round: bool,
     /// An account was run in it.
     ran: bool,
     pub(crate) errors: Vec<String>,
@@ -237,6 +239,9 @@ pub(crate) struct Inner {
     /// Passwords typed into Add Account this session, by account: kept in memory only, and in the
     /// platform's credential store when the owner lets sign-ins be remembered.
     pub(crate) passwords: std::collections::HashMap<u64, String>,
+    /// CalDAV and CardDAV passwords typed this session, by account and origin: kept in memory only,
+    /// and in the platform's credential store when the owner lets sign-ins be remembered.
+    pub(crate) dav_passwords: std::collections::HashMap<(u64, String), String>,
     /// How many of those jobs the end of the round under way has started: it waits for them, up
     /// to [`MOST_TAIL_STARTS`], before it is over.
     tail_starts: u32,
@@ -318,6 +323,8 @@ pub(crate) struct SyncHost {
     pub(crate) fetch_runner: crate::fetch::RunnerSlot,
     /// How calendar and to-do jobs are run (the tests swap theirs in).
     pub(crate) job_runners: Mutex<crate::jobs::Runners>,
+    /// How a CalDAV and CardDAV read is made (the tests swap theirs in).
+    pub(crate) dav_runner: Mutex<crate::dav::DavRunner>,
     /// A calendar or to-do job is under way (read by the driver thread, as `busy` is).
     jobs_busy: AtomicBool,
     /// A round to call off at the next wake (its `finished_rounds` plus one; 0 for none): a
@@ -351,6 +358,7 @@ impl SyncHost {
             fetch_busy: AtomicBool::new(false),
             fetch_runner: std::sync::Mutex::new(crate::fetch::default_runner()),
             job_runners: Mutex::new(crate::jobs::default_runners()),
+            dav_runner: Mutex::new(crate::dav::default_runner()),
             jobs_busy: AtomicBool::new(false),
             stop_asked: AtomicU64::new(0),
             #[cfg(test)]
@@ -397,6 +405,43 @@ impl SyncHost {
     /// Forget an account's password (it went, or another password replaces it).
     pub(crate) fn forget_password(&self, account: u64) {
         self.lock().passwords.remove(&account);
+    }
+
+    /// Keep a CalDAV and CardDAV password for one origin, for this session.
+    pub(crate) fn keep_dav_password(&self, account: u64, origin: String, password: String) {
+        self.lock().dav_passwords.insert((account, origin), password);
+    }
+
+    /// A CalDAV and CardDAV password for `origin`: this session's, else the credential store's.
+    /// Only an origin the account's own settings name is looked up. (Called with the lock held:
+    /// it reads `inner` and the platform's store, and never the lock.)
+    pub(crate) fn dav_password(&self, inner: &Inner, session: &Session, account: u64, origin: &str) -> Option<String> {
+        if let Some(password) = inner.dav_passwords.get(&(account, origin.to_string())) {
+            return Some(password.clone());
+        }
+        let a = session.mailbox.account(account)?;
+        if !a.dav.as_ref().is_some_and(|dav| dav.home_origins().iter().any(|home| home == origin)) {
+            return None;
+        }
+        let key = mailcraft_host::secrets::dav_secret_key(a, origin)?;
+        let store = self.host.platform().secrets()?;
+        store.get(&key)
+    }
+
+    /// Forget an account's CalDAV and CardDAV passwords kept this session (it went).
+    pub(crate) fn forget_dav_passwords(&self, account: u64) {
+        self.lock().dav_passwords.retain(|(held, _), _| *held != account);
+    }
+
+    /// How a CalDAV and CardDAV read is made now.
+    pub(crate) fn dav_runner(&self) -> crate::dav::DavRunner {
+        self.dav_runner.lock().unwrap_or_else(PoisonError::into_inner).clone()
+    }
+
+    /// Run DAV reads as `runner` says (the tests': nothing leaves the machine).
+    #[cfg(test)]
+    pub(crate) fn set_dav_runner(&self, runner: crate::dav::DavRunner) {
+        *self.dav_runner.lock().unwrap_or_else(PoisonError::into_inner) = runner;
     }
 
     /// Whether sign-ins are kept in the credential store (the owner's choice).
@@ -704,7 +749,10 @@ impl SyncHost {
         }
         let only = pull_scope(session, only);
         let accounts: Vec<u64> = server_accounts(session).into_iter().filter(|id| only.is_none_or(|a| a == *id)).collect();
-        if accounts.is_empty() {
+        // A CalDAV and CardDAV account has no mail round; its calendar's read is what a Send/Receive
+        // starts when there is nothing else to run.
+        let has_dav = session.mailbox.accounts.iter().any(|a| a.dav.is_some());
+        if accounts.is_empty() && !has_dav {
             return refused("There is no account to send and receive.");
         }
         // The owner asking (a pull to refresh) lets go of the accounts held back that it asks
@@ -733,7 +781,25 @@ impl SyncHost {
             return refused("Send/Receive isn't available now.");
         }
         if supported.is_empty() {
-            return refused("This kind of account can't be sent and received on the phone yet.");
+            if !has_dav {
+                return refused("This kind of account can't be sent and received on the phone yet.");
+            }
+            // Only calendars and address books: the round is that read, and its answer ends it.
+            if !inner.active {
+                inner.active = true;
+                inner.dav_round = true;
+                inner.ran = false;
+                inner.errors.clear();
+                inner.needs_sign_in.clear();
+            }
+            inner.jobs.dav.soon();
+            if let Some(waiter) = waiter {
+                inner.waiters.push(waiter);
+            }
+            self.tick_locked(&mut inner, session);
+            drop(inner);
+            self.pacer.poke();
+            return SyncAnswer { started: true, message: String::new() };
         }
         if !inner.sr.busy() && session.driver.round.queue.is_empty() {
             let secrets = self.host.platform().secrets();
@@ -783,6 +849,16 @@ impl SyncHost {
         drop(inner);
         self.pacer.poke();
         SyncAnswer { started: true, message: String::new() }
+    }
+
+    /// The round a Send/Receive started for calendars and address books alone ends when that read's
+    /// answer is in: its waiters hear the summary, as they would for mail.
+    pub(crate) fn finish_dav_round(&self, inner: &mut Inner, session: &Session) {
+        if std::mem::take(&mut inner.dav_round) {
+            inner.ran = true;
+            self.finish_round(inner, session, true);
+            self.pacer.poke();
+        }
     }
 
     /// Call the round off (its time ran out): the run under way stops at its next safe place, and

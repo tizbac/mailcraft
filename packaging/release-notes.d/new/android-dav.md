@@ -1,0 +1,1 @@
+- Android: an account of calendars and address books alone (CalDAV / CardDAV), and Linchange accounts that sign in on the server's own page and get an application password. MailCraft is also an Android account now: the phone's own Calendar and Contacts apps show what those accounts keep, without adding a DAV account there.

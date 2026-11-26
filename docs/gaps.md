@@ -76,6 +76,8 @@ this code base.
 
 - Signature pictures counted as attachments (#1970): a picture the HTML draws by `cid:` is the body's however its sender labelled it, but a Microsoft account's message not downloaded yet shows the paperclip its server's `hasAttachments` gives, and the server's own rules and search still count such pictures as attachments. A message stored before this was fixed keeps its paperclip until it is first opened, and in such a message a large picture labelled `application/octet-stream` whose bytes are already on disk stays listed (its type is told from its bytes only while they are in memory).
 
+- The phone's own Calendar and Contacts apps show what MailCraft keeps of its CalDAV and CardDAV accounts (MB3.19), under a MailCraft account in each: one way and read-only there, refreshed by the system's sync adapter after a MailCraft run and every few hours. An event or contact changed in those apps is replaced by MailCraft's copy at the next refresh; only accounts of calendars and address books reach them, never a Microsoft, IMAP or Exchange account's calendars or its people, and a reminder set in the system's calendar app belongs to that app. The phone asks for the calendar and contacts rights when such an account is added; without them nothing is written. Address books are read with the account's own sign-in over HTTP Basic and TLS; a server that wants another kind of sign-in shows no contacts yet.
+
 ## Revision history
 
 | Date | Change | Summary |

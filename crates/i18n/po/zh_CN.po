@@ -493,6 +493,22 @@ msgid "A calendar change couldn't be sent yet and will be tried again: {error}"
 msgstr "日历更改尚无法发送，将重试：{error}"
 
 #. what a command says
+#: crates/mobile/src/jobs.rs
+msgid "A calendar server answered with errors, so some events may be out of date."
+msgstr ""
+
+#. what a command says
+#: crates/mobile/src/jobs.rs
+msgid "A calendar server wouldn't sign in. Sign in again in the account's settings."
+msgstr ""
+
+#. what a command says
+#: crates/mobile/src/jobs.rs
+#, fuzzy
+msgid "A calendar server's certificate isn't trusted, so nothing was sent to it."
+msgstr "日历服务器的证书不受信任，因此没有向其发送任何内容。"
+
+#. what a command says
 #: crates/engine/src/cmd/calendar/selection.rs crates/engine/src/cmd/calendar_extra.rs
 #, fuzzy
 msgid "A calendar that only shows when people are busy has no appointment to copy: open one of the calendars that can be read."
@@ -845,6 +861,11 @@ msgstr "共享邮箱，使用 {account} 的登录信息读取"
 msgid "A short note with the link to that page, to paste into mail or chat. MailCraft sends nothing itself."
 msgstr "一段附有该页面链接的简短说明,可粘贴到邮件或聊天中。MailCraft 本身不会发送任何内容。"
 
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/SettingsScreen.kt
+msgid "A swipe on a message archives, deletes or changes it. Turn it off to keep every action in the message's menu."
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/dialogs.rs
 #, fuzzy
@@ -1102,6 +1123,11 @@ msgstr "添加共享邮箱…"
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Add a Linchange account"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
 #, fuzzy
 msgid "Add a Microsoft account to read your mail here."
 msgstr "添加 Microsoft 账户即可在此阅读邮件。"
@@ -1229,6 +1255,11 @@ msgstr "添加另一个电话号码"
 #, fuzzy
 msgid "Add as a Microsoft account"
 msgstr "添加为 Microsoft 账户"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Add calendars and contacts only (CalDAV / CardDAV)"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/advanced_search.rs
@@ -1717,6 +1748,11 @@ msgstr "此联系人的 X.509 证书（.cer、.pem）或 OpenPGP 公钥 (.asc)"
 msgid "An account couldn't be sent and received."
 msgstr "有账户无法发送和接收。"
 
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "An account with calendars and address books and no mail, kept in step over CalDAV and CardDAV. Your password goes to those servers only, and is kept on this phone when sign-ins are remembered."
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup/senders.rs
 #, fuzzy
@@ -2094,6 +2130,16 @@ msgstr "未列出的约会："
 #, fuzzy
 msgid "Approval Needed"
 msgstr "需要批准"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Approve MailCraft on Linchange's page in your browser. MailCraft is waiting, and carries on by itself once you have."
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Approve in your browser"
+msgstr ""
 
 #. date and time
 #: crates/i18n/src/date.rs
@@ -2953,6 +2999,11 @@ msgstr "日历连接检查"
 msgid "Calendar Listed Twice"
 msgstr "日历重复列出"
 
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Calendar address (CalDAV)"
+msgstr ""
+
 #. command label
 #: crates/engine/src/cmd/dav_sync.rs
 #, fuzzy
@@ -2976,6 +3027,16 @@ msgstr "日历和联系人"
 #, fuzzy
 msgid "Calendar and contacts need your permission: File › Info › Connect calendar and contacts"
 msgstr "日历和联系人需要您的许可：文件 › 信息 › 连接日历和联系人"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Calendars and address books only: no mail"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Calendars and contacts only"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/backstage.rs
@@ -4083,6 +4144,11 @@ msgstr "待发送的联系人更改"
 #, fuzzy
 msgid "Contacts"
 msgstr "联系人"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Contacts address (CardDAV)"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/dialogs.rs
@@ -5674,7 +5740,7 @@ msgid "Email Message"
 msgstr "电子邮件"
 
 #. android, interface
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Email address"
 msgstr "电子邮件地址"
@@ -5684,6 +5750,11 @@ msgstr "电子邮件地址"
 #, fuzzy
 msgid "Email address (optional)"
 msgstr "电子邮件地址（可选）"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Email address or account name"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/PersonEditor.kt
@@ -6392,6 +6463,11 @@ msgstr "将这组日历折叠起来"
 msgid "Folded"
 msgstr "已折叠"
 
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt
+msgid "Folded: {n} unread"
+msgstr ""
+
 #. interface, name, ribbon location
 #: crates/engine/src/cmd/calendar.rs crates/engine/src/cmd/calendar_opened.rs crates/engine/src/cmd/calendar_subscribed.rs crates/engine/src/cmd/folder.rs crates/engine/src/cmd/imported_dupes.rs crates/engine/src/cmd/mail.rs crates/engine/src/cmd/rules.rs crates/model/src/mailbox.rs crates/ui-egui/src/folder_properties.rs crates/ui-egui/src/lib.rs crates/ui-egui/src/menubar.rs
 #, fuzzy
@@ -6551,6 +6627,16 @@ msgstr "适用于无需密码即可接收邮件的中继服务器：绝不会向
 #, fuzzy
 msgid "For an account that signs in with Microsoft: the folders you keep under Favorites in Outlook, in the same order. They are read from the server and never changed there. Without this, the favourites you mark in MailCraft are shown."
 msgstr "对于使用 Microsoft 登录的账户：按 Outlook 中的顺序显示“收藏夹”下的文件夹。它们从服务器读取，不会更改服务器上的内容。未开启时，显示在 MailCraft 中标记的收藏夹。"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "For example https://example.org/caldav/ — empty when it keeps no calendars."
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "For example https://example.org/carddav/ — empty when it keeps no contacts."
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt
@@ -8793,7 +8879,7 @@ msgid "Leave empty to keep the one in use"
 msgstr "留空则继续使用当前值"
 
 #. android
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
 msgid "Leave empty to keep the password you have."
 msgstr ""
 
@@ -8883,6 +8969,16 @@ msgstr "有限详细信息：包括标题"
 #. name
 #: crates/ui-egui/src/account_setup.rs
 msgid "Linchange"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Linchange account"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Linchange server"
 msgstr ""
 
 #. interface
@@ -9308,6 +9404,11 @@ msgid "MailCraft carries the software below. The Rust libraries of its core are 
 msgstr "MailCraft 包含下列软件。其核心的 Rust 库及版本列在源代码仓库中。"
 
 #. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountsController.kt
+msgid "MailCraft couldn't open a browser for Linchange's page."
+msgstr ""
+
+#. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
 #, fuzzy
 msgid "MailCraft couldn't open a browser for Microsoft's page."
@@ -9360,6 +9461,11 @@ msgstr "MailCraft 暂不支持重命名或移动 JMAP 账户的文件夹：这�
 #, fuzzy
 msgid "MailCraft doesn't support POP yet. Use your provider's IMAP server instead (usually imap.<your domain>, port 993)."
 msgstr "MailCraft 尚不支持 POP。请改用服务提供商的 IMAP 服务器（通常为 imap.<your domain>，端口 993）。"
+
+#. what a command says
+#: crates/mobile/src/jobs.rs
+msgid "MailCraft holds as much from a calendar server as it can: some calendars or events were left out."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/dav_job.rs
@@ -9456,6 +9562,11 @@ msgstr "MailCraft 需要使用系统浏览器登录。您也可以使用 Google 
 #, fuzzy
 msgid "MailCraft now installs its updates itself. Turn this off in File › About."
 msgstr "MailCraft 现在会自行安装更新。可在“文件 › 关于”中关闭此功能。"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountsController.kt
+msgid "MailCraft on this phone"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/account_setup.rs
@@ -10610,7 +10721,7 @@ msgid "Name (A–Z)"
 msgstr "名称(A–Z)"
 
 #. android, interface
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup/senders.rs crates/ui-egui/src/dialogs.rs
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup/senders.rs crates/ui-egui/src/dialogs.rs
 #, fuzzy
 msgid "Name (optional)"
 msgstr "名称（可选）"
@@ -12042,7 +12153,7 @@ msgid "October"
 msgstr "10月"
 
 #. android, interface
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/PicturesSettings.kt crates/ui-egui/src/backstage.rs crates/ui-egui/src/ribbon.rs crates/ui-egui/src/spelling.rs
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/PicturesSettings.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/SettingsScreen.kt crates/ui-egui/src/backstage.rs crates/ui-egui/src/ribbon.rs crates/ui-egui/src/spelling.rs
 #, fuzzy
 msgid "Off"
 msgstr "关"
@@ -12650,6 +12761,11 @@ msgstr "打开此日历"
 msgid "Open {name}? {why}"
 msgstr "打开 {name}？{why}"
 
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt
+msgid "Open: {n} unread"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/digital_signatures.rs
 msgid "OpenPGP key"
@@ -13040,7 +13156,7 @@ msgid "Part of your mailbox is damaged"
 msgstr "您的邮箱部分损坏"
 
 #. android, interface
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Password"
 msgstr "密码"
@@ -16799,8 +16915,8 @@ msgstr "使用用户名和密码登录 Exchange 服务器"
 msgid "Signs in with Microsoft · folders kept in step through Microsoft Graph (testing)"
 msgstr "使用 Microsoft 登录 · 通过 Microsoft Graph 保持文件夹同步（测试）"
 
-#. android, interface
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt crates/ui-egui/src/account_setup.rs
+#. interface
+#: crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Signs in with a password"
 msgstr "使用密码登录"
@@ -17349,7 +17465,7 @@ msgid "Swipe Action"
 msgstr "滑动操作"
 
 #. android
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Navigation.kt
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Navigation.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/SettingsScreen.kt
 #, fuzzy
 msgid "Swipe actions"
 msgstr "滑动操作"
@@ -17371,6 +17487,11 @@ msgstr "向左滑动"
 #, fuzzy
 msgid "Swipe to the right"
 msgstr "向右滑动"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/SettingsScreen.kt
+msgid "Swiping is off. A message's actions are in its menu, opened by a long press or the button at its end."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/graph_switch.rs
@@ -17932,6 +18053,21 @@ msgstr "整个系列"
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 msgid "The Linchange approval didn't finish"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountsController.kt
+msgid "The Linchange approval didn't finish. You can try again."
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountsController.kt
+msgid "The Linchange approval was called off."
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountsController.kt
+msgid "The Linchange approval wasn't finished in time. You can try again."
 msgstr ""
 
 #. interface
@@ -18969,6 +19105,11 @@ msgid "The name the calendar gives itself"
 msgstr "日历给自己起的名称"
 
 #. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "The name the servers know you by; empty: the address above."
+msgstr ""
+
+#. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/TaskEditorScreen.kt
 #, fuzzy
 msgid "The notes are too long to edit here."
@@ -19377,6 +19518,11 @@ msgstr "服务器将自动设置重定向到未加密的地址，MailCraft 不�
 #, fuzzy
 msgid "The server shows a certificate that needs your say."
 msgstr "服务器提供的证书需要您确认。"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "The server that hosts your mail and Linchange page."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/graph_fetch.rs crates/ui-egui/src/reading.rs
@@ -21724,7 +21870,7 @@ msgid "User name"
 msgstr "用户名"
 
 #. android
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
 msgid "User name (optional)"
 msgstr ""
 
@@ -22497,6 +22643,11 @@ msgstr "您是此会议的组织者，无需回复。"
 #, fuzzy
 msgid "You replied to this message."
 msgstr "您已回复此邮件。"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "You sign in on Linchange's own page in your browser. It gives MailCraft an application password for this phone, so your account password and its second factor never reach MailCraft."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/lib.rs
@@ -24943,6 +25094,16 @@ msgstr ".pst 文件尚未读取完毕，读取程序就已停止"
 #, fuzzy
 msgid "the Inbox of this account hasn't been read yet"
 msgstr "尚未读取此账户的收件箱"
+
+#. what a command says
+#: crates/mobile/src/accounts.rs
+msgid "the Linchange approval couldn't be started"
+msgstr ""
+
+#. what a command says
+#: crates/mobile/src/accounts.rs
+msgid "the Linchange approval stopped unexpectedly"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/keys.rs
@@ -28790,10 +28951,6 @@ msgstr "−行"
 #, fuzzy
 #~ msgid "A calendar server wouldn't sign in. MailCraft will try again later, or when the password changes."
 #~ msgstr "日历服务器未接受登录。MailCraft 稍后会重试，或在密码更改后重试。"
-
-#, fuzzy
-#~ msgid "A calendar server's certificate isn't trusted, so nothing was sent to it."
-#~ msgstr "日历服务器的证书不受信任，因此没有向其发送任何内容。"
 
 #, fuzzy
 #~ msgid "Calendars and contacts on a server are not read or written yet in this version."

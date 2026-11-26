@@ -1,16 +1,18 @@
 // SPDX-FileCopyrightText: MailCraft contributors
 // SPDX-License-Identifier: MIT OR Apache-2.0
-@file:Suppress("MaxLineLength")
+@file:Suppress("MaxLineLength", "TooManyFunctions")
 
 package work.mailcraft.android
 
 import uniffi.mailcraft_mobile.AccountSettings
 import uniffi.mailcraft_mobile.Core
 import uniffi.mailcraft_mobile.CoreException
+import uniffi.mailcraft_mobile.DavAccountSettings
 import uniffi.mailcraft_mobile.DownloadSettings
 import uniffi.mailcraft_mobile.ExchangeAccountSettings
 import uniffi.mailcraft_mobile.ImapAccountSettings
 import uniffi.mailcraft_mobile.KeepWindow
+import uniffi.mailcraft_mobile.LinchangeOutcome
 import uniffi.mailcraft_mobile.MailServer
 import uniffi.mailcraft_mobile.Permission
 import uniffi.mailcraft_mobile.PermissionOutcome
@@ -184,6 +186,19 @@ internal interface AccountsApi : AccountSettingsApi {
     /** Adds an Exchange server account (Exchange Web Services): its id. */
     suspend fun addExchange(settings: ExchangeAccountSettings): ULong
 
+    /** Obtains a Linchange application password on the server's own page, and adds the account. */
+    suspend fun addLinchange(email: String, displayName: String, server: String, description: String): LinchangeResult =
+        LinchangeResult.Failed("This build can't sign in to Linchange.")
+
+    /** Calls off the Linchange approval that is open, if one is. */
+    fun cancelLinchange() {}
+
+    /** Adds a CalDAV and CardDAV account: calendars and address books alone. */
+    suspend fun addDav(settings: DavAccountSettings): ULong
+
+    /** Changes a CalDAV and CardDAV account's settings. */
+    suspend fun editDav(account: ULong, settings: DavAccountSettings)
+
     suspend fun grant(account: ULong, permission: PermissionKind): GrantResult
 
     suspend fun status(account: ULong, permission: PermissionKind): PermissionStatus
@@ -195,6 +210,36 @@ internal interface AccountsApi : AccountSettingsApi {
     fun approvalLink(email: String): String?
 
     fun cancel()
+}
+
+/** How adding a Linchange account ended, as the screens read it. */
+internal sealed interface LinchangeResult {
+    class SignedIn(val account: ULong, val email: String, val name: String) : LinchangeResult
+
+    data object Cancelled : LinchangeResult
+
+    data object TimedOut : LinchangeResult
+
+    data object NoBrowser : LinchangeResult
+
+    class Failed(val reason: String) : LinchangeResult
+}
+
+/** Which field of the Linchange form was changed. */
+internal enum class LinchangeField {
+    Email,
+    DisplayName,
+    Server,
+}
+
+/** Which field of the CalDAV and CardDAV form was changed. */
+internal enum class DavField {
+    Email,
+    DisplayName,
+    Username,
+    Password,
+    CalendarHome,
+    ContactHome,
 }
 
 /** [AccountsApi] over the Rust core. What it hands the screens carries no token: the core keeps those. */
@@ -224,6 +269,25 @@ internal class CoreAccounts(private val core: Core, private val handback: SignIn
     override suspend fun addImap(settings: ImapAccountSettings): ULong = core.addImapAccount(settings)
 
     override suspend fun addExchange(settings: ExchangeAccountSettings): ULong = core.addExchangeAccount(settings)
+
+    override suspend fun addDav(settings: DavAccountSettings): ULong = core.addDavAccount(settings)
+
+    override suspend fun editDav(account: ULong, settings: DavAccountSettings) = core.editDavAccount(account, settings)
+
+    override suspend fun addLinchange(email: String, displayName: String, server: String, description: String): LinchangeResult =
+        try {
+            when (val outcome = core.addLinchangeAccount(email, displayName, server, description)) {
+                is LinchangeOutcome.SignedIn -> LinchangeResult.SignedIn(outcome.account, outcome.email, outcome.name)
+                LinchangeOutcome.Cancelled -> LinchangeResult.Cancelled
+                LinchangeOutcome.TimedOut -> LinchangeResult.TimedOut
+                LinchangeOutcome.NoBrowser -> LinchangeResult.NoBrowser
+                is LinchangeOutcome.Failed -> LinchangeResult.Failed(outcome.reason)
+            }
+        } catch (_: CoreException) {
+            LinchangeResult.Failed("")
+        }
+
+    override fun cancelLinchange() = core.cancelLinchangeSignIn()
 
     override suspend fun settings(account: ULong): AccountSettings = core.accountSettings(account)
 
@@ -339,6 +403,37 @@ internal sealed interface AddAccountState {
         val username: String = "",
         val password: String = "",
         val url: String = "",
+        val notice: Notice? = null,
+        val working: Boolean = false,
+        /** The account this form edits; null when it adds one. */
+        val editing: ULong? = null,
+    ) : AddAccountState
+
+    /**
+     * A Linchange account: the form, and the wait while the owner approves MailCraft on the
+     * server's own page in the browser (the account password and its second factor are typed
+     * there, never here). [server] is the server as typed; empty means the address's domain.
+     */
+    data class Linchange(
+        val email: String = "",
+        val displayName: String = "",
+        val server: String = "",
+        val notice: Notice? = null,
+        val working: Boolean = false,
+    ) : AddAccountState
+
+    /** Calendars and address books alone, over CalDAV and CardDAV: the form, and why the last try ended. */
+    data class Dav(
+        /** What the account is called: an address, or any other name that isn't empty. */
+        val email: String = "",
+        val displayName: String = "",
+        val username: String = "",
+        val password: String = "",
+        val calendarHome: String = "",
+        val contactHome: String = "",
+        /** The rest of the homes, kept as they were: a phone's form shows the first of each kind. */
+        val otherCalendarHomes: List<String> = emptyList(),
+        val otherContactHomes: List<String> = emptyList(),
         val notice: Notice? = null,
         val working: Boolean = false,
         /** The account this form edits; null when it adds one. */
@@ -487,6 +582,17 @@ internal class AccountActions(
     val onAddImap: () -> Unit = {},
     /** Opens the form for an Exchange server account. */
     val onChooseExchange: () -> Unit = {},
+    /** Opens the form for a Linchange account. */
+    val onChooseLinchange: () -> Unit = {},
+    val onLinchangeField: (LinchangeField, String) -> Unit = { _, _ -> },
+    /** Asks Linchange's page for an application password and adds the account. */
+    val onAddLinchange: () -> Unit = {},
+    /** Calls off the Linchange approval that is open. */
+    val onCancelLinchange: () -> Unit = {},
+    /** Opens the form for calendars and address books alone (CalDAV and CardDAV). */
+    val onChooseDav: () -> Unit = {},
+    val onDavField: (DavField, String) -> Unit = { _, _ -> },
+    val onAddDav: () -> Unit = {},
     /** Opens the form for an account the owner has, to change its settings. */
     val onEditAccount: (AccountItem) -> Unit = {},
     val onExchangeField: (ExchangeField, String) -> Unit = { _, _ -> },

@@ -423,6 +423,11 @@ pub enum AccountKind {
     /// Its server is [`Account::ews`]; the password is given by whoever holds the connection and
     /// is never written anywhere.
     Exchange,
+    /// Calendars and address books alone, kept in step over CalDAV and CardDAV, with no mail: a
+    /// mailbox from another provider is its own account, or the same account's IMAP and SMTP
+    /// servers. Its services are [`Account::dav`]; the password is given by whoever holds the
+    /// connection and is never written anywhere.
+    Dav,
     /// A kind this version doesn't know: an account that a newer MailCraft added, in a file that
     /// one wrote (or one whose kind can't be read at all). Only what says which account it is
     /// is read of it; the whole of it is kept as the file had it and written back so
@@ -433,9 +438,10 @@ pub enum AccountKind {
 }
 
 impl AccountKind {
-    /// Whether the account is kept in step with a server (by IMAP, by Microsoft Graph or by JMAP).
-    /// Not an account of a kind this version doesn't know: whatever server it has, this version
-    /// can't use it.
+    /// Whether the account is kept in step with a mail server (by IMAP, by Microsoft Graph, by
+    /// JMAP or by Exchange Web Services). Not an account of a kind this version doesn't know:
+    /// whatever server it has, this version can't use it. A CalDAV and CardDAV account keeps
+    /// calendars and address books in step and has no mail, so it is not one.
     pub fn has_server(self) -> bool {
         matches!(self, AccountKind::Imap | AccountKind::Microsoft | AccountKind::Jmap | AccountKind::Exchange)
     }
@@ -919,6 +925,20 @@ impl Account {
     pub fn login(&self) -> &str {
         let user = self.username.trim();
         if user.is_empty() { self.email.trim() } else { user }
+    }
+
+    /// Whether the account keeps its calendars and address books over CalDAV and CardDAV
+    /// ([`Account::dav`]). Its mail may go over IMAP and SMTP as any other account's, or it may
+    /// have no mail at all ([`AccountKind::Dav`]).
+    pub fn is_dav(&self) -> bool {
+        matches!(self.kind, AccountKind::Imap | AccountKind::Dav) && self.dav.is_some()
+    }
+
+    /// The name the CalDAV and CardDAV services know the owner by: the one given for them, else
+    /// the account's own login (mail and calendars usually share one).
+    pub fn dav_login(&self) -> &str {
+        let user = self.dav.as_ref().map(|dav| dav.username.trim()).unwrap_or_default();
+        if user.is_empty() { self.login() } else { user }
     }
 
     /// A Microsoft account (it signs in with Microsoft) that is still kept in step by IMAP and
@@ -1646,16 +1666,20 @@ impl Mailbox {
             account.name = account.name_by_default();
         }
         self.accounts.push(account);
-        for kind in FolderKind::STANDARD {
-            let fid = self.alloc_id();
-            self.folders.push(Folder {
-                id: fid,
-                account: id,
-                name: kind.default_name().into(),
-                kind,
-                favorite: kind == FolderKind::Inbox,
-                ..Default::default()
-            });
+        // Calendars and address books alone have no mail folders: their account is reached from
+        // the calendar and the contacts, not from the folder pane's mail.
+        if self.account(id).is_some_and(|a| a.kind != AccountKind::Dav) {
+            for kind in FolderKind::STANDARD {
+                let fid = self.alloc_id();
+                self.folders.push(Folder {
+                    id: fid,
+                    account: id,
+                    name: kind.default_name().into(),
+                    kind,
+                    favorite: kind == FolderKind::Inbox,
+                    ..Default::default()
+                });
+            }
         }
         if self.calendars.is_empty() {
             let cid = self.alloc_id();
@@ -5310,10 +5334,32 @@ impl Mailbox {
         }
         let accounts: Vec<Id> = self.accounts.iter().map(|a| a.id).collect();
         let known_accounts: HashSet<Id> = accounts.iter().copied().collect();
+        // An account of calendars and address books alone has no mail folders; a folder of one
+        // (made by an earlier repair) is not a mail folder and goes, unless it still holds
+        // messages: those are never thrown away by a repair.
+        let dav_accounts: HashSet<Id> = self.accounts.iter().filter(|a| a.kind == AccountKind::Dav).map(|a| a.id).collect();
+        let holding: HashSet<Id> = self.messages.values().map(|message| message.folder).collect();
         let before = self.folders.len();
-        self.folders.retain(|f| known_accounts.contains(&f.account));
-        if self.folders.len() != before {
-            fixed.push(format!("{} folder(s) of unknown accounts removed", before - self.folders.len()));
+        let mut kept_holding = 0usize;
+        self.folders.retain(|folder| {
+            if !known_accounts.contains(&folder.account) {
+                return false;
+            }
+            if dav_accounts.contains(&folder.account) {
+                if holding.contains(&folder.id) {
+                    kept_holding += 1;
+                    return true;
+                }
+                return false;
+            }
+            true
+        });
+        let removed = before.saturating_sub(self.folders.len());
+        if removed != 0 {
+            fixed.push(format!("{} folder(s) of accounts without mail removed", removed.saturating_sub(kept_holding)));
+        }
+        if kept_holding > 0 {
+            fixed.push(format!("{kept_holding} folder(s) of a calendars-only account kept because they hold messages"));
         }
         for f in &mut self.folders {
             if f.id == 0 || !sane(&f.id) || !seen.insert(f.id) {
@@ -5361,7 +5407,7 @@ impl Mailbox {
                 f.kind = FolderKind::Custom;
             }
         }
-        for account in accounts {
+        for account in accounts.into_iter().filter(|account| !dav_accounts.contains(account)) {
             for kind in FolderKind::STANDARD {
                 if !has.contains(&(account, kind)) {
                     let id = self.alloc_id();

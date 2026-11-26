@@ -168,6 +168,7 @@ pub(crate) fn row(s: &Session, m: &Message, r: &mailcraft_engine::list::Row) -> 
 fn person(c: &Contact) -> PersonRecord {
     PersonRecord {
         id: c.id,
+        account: c.origin.account,
         name: text::clip(&c.name(), MAX_NAME),
         company: text::clip(&c.company, MAX_NAME),
         title: text::clip(&c.title, MAX_NAME),
@@ -190,6 +191,7 @@ pub(crate) fn account_kind(kind: mailcraft_model::AccountKind) -> &'static str {
         AccountKind::Local => "local",
         AccountKind::Jmap => "jmap",
         AccountKind::Exchange => "exchange",
+        AccountKind::Dav => "dav",
         _ => "other",
     }
 }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-FileCopyrightText: MailCraft contributors
+  SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+<ContactsAccountType xmlns:android="http://schemas.android.com/apk/res/android"
+    accountType="work.mailcraft.android"
+    accountTypeLabel="@string/app_name"
+    accountTypeIcon="@android:drawable/ic_dialog_email" />

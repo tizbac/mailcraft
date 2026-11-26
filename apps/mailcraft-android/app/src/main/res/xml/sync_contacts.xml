@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-FileCopyrightText: MailCraft contributors
+  SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+<sync-adapter xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accountType="work.mailcraft.android"
+    android:allowParallelSyncs="false"
+    android:contentAuthority="com.android.contacts"
+    android:isAlwaysSyncable="true"
+    android:supportsUploading="false"
+    android:userVisible="true" />

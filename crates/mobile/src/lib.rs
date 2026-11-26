@@ -29,6 +29,8 @@ pub mod blocks;
 mod calendar_queries;
 mod compose;
 mod core;
+mod dav;
+mod dav_contacts;
 #[cfg(feature = "e2e")]
 mod e2e;
 mod error;
@@ -66,6 +68,10 @@ mod compose_share_tests;
 #[cfg(test)]
 mod compose_tests;
 #[cfg(test)]
+mod dav_contacts_tests;
+#[cfg(test)]
+mod dav_tests;
+#[cfg(test)]
 mod ews_fetch_tests;
 #[cfg(test)]
 mod fake_tests;
@@ -87,6 +93,8 @@ mod junk_tests;
 mod keep_tests;
 #[cfg(test)]
 mod limits_tests;
+#[cfg(test)]
+mod linchange_tests;
 #[cfg(test)]
 mod links_tests;
 #[cfg(test)]
@@ -120,7 +128,10 @@ mod tests;
 #[cfg(test)]
 mod zone_tests;
 
-pub use accounts::{Permission, PermissionOutcome, PermissionState, SignInOutcome};
+pub use accounts::{
+    AccountSettings, DavAccountSettings, ExchangeAccountSettings, ImapAccountSettings, LinchangeOutcome, MailServer, Permission, PermissionOutcome,
+    PermissionState, SignInOutcome,
+};
 pub use attachments::{AttachmentCheck, AttachmentFile, CalendarImported, OpenVerdict, attachment_check};
 pub use compose::{
     ComposeFile, ComposeFormat, ComposeKind, ComposeParagraph, ComposePicture, ComposeSpan, ComposeStart, ComposeView, FromChoice, ListMark,

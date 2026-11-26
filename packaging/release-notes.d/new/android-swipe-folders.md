@@ -1,0 +1,1 @@
+- Android: swipes on the mail list can be turned off (every action stays in a row's menu), and an account's folders fold away in the drawer; which accounts are folded is kept on the phone.

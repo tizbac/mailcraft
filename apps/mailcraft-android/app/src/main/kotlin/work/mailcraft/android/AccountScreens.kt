@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: MailCraft contributors
 // SPDX-License-Identifier: MIT OR Apache-2.0
 @file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
-@file:Suppress("MaxLineLength")
+@file:Suppress("MaxLineLength", "TooManyFunctions")
 
 package work.mailcraft.android
 
@@ -43,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -59,7 +60,8 @@ internal fun AddAccountScreen(texts: Texts, state: AddAccountState, actions: Acc
         topBar = {
             TopAppBar(
                 title = {
-                    val editing = (state as? AddAccountState.Imap)?.editing != null || (state as? AddAccountState.Exchange)?.editing != null
+                    val editing = (state as? AddAccountState.Imap)?.editing != null || (state as? AddAccountState.Exchange)?.editing != null ||
+                        (state as? AddAccountState.Dav)?.editing != null
                     Text(texts.t(if (editing) "Edit account" else "Add account"), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 },
                 navigationIcon = {
@@ -76,6 +78,8 @@ internal fun AddAccountScreen(texts: Texts, state: AddAccountState, actions: Acc
                 is AddAccountState.Form -> AddAccountForm(texts, state, actions)
                 is AddAccountState.Imap -> ImapAccountForm(texts, state, actions)
                 is AddAccountState.Exchange -> ExchangeAccountForm(texts, state, actions)
+                is AddAccountState.Linchange -> LinchangeAccountForm(texts, state, actions)
+                is AddAccountState.Dav -> DavAccountForm(texts, state, actions)
                 is AddAccountState.Waiting -> SignInWaiting(texts, actions.onCancelSignIn)
                 is AddAccountState.Approval -> ApprovalHelp(texts, state, actions)
                 is AddAccountState.Done -> Unit
@@ -111,6 +115,152 @@ private fun AddAccountForm(texts: Texts, state: AddAccountState.Form, actions: A
     }
     OutlinedButton(onClick = actions.onChooseExchange, modifier = Modifier.fillMaxWidth()) {
         Text(texts.t("Add an Exchange account"))
+    }
+    OutlinedButton(onClick = actions.onChooseLinchange, modifier = Modifier.fillMaxWidth()) {
+        Text(texts.t("Add a Linchange account"))
+    }
+    OutlinedButton(onClick = actions.onChooseDav, modifier = Modifier.fillMaxWidth()) {
+        Text(texts.t("Add calendars and contacts only (CalDAV / CardDAV)"))
+    }
+}
+
+/** The Linchange form: the address, the server, and the wait while its own page approves MailCraft. */
+@Composable
+private fun LinchangeAccountForm(texts: Texts, state: AddAccountState.Linchange, actions: AccountActions) {
+    Text(texts.t("Linchange account"), style = MaterialTheme.typography.titleMedium)
+    Text(
+        texts.t(
+            "You sign in on Linchange's own page in your browser. It gives MailCraft an application password for this phone, so your account password and its second factor never reach MailCraft.",
+        ),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    OutlinedTextField(
+        value = state.email,
+        onValueChange = { actions.onLinchangeField(LinchangeField.Email, it) },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(texts.t("Email address")) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+        enabled = !state.working,
+    )
+    OutlinedTextField(
+        value = state.server,
+        onValueChange = { actions.onLinchangeField(LinchangeField.Server, it) },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(texts.t("Linchange server")) },
+        supportingText = { Text(texts.t("The server that hosts your mail and Linchange page.")) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+        enabled = !state.working,
+    )
+    OutlinedTextField(
+        value = state.displayName,
+        onValueChange = { actions.onLinchangeField(LinchangeField.DisplayName, it) },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(texts.t("Name (optional)")) },
+        singleLine = true,
+        enabled = !state.working,
+    )
+    state.notice?.let { NoticeCard(it.text(texts)) }
+    if (state.working) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Gap)) {
+            CircularProgressIndicator(modifier = Modifier.size(Spinner))
+            Text(
+                texts.t("Approve MailCraft on Linchange's page in your browser. MailCraft is waiting, and carries on by itself once you have."),
+                modifier = Modifier.weight(1f),
+            )
+        }
+        OutlinedButton(onClick = actions.onCancelLinchange, modifier = Modifier.fillMaxWidth()) {
+            Text(texts.t("Cancel"))
+        }
+    } else {
+        Button(onClick = actions.onAddLinchange, modifier = Modifier.fillMaxWidth()) {
+            Text(texts.t("Approve in your browser"))
+        }
+    }
+}
+
+/** The CalDAV and CardDAV form: calendars and address books alone, with the homes they live at. */
+@Composable
+@Suppress("LongMethod")
+private fun DavAccountForm(texts: Texts, state: AddAccountState.Dav, actions: AccountActions) {
+    Text(texts.t("Calendars and contacts only"), style = MaterialTheme.typography.titleMedium)
+    Text(
+        texts.t(
+            "An account with calendars and address books and no mail, kept in step over CalDAV and CardDAV. Your password goes to those servers only, and is kept on this phone when sign-ins are remembered.",
+        ),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    OutlinedTextField(
+        value = state.email,
+        onValueChange = { actions.onDavField(DavField.Email, it) },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(texts.t("Email address or account name")) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+        enabled = !state.working,
+    )
+    OutlinedTextField(
+        value = state.displayName,
+        onValueChange = { actions.onDavField(DavField.DisplayName, it) },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(texts.t("Name (optional)")) },
+        singleLine = true,
+        enabled = !state.working,
+    )
+    OutlinedTextField(
+        value = state.username,
+        onValueChange = { actions.onDavField(DavField.Username, it) },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(texts.t("User name (optional)")) },
+        supportingText = { Text(texts.t("The name the servers know you by; empty: the address above.")) },
+        singleLine = true,
+        enabled = !state.working,
+    )
+    OutlinedTextField(
+        value = state.password,
+        onValueChange = { actions.onDavField(DavField.Password, it) },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(texts.t("Password")) },
+        supportingText = if (state.editing != null) {
+            { Text(texts.t("Leave empty to keep the password you have.")) }
+        } else {
+            null
+        },
+        singleLine = true,
+        visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        enabled = !state.working,
+    )
+    OutlinedTextField(
+        value = state.calendarHome,
+        onValueChange = { actions.onDavField(DavField.CalendarHome, it) },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(texts.t("Calendar address (CalDAV)")) },
+        supportingText = { Text(texts.t("For example https://example.org/caldav/ — empty when it keeps no calendars.")) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+        enabled = !state.working,
+    )
+    OutlinedTextField(
+        value = state.contactHome,
+        onValueChange = { actions.onDavField(DavField.ContactHome, it) },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(texts.t("Contacts address (CardDAV)")) },
+        supportingText = { Text(texts.t("For example https://example.org/carddav/ — empty when it keeps no contacts.")) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+        enabled = !state.working,
+    )
+    state.notice?.let { NoticeCard(it.text(texts)) }
+    Button(onClick = actions.onAddDav, modifier = Modifier.fillMaxWidth(), enabled = !state.working) {
+        if (state.working) {
+            CircularProgressIndicator(modifier = Modifier.size(Spinner))
+        } else {
+            Text(texts.t(if (state.editing == null) "Add account" else "Save"))
+        }
     }
 }
 
@@ -232,13 +382,13 @@ internal fun AccountsPage(texts: Texts, accounts: List<AccountItem>, ui: Account
                 }
             } else {
                 Text(
-                    texts.t("Signs in with a password"),
+                    texts.t(if (account.kind == "dav") "Calendars and contacts only" else "Signs in with a password"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(ChipGap)) {
-                if (account.kind == "imap" || account.kind == "exchange") {
+                if (account.kind == "imap" || account.kind == "exchange" || account.kind == "dav") {
                     TextButton(onClick = {
                         actions.onEditAccount(account)
                         onAdd()

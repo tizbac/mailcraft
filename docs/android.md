@@ -35,6 +35,16 @@ are still in line stay there. A pull in a shared mailbox's folder brings the acc
 to. A background run that comes while a pull runs adds the other accounts to the round, so it
 brings all of them as before.
 
+## The phone's own Calendar and Contacts
+
+A CalDAV and CardDAV account (`kind: dav` in the mailbox) is also an Android account
+(`work.mailcraft.android`), made when the account is added and removed with it. The system's
+Calendar and Contacts apps sync it through `CalendarSyncService` and `ContactsSyncService`
+(`MailCraftSyncAdapter`, `SystemSync`): MailCraft writes what it already has to those providers,
+one way and read-only there, and the sync adapter is asked after a MailCraft round and every six
+hours. The owner is asked once for the calendar and contacts rights when such an account exists;
+without them nothing is written. No event or contact is fetched from a server by the system's sync.
+
 ## End to end
 
 One instrumented test (`app/src/androidTest/.../EndToEndTest.kt`) runs the whole app on an

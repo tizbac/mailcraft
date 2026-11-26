@@ -10,7 +10,11 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
@@ -23,6 +27,9 @@ import uniffi.mailcraft_mobile.SyncAnswer
 
 /** The tag of the device log's lines on how long Send/Receive took (`adb logcat -s MailCraftSync`). */
 private const val SYNC_LOG_TAG = "MailCraftSync"
+
+/** How long a burst of changes waits before the phone's calendar and contacts are written. */
+private const val SYSTEM_SYNC_DELAY_MS = 2_000L
 
 /** The Rust core and what the app built on it, once both are ready. */
 internal class Opened(
@@ -54,6 +61,9 @@ class MailCraftApplication : Application() {
 
     /** Where starting the core stands; [begin] it first. */
     internal val started: StateFlow<Started> get() = startup.state
+
+    /** The next writing of MailCraft's calendars and contacts into the phone's own apps. */
+    private var systemSync: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -178,6 +188,28 @@ class MailCraftApplication : Application() {
         scope.launch { ready.hub.saveNow() }
     }
 
+    /**
+     * The core for the system's sync adapter: opened if no window has (after a restart), or the
+     * one already open. Waits no longer than [timeoutMs] for it; null when it can't be had.
+     */
+    internal suspend fun coreForSystemSync(timeoutMs: Long = 30_000): Core? {
+        begin()
+        return withTimeoutOrNull(timeoutMs) { (started.first { it !is Phase.Loading } as? Phase.Ready)?.value?.core }
+    }
+
+    /**
+     * Writes the calendars and contacts once more, soon: a change or a round has just finished, and
+     * a burst of them is one writing. Called on the main thread.
+     */
+    private fun systemSyncSoon(core: Core) {
+        systemSync?.cancel()
+        systemSync = scope.launch {
+            delay(SYSTEM_SYNC_DELAY_MS)
+            withContext(Dispatchers.IO) { SystemSync.reconcile(this@MailCraftApplication, core) }
+            PhoneAccounts.requestSync(this@MailCraftApplication)
+        }
+    }
+
     // Setting up the system's certificate check and opening the core can each fail without
     // being a bug in the app (the library did not load, the platform refused), so a failure is
     // an answer for the screen to show and never a crash. Runs on a background thread.
@@ -262,6 +294,10 @@ class MailCraftApplication : Application() {
             // account numbers only, never anything of the mail.
             events.register { event -> if (event is Event.SyncLog) Log.i(SYNC_LOG_TAG, event.line) }
             events.launchIn(scope) { nextEvent(opened.core) }
+            // The phone's own Calendar and Contacts apps see what MailCraft keeps of its CalDAV and
+            // CardDAV accounts: at every start, and after each round that found something.
+            events.register { event -> if (event is Event.SyncFinished) systemSyncSoon(opened.core) }
+            systemSyncSoon(opened.core)
             // The core keeps the holds in memory only: the ones the owner left say so again at every start.
             // The holds were given at the opening; said again here, an account that has gone is
             // forgotten (one that fails here is said again before the background's round).
@@ -290,7 +326,7 @@ internal suspend fun nextEvent(core: Core): uniffi.mailcraft_mobile.Event? =
  * owner's ask (a pull to refresh), which lets go of the accounts held back. It says it started
  * when either ran.
  */
-private suspend fun syncAll(core: Core, owner: Boolean, account: ULong? = null): SyncAnswer {
+internal suspend fun syncAll(core: Core, owner: Boolean, account: ULong? = null): SyncAnswer {
     val graph = if (owner) core.refreshMail(account) else core.syncKeepingHolds()
     val imap = try {
         core.syncImapNow(120_000uL)

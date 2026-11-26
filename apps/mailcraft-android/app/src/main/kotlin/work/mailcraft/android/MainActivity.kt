@@ -46,11 +46,13 @@ import java.time.ZoneId
 import java.util.Locale
 import java.util.TimeZone
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import uniffi.mailcraft_mobile.Core
 
 /**
@@ -269,6 +271,8 @@ private fun CoreShell(
     var swipe by remember { mutableStateOf(prefs.load()) }
     val noticeStore = remember { DeviceNoticeButtons(appContext) }
     var noticeButtons by remember { mutableStateOf(noticeStore.load()) }
+    val folderPrefs = remember { DeviceFolderPrefs(appContext) }
+    var collapsedAccounts by remember { mutableStateOf(folderPrefs.load()) }
     // (A folder of 0 is the first Inbox.)
     var query by rememberSaveable(stateSaver = MailQuery.Saver) { mutableStateOf(MailQuery(0uL)) }
     val ui by list.ui.collectAsState()
@@ -286,6 +290,20 @@ private fun CoreShell(
         (appContext as? MailCraftApplication)?.followNotificationSwitch()
     }
     val scope = rememberCoroutineScope()
+    // A CalDAV and CardDAV account is shown in the phone's own Calendar and Contacts apps: the
+    // owner is asked for those rights once such an account exists, and what MailCraft keeps is
+    // written there when they are given.
+    AskForSystemSyncOnce(hasDavAccount = accounts.any { it.kind == "dav" }) {
+        scope.launch {
+            withContext(Dispatchers.IO) { SystemSync.reconcile(appContext, core) }
+            PhoneAccounts.requestSync(appContext)
+        }
+    }
+    LaunchedEffect(accounts) {
+        if (accounts.none { it.kind == "dav" }) return@LaunchedEffect
+        withContext(Dispatchers.IO) { SystemSync.reconcile(appContext, core) }
+        PhoneAccounts.requestSync(appContext)
+    }
     val pictured = rememberPictures(core, list, scope, appContext)
     val pictures = pictured.stack
     val writing = rememberComposeHost(core, texts, scope)
@@ -314,6 +332,7 @@ private fun CoreShell(
             nowMillis = now,
             swipe = swipe,
             noticeButtons = noticeButtons,
+            collapsedAccounts = collapsedAccounts,
             readingPrefs = readingChoice.prefs,
             reading = pictured.reading,
             pictures = pictured.settings,
@@ -338,6 +357,10 @@ private fun CoreShell(
             onNoticeButtons = {
                 noticeButtons = it
                 noticeStore.save(it)
+            },
+            onCollapseAccount = { account, collapsed ->
+                collapsedAccounts = if (collapsed) collapsedAccounts + account.id else collapsedAccounts - account.id
+                folderPrefs.save(collapsedAccounts)
             },
             onReadingPrefs = readingChoice.onChange,
             reading = pictured.reader.actions(writing::begin),

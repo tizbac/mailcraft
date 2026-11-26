@@ -38,6 +38,11 @@ private class HubApi(val gate: CompletableDeferred<Unit>) : AccountsApi {
         incoming = null,
         outgoing = null,
         url = "",
+        calendarHomes = emptyList(),
+        contactHomes = emptyList(),
+        davUsername = "",
+        davTrusted = "",
+        davSeparatePassword = false,
     )
 
     override suspend fun checkImap(settings: uniffi.mailcraft_mobile.ImapAccountSettings) = Unit
@@ -45,6 +50,10 @@ private class HubApi(val gate: CompletableDeferred<Unit>) : AccountsApi {
     override suspend fun editImap(account: ULong, settings: uniffi.mailcraft_mobile.ImapAccountSettings) = Unit
 
     override suspend fun editExchange(account: ULong, settings: uniffi.mailcraft_mobile.ExchangeAccountSettings) = Unit
+
+    override suspend fun addDav(settings: uniffi.mailcraft_mobile.DavAccountSettings): ULong = 10u
+
+    override suspend fun editDav(account: ULong, settings: uniffi.mailcraft_mobile.DavAccountSettings) = Unit
 
     override suspend fun grant(account: ULong, permission: PermissionKind): GrantResult = GrantResult.Granted
 

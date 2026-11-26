@@ -95,6 +95,8 @@ internal class ShellData(
     val swipe: SwipeConfig = SwipeConfig(),
     /** The buttons the owner chose for new-mail notifications. */
     val noticeButtons: NoticeButtons = NoticeButtons(),
+    /** The accounts whose folders the owner folded away in the drawer. */
+    val collapsedAccounts: Set<ULong> = emptySet(),
     /** What the owner chose about reading: the light page in the dark theme, the header open or shut. */
     val readingPrefs: ReadingPrefs = ReadingPrefs(),
     /** The message being read, and how its pictures are coming. */
@@ -114,9 +116,12 @@ internal class ShellData(
 /** Whether the mailbox's outline (its accounts and folders) has been read, and how that went. */
 internal enum class OutlineStatus { Loading, Failed, Ready }
 
-/** The list the Mail tab shows: an outline read with no folder to show has no list to wait for. */
+/**
+ * The list the Mail tab shows: an outline read with no folder to show (a mailbox of calendars and
+ * address books alone) has no list to wait for, and says there is no mail rather than failing.
+ */
 internal fun shownMail(outlineRead: Boolean, folder: FolderItem?, ui: MailListUi): MailListUi =
-    if (outlineRead && folder == null) ui.copy(load = LoadState.Failed) else ui
+    if (outlineRead && folder == null) ui.copy(load = LoadState.Ready, snapshot = ListSnapshot.Empty) else ui
 
 internal fun outlineStatus(outlineRead: Boolean, outline: MailboxOutline?): OutlineStatus = when {
     !outlineRead -> OutlineStatus.Loading
@@ -140,6 +145,8 @@ internal class ShellActions(
     val mail: MailListActions = MailListActions.None,
     val onSwipe: (SwipeConfig) -> Unit = {},
     val onReadingPrefs: (ReadingEdit) -> Unit = {},
+    /** An account's folders were folded away or opened in the drawer. */
+    val onCollapseAccount: (AccountItem, Boolean) -> Unit = { _, _ -> },
     val reading: ReadingActions = ReadingActions.None,
     val onPictures: (PicturePrefs) -> Unit = {},
     val onClearPictures: () -> Unit = {},
@@ -242,10 +249,14 @@ private fun AppFrame(
                 texts = texts,
                 accounts = data.accounts,
                 selectedFolder = data.folderId.takeIf { !nav.settings && !nav.adding && nav.tab == Tab.Mail },
+                collapsed = data.collapsedAccounts,
                 onFolder = { account, folder ->
                     actions.onFolder(account, folder)
                     nav = nav.select(Tab.Mail)
                     scope.launch { drawer.close() }
+                },
+                onToggleAccount = { account ->
+                    actions.onCollapseAccount(account, account.id !in data.collapsedAccounts)
                 },
                 onAddAccount = {
                     nav = nav.openAddAccount()
@@ -614,8 +625,20 @@ private fun isDraft(data: ShellData): Boolean {
 /** These actions with the list's own changed. */
 private fun ShellActions.copy(mail: MailListActions) =
     ShellActions(
-        onFolder, onLanguage, accounts, settings, mail, onSwipe, onReadingPrefs, reading, onPictures,
-        onClearPictures, writing, organiser, onNoticeButtons,
+        onFolder = onFolder,
+        onLanguage = onLanguage,
+        accounts = accounts,
+        settings = settings,
+        mail = mail,
+        onSwipe = onSwipe,
+        onCollapseAccount = onCollapseAccount,
+        onReadingPrefs = onReadingPrefs,
+        reading = reading,
+        onPictures = onPictures,
+        onClearPictures = onClearPictures,
+        writing = writing,
+        organiser = organiser,
+        onNoticeButtons = onNoticeButtons,
     )
 
 @Composable

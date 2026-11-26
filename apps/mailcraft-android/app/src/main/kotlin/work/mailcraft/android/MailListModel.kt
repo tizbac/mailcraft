@@ -252,17 +252,22 @@ internal enum class SwipeAction(val code: String) {
     }
 }
 
-/** The two swipes: [start] is a swipe to the right, [end] to the left. */
+/**
+ * The two swipes: [start] is a swipe to the right, [end] to the left, and [enabled] whether a row
+ * swipes at all (off: the owner turned the gestures off, and every action is still in a row's menu).
+ */
 internal data class SwipeConfig(
     val start: SwipeAction = SwipeAction.Archive,
     val end: SwipeAction = SwipeAction.Delete,
+    val enabled: Boolean = true,
 ) {
     companion object {
-        fun fromCodes(start: String?, end: String?): SwipeConfig {
+        fun fromCodes(start: String?, end: String?, enabled: Boolean = true): SwipeConfig {
             val d = SwipeConfig()
             return SwipeConfig(
                 SwipeAction.entries.firstOrNull { it.code == start } ?: d.start,
                 SwipeAction.entries.firstOrNull { it.code == end } ?: d.end,
+                enabled,
             )
         }
     }

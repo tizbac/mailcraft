@@ -34,10 +34,11 @@ use mailcraft_host::graph::{GraphRequest, GraphResult};
 use mailcraft_host::sync::Adopted;
 use mailcraft_host::tasks::{TasksJob, TasksResult};
 use mailcraft_host::tasks_job::TasksJobs;
-use mailcraft_model::Id;
 use mailcraft_model::sync::Tokens;
+use mailcraft_model::{DavProblem, Id};
 
 use crate::Permission;
+use crate::dav::DavStart;
 use crate::events::Event;
 use crate::sync::{Inner, SyncHost};
 
@@ -84,11 +85,13 @@ pub(crate) struct Jobs {
     /// For the device's log: the account of each job in flight and when it began.
     calendar_began: Option<(Id, Instant)>,
     tasks_began: Option<(Id, Instant)>,
+    /// The CalDAV and CardDAV read in flight.
+    pub(crate) dav: crate::dav::DavJobs,
 }
 
 impl Jobs {
     pub(crate) fn busy(&self) -> bool {
-        self.calendar.busy() || self.tasks.busy()
+        self.calendar.busy() || self.tasks.busy() || self.dav.busy()
     }
 }
 
@@ -96,6 +99,20 @@ impl Jobs {
 /// through the interface language where it is said.
 fn words(text: &'static str) -> &'static str {
     text
+}
+
+/// What a CalDAV and CardDAV read that didn't go well is told to the owner, once for each run that
+/// finds it. (`None` for a read that did what it could.)
+fn dav_said(problem: DavProblem) -> Option<&'static str> {
+    match problem {
+        DavProblem::NeedsPassword | DavProblem::WrongPassword | DavProblem::UnsupportedSignIn => {
+            Some(words("A calendar server wouldn't sign in. Sign in again in the account's settings."))
+        }
+        DavProblem::Certificate => Some(words("A calendar server's certificate isn't trusted, so nothing was sent to it.")),
+        DavProblem::ServerErrors => Some(words("A calendar server answered with errors, so some events may be out of date.")),
+        DavProblem::Full => Some(words("MailCraft holds as much from a calendar server as it can: some calendars or events were left out.")),
+        _ => None,
+    }
 }
 
 impl SyncHost {
@@ -112,9 +129,47 @@ impl SyncHost {
         self.take_calendar(inner, session);
         self.take_tasks(inner, session);
         self.ask_tasks(session);
+        let now = self.now_ms();
+        // (The DAV job is moved out while it is used, so that what its answer says of the account
+        // — sign in again, a line for Send/Receive's problems — is written beside it.)
+        let mut dav = std::mem::take(&mut inner.jobs.dav);
+        if let Some((account, problem, wait)) = dav.take(session) {
+            dav.noted(account, problem, wait, now);
+            match problem {
+                DavProblem::WrongPassword | DavProblem::NeedsPassword | DavProblem::UnsupportedSignIn => {
+                    inner.needs_sign_in.insert(account);
+                    self.forget_dav_passwords(account);
+                }
+                DavProblem::None | DavProblem::Limits => {
+                    inner.needs_sign_in.remove(&account);
+                }
+                _ => {}
+            }
+            if let Some(said) = dav_said(problem) {
+                crate::sync::add_error(&mut inner.errors, said.to_string());
+            }
+            // (A Send/Receive that had only calendars and address books to read ends with its answer.)
+            self.finish_dav_round(inner, session);
+        }
+        let dav_started = if may_start && !inner.jobs.busy() {
+            match dav.start(self, inner, session, now) {
+                DavStart::Started => true,
+                DavStart::NeedsSignIn(account) => {
+                    inner.needs_sign_in.insert(account);
+                    // (A Send/Receive that had only this read to do is over: the owner is asked,
+                    // and its waiters hear the summary.)
+                    self.finish_dav_round(inner, session);
+                    false
+                }
+                DavStart::None => false,
+            }
+        } else {
+            false
+        };
+        inner.jobs.dav = dav;
         let started = if may_start && !inner.jobs.busy() { self.start_job(inner, session) } else { 0 };
         self.note_keys(inner);
-        started
+        started + u32::from(dav_started)
     }
 
     /// The calendar job's answer, when it has come.

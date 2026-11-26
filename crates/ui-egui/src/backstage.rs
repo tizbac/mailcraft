@@ -140,6 +140,8 @@ pub(crate) fn account_detail(app: &MailApp, a: &mailcraft_model::Account) -> Str
         AccountKind::Jmap => jmap_line(a),
         // An Exchange server account names its server, and says why it isn't kept in step.
         AccountKind::Exchange => ews_line(app, a),
+        // Calendars and address books alone: no mail.
+        AccountKind::Dav => tl!("Calendars and address books only: no mail").to_string(),
         // Kept as its file has it: this version neither sends nor receives with it.
         AccountKind::Unknown => tl!("Added by a newer version of MailCraft: send and receive with it there").to_string(),
         AccountKind::Imap => {

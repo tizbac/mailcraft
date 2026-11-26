@@ -117,6 +117,8 @@ pub struct CalendarRange {
 #[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
 pub struct PersonRecord {
     pub id: u64,
+    /// The account whose address book keeps it; 0 for one on this phone only.
+    pub account: u64,
     pub name: String,
     pub company: String,
     pub title: String,
