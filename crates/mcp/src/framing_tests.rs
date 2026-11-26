@@ -901,6 +901,7 @@ const WRITTEN_PARAMS: &[&str] = &[
     "query",
     "text",
     "html",
+    "spreadsheet",
     "body",
     "subject",
     "title",
