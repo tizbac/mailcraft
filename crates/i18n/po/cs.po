@@ -4201,6 +4201,11 @@ msgstr "Zkopírovat zprávu pro mého správce"
 msgid "Copy all of it"
 msgstr "Kopírovat vše"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Copy in Cell"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
 #, fuzzy
@@ -4535,6 +4540,11 @@ msgstr ""
 #, fuzzy
 msgid "Cut"
 msgstr "Vyjmout"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Cut in Cell"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/calendar_view.rs
@@ -15371,6 +15381,11 @@ msgstr "Vybrat úkol"
 msgid "Select an item to read"
 msgstr "Vyberte položku ke čtení"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Select in Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/reading/select.rs
 #, fuzzy
@@ -15380,6 +15395,11 @@ msgstr "Nejprve vyberte nějaký text"
 #. interface
 #: crates/ui-egui/src/address_book.rs
 msgid "Select somebody to see the details"
+msgstr ""
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Select the Cell"
 msgstr ""
 
 #. interface
@@ -22975,6 +22995,11 @@ msgid "a link goes to an address like https://..., mailto:... or ms-settings:...
 msgstr "odkaz vede na adresu jako https://..., mailto:... nebo ms-settings:..., nikdy javascript:, vbscript:, data: ani file:"
 
 #. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a link is put on the text of the message, not inside a table cell"
+msgstr ""
+
+#. what a command says
 #: crates/engine/src/cmd/junk.rs
 #, fuzzy
 msgid "a list holds {n} entries at most"
@@ -23141,6 +23166,21 @@ msgstr "je otevřený podpis: velikost jeho obrázků nastavte pomocí signature
 #, fuzzy
 msgid "a signature's pictures are PNG, JPEG or GIF (many mail programs can't show other kinds)"
 msgstr "obrázky podpisu jsou PNG, JPEG nebo GIF (mnoho poštovních programů jiné druhy nezobrazí)"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds lines of text, not a list"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds no list to indent"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds no list to outdent"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/tasks.rs
@@ -24350,6 +24390,11 @@ msgstr "neznámé do prvního Odeslat/přijmout"
 #, fuzzy
 msgid "not sent: {why}. Send with \"confirmed\": true to send it anyway, or with \"moveToBcc\": true to move the people outside the organisation to Bcc first"
 msgstr "neodesláno: {why}. Odešlete s \"confirmed\": true, aby se přesto odeslalo, nebo s \"moveToBcc\": true, aby se lidé mimo organizaci nejprve přesunuli do Skryté kopie"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "nothing is selected in the cell"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/format.rs

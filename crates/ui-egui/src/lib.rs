@@ -960,6 +960,8 @@ pub struct UiState {
     /// Not kept between runs.
     #[serde(skip)]
     pub table_caret: Option<(usize, usize, usize, usize)>,
+    /// The other end of the selection in that cell, when there is one.
+    pub table_anchor: Option<(usize, usize, usize, usize)>,
     pub backstage: bool,
     pub backstage_page: String,
     pub ribbon_collapsed: bool,
@@ -1118,6 +1120,7 @@ impl Default for UiState {
             tab: "Home".into(),
             table_cell: None,
             table_caret: None,
+            table_anchor: None,
             backstage: false,
             backstage_page: "info".into(),
             ribbon_collapsed: false,

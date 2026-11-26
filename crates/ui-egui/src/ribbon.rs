@@ -874,9 +874,33 @@ pub(crate) struct Look {
     pub plain: bool,
 }
 
-/// How the selection of the text being edited looks ([`mailcraft_engine::Session::doc`]).
+/// How the selection of the text being edited looks ([`mailcraft_engine::Session::doc`]), or the
+/// cell the owner is typing in when they are in one.
 pub(crate) fn look_now(app: &MailApp) -> Look {
+    let plain = app.session.doc().is_some_and(|(_, plain)| plain);
+    if let Some(styles) = app.session.table_styles() {
+        return look_styles(&styles, plain);
+    }
     app.session.doc().map(|(body, plain)| look(body, plain)).unwrap_or_default()
+}
+
+/// How a cell's selected text looks (or the style the next typed character would have).
+fn look_styles(styles: &[mailcraft_model::rich::Style], plain: bool) -> Look {
+    let first = styles.first().cloned().unwrap_or_default();
+    let all = |f: &dyn Fn(&mailcraft_model::rich::Style) -> bool| styles.iter().all(f);
+    Look {
+        bold: all(&|s| s.bold),
+        italic: all(&|s| s.italic),
+        underline: all(&|s| s.underline),
+        size: all(&|s| s.size == first.size).then_some(first.size),
+        font: all(&|s| s.font == first.font).then_some(first.font.clone()),
+        color: all(&|s| s.color == first.color).then(|| first.color.clone()),
+        highlight: all(&|s| s.highlight == first.highlight).then(|| first.highlight.clone()),
+        bullets: false,
+        numbering: false,
+        link: all(&|s| s.link.is_some()),
+        plain,
+    }
 }
 
 pub(crate) fn look(body: &mailcraft_model::RichBody, plain: bool) -> Look {

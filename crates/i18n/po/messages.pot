@@ -3515,6 +3515,11 @@ msgstr ""
 msgid "Copy all of it"
 msgstr ""
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Copy in Cell"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
 msgid "Copy message for an administrator"
@@ -3793,6 +3798,11 @@ msgstr ""
 #. command label, interface, name, ribbon
 #: crates/engine/src/cmd/format.rs crates/ui-egui/src/calendar_view.rs crates/ui-egui/src/lib.rs crates/ui-egui/src/menubar.rs crates/ui-egui/src/ribbon.rs
 msgid "Cut"
+msgstr ""
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Cut in Cell"
 msgstr ""
 
 #. interface
@@ -12805,6 +12815,11 @@ msgstr ""
 msgid "Select an item to read"
 msgstr ""
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Select in Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/reading/select.rs
 msgid "Select some text first"
@@ -12813,6 +12828,11 @@ msgstr ""
 #. interface
 #: crates/ui-egui/src/address_book.rs
 msgid "Select somebody to see the details"
+msgstr ""
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Select the Cell"
 msgstr ""
 
 #. interface
@@ -19135,6 +19155,11 @@ msgid "a link goes to an address like https://..., mailto:... or ms-settings:...
 msgstr ""
 
 #. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a link is put on the text of the message, not inside a table cell"
+msgstr ""
+
+#. what a command says
 #: crates/engine/src/cmd/junk.rs
 msgid "a list holds {n} entries at most"
 msgstr ""
@@ -19272,6 +19297,21 @@ msgstr ""
 #. what a command says
 #: crates/model/src/signature.rs
 msgid "a signature's pictures are PNG, JPEG or GIF (many mail programs can't show other kinds)"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds lines of text, not a list"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds no list to indent"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds no list to outdent"
 msgstr ""
 
 #. what a command says
@@ -20287,6 +20327,11 @@ msgstr ""
 #. what a command says
 #: crates/engine/src/cmd/compose.rs
 msgid "not sent: {why}. Send with \"confirmed\": true to send it anyway, or with \"moveToBcc\": true to move the people outside the organisation to Bcc first"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "nothing is selected in the cell"
 msgstr ""
 
 #. what a command says

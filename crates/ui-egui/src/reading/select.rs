@@ -149,6 +149,121 @@ pub fn copied<S: Surface + ?Sized>(surface: &S, lo: Point, hi: Point) -> String 
     out
 }
 
+/// What lies between `lo` and `hi` as HTML, with the look the message gave it: paragraphs, bold,
+/// italic, underline, strike-through, colours, sizes, fonts and links. What is copied from a
+/// message keeps its formatting when it is pasted into another mail or a word processor.
+pub fn copied_html(laid: &Laid, lo: Point, hi: Point) -> String {
+    let mut out = String::new();
+    let mut open = false;
+    let Some(last) = laid.count().checked_sub(1) else { return out };
+    for seg in lo.seg..=hi.seg.min(last) {
+        let Some(part) = part(lo, hi, seg, laid.len(seg)) else { continue };
+        let Some(item) = laid.segment(seg) else { continue };
+        match &item.kind {
+            ItemKind::Text(text) => {
+                if !text.join.cont {
+                    if open {
+                        out.push_str("</p>");
+                    }
+                    out.push_str("<p>");
+                    open = true;
+                }
+                // A list item copied from its start has its marker.
+                if part.start == 0 && !text.lead.is_empty() {
+                    out.push_str(&escape_html(&text.lead));
+                }
+                spans_html(&mut out, &text.spans, part);
+            }
+            // A picture that is not shown is copied as what it says it shows.
+            ItemKind::Placeholder(stand_in) if stand_in.described && part.start == 0 && part.end >= 1 => {
+                if !stand_in.join.cont {
+                    if open {
+                        out.push_str("</p>");
+                    }
+                    out.push_str("<p>");
+                    open = true;
+                }
+                out.push_str(&escape_html(&stand_in.label));
+            }
+            _ => {}
+        }
+    }
+    if open {
+        out.push_str("</p>");
+    }
+    out
+}
+
+/// Characters `part` of a text's spans as HTML, each with the look the message gave it.
+fn spans_html(out: &mut String, spans: &[mailcraft_html::Span], part: Range<usize>) {
+    let mut seen = 0usize;
+    for span in spans {
+        let n = span.text.chars().count();
+        let (start, end) = (seen, seen.saturating_add(n));
+        seen = end;
+        let from = part.start.max(start).saturating_sub(start);
+        let to = part.end.min(end).saturating_sub(start);
+        if from >= to {
+            continue;
+        }
+        let piece = char_slice(&span.text, from, to);
+        if piece.is_empty() {
+            continue;
+        }
+        if let Some(url) = &span.link {
+            out.push_str(&format!("<a href=\"{}\">", escape_attr(url)));
+        }
+        let mut css = String::new();
+        if span.bold {
+            css.push_str("font-weight:bold;");
+        }
+        if span.italic {
+            css.push_str("font-style:italic;");
+        }
+        let mut decoration: Vec<&str> = Vec::new();
+        if span.underline {
+            decoration.push("underline");
+        }
+        if span.strike {
+            decoration.push("line-through");
+        }
+        if !decoration.is_empty() {
+            css.push_str(&format!("text-decoration:{};", decoration.join(" ")));
+        }
+        if let Some(color) = span.color {
+            css.push_str(&format!("color:#{:02x}{:02x}{:02x};", color.0, color.1, color.2));
+        }
+        if let Some(background) = span.background {
+            css.push_str(&format!("background-color:#{:02x}{:02x}{:02x};", background.0, background.1, background.2));
+        }
+        if let Some(size) = span.size {
+            css.push_str(&format!("font-size:{size}px;"));
+        }
+        if span.code {
+            css.push_str("font-family:monospace;");
+        } else if let Some(font) = &span.font {
+            css.push_str(&format!("font-family:{};", escape_attr(font)));
+        }
+        let text = escape_html(piece).replace('\n', "<br>");
+        if css.is_empty() {
+            out.push_str(&text);
+        } else {
+            out.push_str(&format!("<span style=\"{}\">{text}</span>", escape_attr(&css)));
+        }
+        if span.link.is_some() {
+            out.push_str("</a>");
+        }
+    }
+}
+
+fn escape_html(text: &str) -> String {
+    text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
+fn escape_attr(text: &str) -> String {
+    escape_html(text).replace('"', "&quot;")
+}
+
 /// Characters `from..to` of `text`: cut at character boundaries, and at the end of the text.
 pub fn char_slice(text: &str, from: usize, to: usize) -> &str {
     if from >= to {
@@ -1205,7 +1320,7 @@ fn copy(app: &mut MailApp, p: &Value) -> Result<Value, String> {
     let nothing = || tl!("Select some text first").to_string();
     let ctx = app.ctx.clone().ok_or_else(nothing)?;
     let state = app.text_selection.state(place).ok_or_else(nothing)?;
-    let Some(text) = selected_text(&ctx, state) else {
+    let Some((text, html)) = selected_with_html(&ctx, state) else {
         state.copy_when_laid = true;
         return Ok(json!({"pending": true}));
     };
@@ -1213,8 +1328,38 @@ fn copy(app: &mut MailApp, p: &Value) -> Result<Value, String> {
         return Err(nothing());
     }
     let chars = text.chars().count();
-    ctx.copy_text(for_clipboard(&text));
+    let text = for_clipboard(&text);
+    // The HTML of the selection goes beside its text where the clipboard takes HTML, so that it
+    // keeps its formatting in another mail or a word processor; egui's clipboard takes text only.
+    let put = match (&app.services.clipboard, html) {
+        (Some(board), Some(html)) if !html.is_empty() => board.put(&html, &text),
+        _ => Err(String::new()),
+    };
+    if put.is_err() {
+        ctx.copy_text(text);
+    }
     Ok(json!({"chars": chars}))
+}
+
+/// What is selected at `place`, as plain text and, for a message's body, as HTML; `None` when it
+/// reaches the end of a body that is not laid out to its end yet.
+fn selected_with_html(ctx: &egui::Context, state: &PlaceState) -> Option<(String, Option<String>)> {
+    let Some(selection) = state.selection.as_ref() else { return Some((String::new(), None)) };
+    match selection.zone {
+        Zone::Header => {
+            let header = state.header.as_slice();
+            Some((range(header, selection).map(|(lo, hi)| copied(header, lo, hi)).unwrap_or_default(), None))
+        }
+        Zone::Body if !state.body_visible => Some((String::new(), None)),
+        Zone::Body => super::view::with_laid(ctx, state.place, state.message, |laid| {
+            if !laid.done && selection.anchor.max(selection.head).seg >= laid.count() {
+                return None;
+            }
+            let Some((lo, hi)) = range(laid, selection) else { return Some((String::new(), None)) };
+            Some((copied(laid, lo, hi), Some(copied_html(laid, lo, hi))))
+        })
+        .unwrap_or(Some((String::new(), None))),
+    }
 }
 
 /// Select the whole body of the message that is read at a place.

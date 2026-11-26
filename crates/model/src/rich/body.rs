@@ -133,6 +133,20 @@ impl RichBody {
         &mut self.text
     }
 
+    /// Change the text itself (a table cell, whose `table_at_mut` goes around the run-level
+    /// edits) as one undo step when `f` changes it; answers what `f` did.
+    pub fn edit_text<T>(&mut self, f: impl FnOnce(&mut RichText) -> Result<T, ModelError>) -> Result<T, ModelError> {
+        let before = self.text.clone();
+        let out = f(&mut self.text)?;
+        if self.text != before {
+            let after = std::mem::replace(&mut self.text, before);
+            self.push_undo();
+            self.text = after;
+            self.typing = None;
+        }
+        Ok(out)
+    }
+
     /// The text without formatting (positions count its characters).
     pub fn plain(&self) -> String {
         self.text.text()

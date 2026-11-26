@@ -1,0 +1,1 @@
+- **Pictures paste into a table cell from a browser or a file.** A picture copied in a browser (its “Copy Image”) or a picture file copied in a file manager, pasted with the caret in a table cell, goes above that cell's text, as a picture on the clipboard does; before, the browser's copy pasted as an empty address and the file's as its path.

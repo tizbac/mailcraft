@@ -4189,6 +4189,11 @@ msgstr "Copier un message pour mon administrateur"
 msgid "Copy all of it"
 msgstr "Tout copier"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Copy in Cell"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
 #, fuzzy
@@ -4522,6 +4527,11 @@ msgstr ""
 #, fuzzy
 msgid "Cut"
 msgstr "Couper"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Cut in Cell"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/calendar_view.rs
@@ -15280,6 +15290,11 @@ msgstr "Sélectionnez une tâche"
 msgid "Select an item to read"
 msgstr "Sélectionnez un élément à lire"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Select in Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/reading/select.rs
 #, fuzzy
@@ -15291,6 +15306,11 @@ msgstr "Sélectionnez d'abord du texte"
 #, fuzzy
 msgid "Select somebody to see the details"
 msgstr "Sélectionnez une personne pour voir les détails"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Select the Cell"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/attachment_preview.rs
@@ -22825,6 +22845,11 @@ msgid "a link goes to an address like https://..., mailto:... or ms-settings:...
 msgstr "un lien mène à une adresse comme https://..., mailto:... ou ms-settings:..., jamais javascript:, vbscript:, data: ou file:"
 
 #. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a link is put on the text of the message, not inside a table cell"
+msgstr ""
+
+#. what a command says
 #: crates/engine/src/cmd/junk.rs
 #, fuzzy
 msgid "a list holds {n} entries at most"
@@ -22991,6 +23016,21 @@ msgstr "une signature est ouverte : dimensionnez ses images avec signature.pictu
 #, fuzzy
 msgid "a signature's pictures are PNG, JPEG or GIF (many mail programs can't show other kinds)"
 msgstr "les images d'une signature sont au format PNG, JPEG ou GIF (de nombreux programmes de messagerie ne peuvent pas afficher d'autres formats)"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds lines of text, not a list"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds no list to indent"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds no list to outdent"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/tasks.rs
@@ -24197,6 +24237,11 @@ msgstr "inconnu avant le premier Envoyer/Recevoir"
 #, fuzzy
 msgid "not sent: {why}. Send with \"confirmed\": true to send it anyway, or with \"moveToBcc\": true to move the people outside the organisation to Bcc first"
 msgstr "non envoyé : {why}. Envoyez avec \"confirmed\": true pour l'envoyer quand même, ou avec \"moveToBcc\": true pour d'abord déplacer en Cci les personnes extérieures à l'organisation"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "nothing is selected in the cell"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/format.rs

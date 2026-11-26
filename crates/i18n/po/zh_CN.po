@@ -4201,6 +4201,11 @@ msgstr "复制消息给我的管理员"
 msgid "Copy all of it"
 msgstr "复制全部"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Copy in Cell"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
 #, fuzzy
@@ -4535,6 +4540,11 @@ msgstr ""
 #, fuzzy
 msgid "Cut"
 msgstr "剪切"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Cut in Cell"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/calendar_view.rs
@@ -15341,6 +15351,11 @@ msgstr "选择任务"
 msgid "Select an item to read"
 msgstr "选择要阅读的项目"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Select in Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/reading/select.rs
 #, fuzzy
@@ -15352,6 +15367,11 @@ msgstr "请先选择文本"
 #, fuzzy
 msgid "Select somebody to see the details"
 msgstr "选择一个人以查看详细信息"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Select the Cell"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/attachment_preview.rs
@@ -22897,6 +22917,11 @@ msgid "a link goes to an address like https://..., mailto:... or ms-settings:...
 msgstr "链接会转到类似 https://..., mailto:... 或 ms-settings:... 的地址，而不是 javascript:、vbscript:、data: 或 file:"
 
 #. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a link is put on the text of the message, not inside a table cell"
+msgstr ""
+
+#. what a command says
 #: crates/engine/src/cmd/junk.rs
 #, fuzzy
 msgid "a list holds {n} entries at most"
@@ -23063,6 +23088,21 @@ msgstr "已有签名打开：请使用 signature.picture.set 调整其图片大�
 #, fuzzy
 msgid "a signature's pictures are PNG, JPEG or GIF (many mail programs can't show other kinds)"
 msgstr "签名图片须为 PNG、JPEG 或 GIF（许多邮件程序无法显示其他格式）"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds lines of text, not a list"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds no list to indent"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds no list to outdent"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/tasks.rs
@@ -24267,6 +24307,11 @@ msgstr "首次发送/接收后才能知道"
 #, fuzzy
 msgid "not sent: {why}. Send with \"confirmed\": true to send it anyway, or with \"moveToBcc\": true to move the people outside the organisation to Bcc first"
 msgstr "未发送：{why}。使用 \"confirmed\": true 发送可强制发送，或使用 \"moveToBcc\": true 先将组织外的人员移至密送"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "nothing is selected in the cell"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/format.rs

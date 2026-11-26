@@ -4914,3 +4914,65 @@ fn a_reply_quotes_the_html_or_the_text_part_as_the_pane_showed_it() {
         }
     }
 }
+
+/// A copy of a message is HTML with the look the message gave it, so that it keeps its formatting
+/// in another mail or in a word processor.
+#[test]
+fn a_copy_of_a_message_is_html_with_its_formatting() {
+    in_frame(false, |ctx| {
+        let html = "<p>plain <b>bold</b> <i>italic</i> <u>under</u> <s>gone</s> \
+            <span style=\"color:#ff0000\">red</span> <span style=\"background-color:#ffff00\">lit</span> \
+            <a href=\"https://example.org/\">link</a></p><p>second</p>";
+        let m = html_message(91, ("Ada", "ada@example.org"), "Look", html);
+        let laid = lay_out(ctx, &m, 820.0);
+        let (lo, hi) = (select::clamp(&laid, Point::START).expect("a start"), select::clamp(&laid, Point::END).expect("an end"));
+        let said = select::copied_html(&laid, lo, hi);
+        assert!(said.starts_with("<p>"), "{said}");
+        assert!(said.contains("font-weight:bold") && said.contains(">bold<"), "{said}");
+        assert!(said.contains("font-style:italic") && said.contains(">italic<"), "{said}");
+        assert!(said.contains("text-decoration:underline") && said.contains(">under<"), "{said}");
+        assert!(said.contains("text-decoration:line-through") && said.contains(">gone<"), "{said}");
+        assert!(said.contains("color:#ff0000") && said.contains(">red<"), "{said}");
+        assert!(said.contains("background-color:#ffff00") && said.contains(">lit<"), "{said}");
+        assert!(said.contains("<a href=\"https://example.org/\">link</a>"), "{said}");
+        assert!(said.contains("</p><p>"), "{said}");
+        // Nothing runs: what is written is text and its look.
+        assert!(!said.contains("<script"), "{said}");
+        let text = select::copied(&laid, lo, hi);
+        assert!(text.contains("plain bold italic under gone red lit link"), "{text}");
+        assert!(text.contains("second"), "{text}");
+    });
+}
+
+/// What the system's clipboard was given.
+struct CopyRecorder(std::sync::Arc<std::sync::Mutex<Option<(String, String)>>>);
+
+impl crate::RichClipboard for CopyRecorder {
+    fn put(&self, html: &str, text: &str) -> Result<(), String> {
+        *self.0.lock().unwrap() = Some((html.to_string(), text.to_string()));
+        Ok(())
+    }
+
+    fn html(&self) -> Option<String> {
+        None
+    }
+}
+
+#[test]
+fn copying_a_message_puts_its_html_on_the_system_clipboard() {
+    let (mut app, ids) = corpus_app(false);
+    let kept = std::sync::Arc::new(std::sync::Mutex::new(None));
+    app.services.clipboard = Some(Box::new(CopyRecorder(kept.clone())));
+    let mut harness = window(app, (1280.0, 2000.0));
+    let id = id_of(&ids, "gmail reply");
+    select(&mut harness, id);
+    harness.run_steps(6);
+    assert!(harness.state().services.clipboard.is_some(), "the recorder is the clipboard");
+    harness.state_mut().execute("ui.selectAllInMessage", json!({"pane": true})).unwrap();
+    let said = harness.state_mut().execute("ui.copySelection", json!({"pane": true})).unwrap();
+    assert_ne!(said.get("pending"), Some(&json!(true)), "the body is laid out by now");
+    harness.run_steps(1);
+    let (html, text) = kept.lock().unwrap().clone().expect("the selection went to the system's clipboard");
+    assert!(html.contains("<p>"), "{html}");
+    assert!(!text.is_empty(), "the text stands beside the HTML");
+}

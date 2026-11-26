@@ -4192,6 +4192,11 @@ msgstr "შეტყობინების კოპირება ჩემ�
 msgid "Copy all of it"
 msgstr "ყველაფრის კოპირება"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Copy in Cell"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
 #, fuzzy
@@ -4525,6 +4530,11 @@ msgstr ""
 #, fuzzy
 msgid "Cut"
 msgstr "ამოჭრა"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Cut in Cell"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/calendar_view.rs
@@ -15294,6 +15304,11 @@ msgstr "მონიშნეთ დავალება"
 msgid "Select an item to read"
 msgstr "მონიშნეთ ელემენტი წასაკითხად"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Select in Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/reading/select.rs
 #, fuzzy
@@ -15305,6 +15320,11 @@ msgstr "ჯერ მონიშნეთ ტექსტი"
 #, fuzzy
 msgid "Select somebody to see the details"
 msgstr "დეტალების სანახავად მონიშნეთ ვინმე"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Select the Cell"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/attachment_preview.rs
@@ -22844,6 +22864,11 @@ msgid "a link goes to an address like https://..., mailto:... or ms-settings:...
 msgstr "ბმული მიდის ისეთ მისამართზე, როგორიცაა https://..., mailto:... ან ms-settings:..., და არასდროს javascript:, vbscript:, data: ან file:"
 
 #. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a link is put on the text of the message, not inside a table cell"
+msgstr ""
+
+#. what a command says
 #: crates/engine/src/cmd/junk.rs
 #, fuzzy
 msgid "a list holds {n} entries at most"
@@ -23006,6 +23031,21 @@ msgstr "ხელმოწერა გახსნილია: მისი �
 #, fuzzy
 msgid "a signature's pictures are PNG, JPEG or GIF (many mail programs can't show other kinds)"
 msgstr "ხელმოწერის სურათები არის PNG, JPEG ან GIF (ბევრი საფოსტო პროგრამა სხვა ტიპებს ვერ აჩვენებს)"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds lines of text, not a list"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds no list to indent"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds no list to outdent"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/tasks.rs
@@ -24213,6 +24253,11 @@ msgstr "უცნობია პირველ „გაგზავნა/მ
 #, fuzzy
 msgid "not sent: {why}. Send with \"confirmed\": true to send it anyway, or with \"moveToBcc\": true to move the people outside the organisation to Bcc first"
 msgstr "არ გაიგზავნა: {why}. გაგზავნეთ პარამეტრით \"confirmed\": true, რომ მაინც გაიგზავნოს, ან \"moveToBcc\": true, რომ ორგანიზაციის გარეთ მყოფი ადამიანები ჯერ ფარულ ასლში გადავიდნენ"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "nothing is selected in the cell"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/format.rs

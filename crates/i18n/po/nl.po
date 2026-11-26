@@ -4061,6 +4061,11 @@ msgstr "Een bericht voor mijn beheerder kopiëren"
 msgid "Copy all of it"
 msgstr "Alles kopiëren"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Copy in Cell"
+msgstr ""
+
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
 #, fuzzy
@@ -4389,6 +4394,11 @@ msgstr ""
 #: crates/engine/src/cmd/format.rs crates/ui-egui/src/calendar_view.rs crates/ui-egui/src/lib.rs crates/ui-egui/src/menubar.rs crates/ui-egui/src/ribbon.rs
 msgid "Cut"
 msgstr "Knippen"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Cut in Cell"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/calendar_view.rs
@@ -14842,6 +14852,11 @@ msgstr "Selecteer een taak"
 msgid "Select an item to read"
 msgstr "Selecteer een item om te lezen"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Select in Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/reading/select.rs
 #, fuzzy
@@ -14853,6 +14868,11 @@ msgstr "Selecteer eerst tekst"
 #, fuzzy
 msgid "Select somebody to see the details"
 msgstr "Selecteer iemand om de details te zien"
+
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Select the Cell"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/attachment_preview.rs
@@ -22302,6 +22322,11 @@ msgid "a link goes to an address like https://..., mailto:... or ms-settings:...
 msgstr "een koppeling gaat naar een adres zoals https://..., mailto:... of ms-settings:..., nooit javascript:, vbscript:, data: of file:"
 
 #. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a link is put on the text of the message, not inside a table cell"
+msgstr ""
+
+#. what a command says
 #: crates/engine/src/cmd/junk.rs
 #, fuzzy
 msgid "a list holds {n} entries at most"
@@ -22468,6 +22493,21 @@ msgstr "een handtekening is geopend: wijzig de grootte van de afbeeldingen met s
 #, fuzzy
 msgid "a signature's pictures are PNG, JPEG or GIF (many mail programs can't show other kinds)"
 msgstr "de afbeeldingen van een handtekening zijn PNG, JPEG of GIF (veel e-mailprogramma's kunnen andere soorten niet weergeven)"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds lines of text, not a list"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds no list to indent"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "a table cell holds no list to outdent"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/tasks.rs
@@ -23674,6 +23714,11 @@ msgstr "niet bekend tot het eerste Verzenden/ontvangen"
 #, fuzzy
 msgid "not sent: {why}. Send with \"confirmed\": true to send it anyway, or with \"moveToBcc\": true to move the people outside the organisation to Bcc first"
 msgstr "niet verzonden: {why}. Verzend met \"confirmed\": true om het toch te verzenden, of met \"moveToBcc\": true om de personen buiten de organisatie eerst naar BCC te verplaatsen"
+
+#. what a command says
+#: crates/engine/src/cmd/format.rs
+msgid "nothing is selected in the cell"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/format.rs
