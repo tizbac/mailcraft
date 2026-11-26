@@ -633,6 +633,36 @@ impl Layout {
         Some((p.start + b.local, row, cell))
     }
 
+    /// The character of the cell at `row`, `cell` of the table at `place` nearest to a point of
+    /// the body, kept inside that cell (a drag that leaves it stops at its edge).
+    fn table_caret_in(&self, place: usize, row: usize, cell: usize, at: Vec2) -> Option<usize> {
+        let p = self.para_at(place)?;
+        let local = place.checked_sub(p.start)?;
+        let b = p.tables.iter().find(|b| b.local == local)?;
+        b.grid.caret_at_in(row, cell, at - b.rect.min.to_vec2())
+    }
+
+    /// Where the word around character `at` of a cell begins and ends, and its line's.
+    fn table_cell_word_ends(&self, place: usize, row: usize, cell: usize, at: usize) -> Option<(usize, usize)> {
+        let p = self.para_at(place)?;
+        let local = place.checked_sub(p.start)?;
+        let b = p.tables.iter().find(|b| b.local == local)?;
+        b.grid.cell_word_ends(row, cell, at)
+    }
+
+    fn table_cell_line_ends(&self, place: usize, row: usize, cell: usize, at: usize) -> Option<(usize, usize)> {
+        let text = self.table_cell_text(place, row, cell)?;
+        Some((line_start(&text, at), line_end(&text, at)))
+    }
+
+    /// The text of the cell at `row`, `cell` of the table at `place`.
+    fn table_cell_text(&self, place: usize, row: usize, cell: usize) -> Option<String> {
+        let p = self.para_at(place)?;
+        let local = place.checked_sub(p.start)?;
+        let b = p.tables.iter().find(|b| b.local == local)?;
+        b.grid.cell_text(row, cell)
+    }
+
     /// The picture that is the selection, alone: its id and where it is in the body.
     fn selected_picture(&self, sel: Selection) -> Option<(u32, Rect)> {
         if sel.end() != sel.start() + 1 {
@@ -828,6 +858,8 @@ struct State {
     column: Option<f32>,
     /// What the pointer took where it went down, for dragging a selection from there.
     anchor: Option<Anchor<usize>>,
+    /// The cell a drag began in, and the character it began at, for a selection inside it.
+    cell_anchor: Option<(usize, usize, usize, usize)>,
     /// What an input method is composing, not yet typed.
     preedit: String,
     /// A picture's corner being dragged: its id and the width it has so far.
@@ -953,11 +985,15 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
             Some((from, row, cell, at)) => {
                 app.ui.table_caret = Some((from, row, cell, at));
                 app.ui.table_cell = Some((from, row, cell));
+                if app.session.table_selection().is_none() {
+                    app.ui.table_anchor = None;
+                }
             }
             // (A caret whose message was closed, or whose signature is no longer open, goes with
             // it. One whose click the engine didn't take stays: typing enters the cell again.)
             None if app.session.table_edit_stale() => {
                 app.ui.table_caret = None;
+                app.ui.table_anchor = None;
                 app.ui.table_cell = None;
             }
             None => {}
@@ -1043,17 +1079,53 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
                     cell_click = Some(place);
                     st.preedit.clear();
                     app.ui.table_cell = Some((place, row, cell));
-                    app.ui.table_caret = Some((place, row, cell, at));
-                    if let Err(e) = app.execute("table.cellEdit", json!({"from": place, "row": row, "cell": cell, "at": at})) {
+                    // A double click takes the word and a triple click the line, as in the text.
+                    let (from_at, to_at) = match unit {
+                        Unit::Char => (at, at),
+                        Unit::Word => layout.table_cell_word_ends(place, row, cell, at).unwrap_or((at, at)),
+                        Unit::Paragraph => layout.table_cell_line_ends(place, row, cell, at).unwrap_or((at, at)),
+                    };
+                    // Shift and a click selects from where the selection began, as in the text.
+                    let anchor = if shift {
+                        app.ui
+                            .table_anchor
+                            .filter(|(there, r, c, _)| (*there, *r, *c) == (place, row, cell))
+                            .map_or(from_at, |(_, _, _, anchor)| anchor)
+                    } else {
+                        from_at
+                    };
+                    let head = if shift { at } else { to_at };
+                    let command = if anchor != head { "table.cellSelect" } else { "table.cellEdit" };
+                    let params = if command == "table.cellSelect" {
+                        json!({"from": place, "row": row, "cell": cell, "anchor": anchor, "at": head})
+                    } else {
+                        json!({"from": place, "row": row, "cell": cell, "at": head})
+                    };
+                    app.ui.table_caret = Some((place, row, cell, head));
+                    app.ui.table_anchor = Some((place, row, cell, anchor));
+                    st.cell_anchor = Some((place, row, cell, anchor));
+                    if let Err(e) = app.execute(command, params) {
                         app.status(e);
                     }
                 }
                 None => {
                     app.ui.table_cell = None;
                     app.ui.table_caret = None;
+                    app.ui.table_anchor = None;
+                    st.cell_anchor = None;
                     let _ = app.run("table.cellLeave", json!({}));
                 }
             }
+        }
+        // A drag that began in a cell selects inside that cell, from where it began.
+        if resp.dragged()
+            && let Some((place, row, cell, anchor)) = st.cell_anchor
+            && let Some(at) = layout.table_caret_in(place, row, cell, pointer - origin)
+        {
+            if let Ok(answer) = app.execute("table.cellSelect", json!({"from": place, "row": row, "cell": cell, "anchor": anchor, "at": at})) {
+                focus_cell(app, &answer);
+            }
+            resync(&mut layout, app);
         }
         let object = if pressed && !shift && cell_click.is_none() {
             layout.picture_hit(pointer - origin).map(|(place, _, _)| place).or_else(|| layout.table_hit(pointer - origin))
@@ -1082,7 +1154,7 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
             resp.request_focus();
             let (a, b) = anchor.reach(under(anchor.unit));
             select(a, b)
-        } else if resp.dragged() {
+        } else if resp.dragged() && st.cell_anchor.is_none() {
             reveal = true;
             st.anchor.map(|a| a.reach(under(a.unit))).filter(|ends| *ends != (sel.anchor, sel.head)).and_then(|(a, b)| select(a, b))
         } else {
@@ -1189,19 +1261,39 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
             resync(&mut layout, app);
             // While the owner types in a table cell, the events go to that cell.
             if let Some((from, row, cell, at)) = app.ui.table_caret
-                && let Event::Key { key, pressed: true, .. } = &event
+                && let Event::Key { key, pressed: true, modifiers, .. } = &event
             {
+                let anchor =
+                    app.ui.table_anchor.filter(|(there, r, c, _)| (*there, *r, *c) == (from, row, cell)).map_or(at, |(_, _, _, anchor)| anchor);
+                let extend = modifiers.shift;
+                if *key == Key::A && modifiers.command {
+                    if let Ok(answer) = app.execute("table.cellSelectAll", json!({})) {
+                        focus_cell(app, &answer);
+                    }
+                    resync(&mut layout, app);
+                    continue;
+                }
+                // A move inside the cell: by a character, to a line's start or end, or by a word
+                // with Ctrl held. Shift keeps the selection and moves its far end.
+                let text = layout.table_cell_text(from, row, cell).unwrap_or_default();
                 let moved = match key {
+                    Key::ArrowLeft if modifiers.command => Some(word_left(&text, at)),
+                    Key::ArrowRight if modifiers.command => Some(word_right(&text, at)),
                     Key::ArrowLeft => Some(at.saturating_sub(1)),
                     Key::ArrowRight => Some(at.saturating_add(1)),
+                    Key::Home => Some(line_start(&text, at)),
+                    Key::End => Some(line_end(&text, at)),
                     _ => None,
                 };
                 if let Some(new_at) = moved {
-                    if let Ok(answer) = app.execute("table.cellEdit", json!({"from": from, "row": row, "cell": cell, "at": new_at }))
-                        && let Some(new_at) = answer.get("at").and_then(Value::as_u64)
-                        && let Some(caret) = app.ui.table_caret.as_mut()
-                    {
-                        caret.3 = usize::try_from(new_at).unwrap_or(caret.3);
+                    let command = if extend { "table.cellSelect" } else { "table.cellEdit" };
+                    let params = if extend {
+                        json!({"from": from, "row": row, "cell": cell, "anchor": anchor, "at": new_at})
+                    } else {
+                        json!({"from": from, "row": row, "cell": cell, "at": new_at})
+                    };
+                    if let Ok(answer) = app.execute(command, params) {
+                        focus_cell(app, &answer);
                     }
                     resync(&mut layout, app);
                     continue;
@@ -1212,8 +1304,27 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
                     continue;
                 }
             }
+            // Copy and Cut take the cell's selection as HTML and text, as the message's do.
+            if app.ui.table_caret.is_some() && matches!(event, Event::Copy | Event::Cut) {
+                let command = if matches!(event, Event::Cut) { "table.cellCut" } else { "table.cellCopy" };
+                if let Ok(answer) = run_in_cell(app, command, json!({})) {
+                    put_on_clipboard(app, &ctx, &answer);
+                }
+                resync(&mut layout, app);
+                continue;
+            }
             // An image on the clipboard goes into the cell, above its text.
             if app.ui.table_caret.is_some() {
+                // A picture copied in a file manager comes as its path.
+                if let Event::Paste(text) = &event
+                    && let Some(path) = picture_path(text)
+                {
+                    if let Err(e) = run_in_cell(app, "table.cellPicture", json!({"path": path})) {
+                        app.status(e);
+                    }
+                    resync(&mut layout, app);
+                    continue;
+                }
                 let png = match &event {
                     Event::PasteImage(picture) => {
                         let [width, height] = picture.size;
@@ -1221,7 +1332,15 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
                         let rgba: Vec<u8> = if fits { picture.pixels.iter().flat_map(|c| c.to_srgba_unmultiplied()).collect() } else { Vec::new() };
                         crate::clipboard_picture_png(width, height, &rgba)
                     }
-                    Event::Paste(text) if text.is_empty() => app.services.clipboard.as_ref().and_then(|board| board.image()),
+                    Event::Paste(text) => {
+                        let board = app.services.clipboard.as_ref();
+                        // A browser's Copy Image puts an `<img>` of its web address beside the
+                        // picture itself, which would paste as a link and a caption: when the HTML
+                        // is that picture alone, the picture on the clipboard is what goes in.
+                        let html = board.and_then(|board| board.html()).filter(|html| !html.trim().is_empty());
+                        let alone = html.as_deref().is_some_and(pictures_only) && board.is_some_and(|board| board.has_image());
+                        if text.is_empty() || alone { board.and_then(|board| board.image()) } else { None }
+                    }
                     _ => None,
                 };
                 if let Some(png) = png {
@@ -1238,19 +1357,13 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
             {
                 if command == "table.cellLeave" {
                     app.ui.table_caret = None;
+                    app.ui.table_anchor = None;
                 }
                 if matches!(&event, Event::Ime(egui::ImeEvent::Commit(_))) {
                     st.preedit.clear();
                 }
-                let answer = run_in_cell(app, command, params);
-                match answer {
-                    Ok(answer) => {
-                        if let Some(at) = answer.get("at").and_then(Value::as_u64)
-                            && let Some(caret) = app.ui.table_caret.as_mut()
-                        {
-                            caret.3 = usize::try_from(at).unwrap_or(caret.3);
-                        }
-                    }
+                match run_in_cell(app, command, params) {
+                    Ok(answer) => focus_cell(app, &answer),
                     Err(e) => app.status(e),
                 }
                 resync(&mut layout, app);
@@ -1445,9 +1558,17 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
         for table in &p.tables {
             let rect = table.rect.translate(at.to_vec2());
             let place = p.start + table.local;
-            let selected = app.ui.table_cell.filter(|(there, _, _)| *there == place).map(|(_, row, cell)| (row, cell));
+            // The cell being typed in shows its caret and its selection, not the whole cell
+            // tinted: that would hide the text selection behind it.
             let caret = app.ui.table_caret.filter(|(there, _, _, _)| *there == place).map(|(_, row, cell, at)| (row, cell, at));
-            table.grid.paint(painter, rect.min, &t, selected, caret);
+            let selected = app
+                .ui
+                .table_cell
+                .filter(|(there, _, _)| *there == place)
+                .map(|(_, row, cell)| (row, cell))
+                .filter(|cell| Some(*cell) != caret.map(|(row, cell, _)| (row, cell)));
+            let selection = table_selection(app, place);
+            table.grid.paint(painter, rect.min, &t, selected, caret, selection);
             // A cell's picture stands above its text, drawn as the body's pictures are.
             for (r, id) in table.grid.images(rect.min) {
                 let picture = shown.iter().find(|x| x.id == id);
@@ -1794,6 +1915,76 @@ fn paste_html(app: &MailApp, ctx: &egui::Context, id: egui::Id, event: &Event) -
     }
 }
 
+/// The characters selected in the table at `place`, as (row, cell, from, to).
+fn table_selection(app: &MailApp, place: usize) -> Option<(usize, usize, usize, usize)> {
+    let (there, row, cell, at) = app.ui.table_caret?;
+    let (there2, arow, acell, anchor) = app.ui.table_anchor?;
+    if there != place || there2 != place || (row, cell) != (arow, acell) {
+        return None;
+    }
+    let (lo, hi) = (at.min(anchor), at.max(anchor));
+    (lo != hi).then_some((row, cell, lo, hi))
+}
+
+/// Take the caret and the selection a cell command answered into the window's state.
+fn focus_cell(app: &mut MailApp, answer: &Value) {
+    let number = |key: &str| answer.get(key).and_then(Value::as_u64).and_then(|n| usize::try_from(n).ok());
+    let (Some(from), Some(row), Some(cell)) = (number("from"), number("row"), number("cell")) else { return };
+    let at = number("at").unwrap_or(0);
+    let anchor = number("anchor").unwrap_or(at);
+    app.ui.table_caret = Some((from, row, cell, at));
+    app.ui.table_anchor = (anchor != at).then_some((from, row, cell, anchor));
+    app.ui.table_cell = Some((from, row, cell));
+}
+
+/// Put what a copy answered on the clipboard as HTML and text, where the host's clipboard takes
+/// HTML, and as text alone where it doesn't.
+fn put_on_clipboard(app: &MailApp, ctx: &egui::Context, answer: &Value) {
+    let text = answer.get("text").and_then(Value::as_str).unwrap_or_default().to_string();
+    let html = answer.get("html").and_then(Value::as_str);
+    let put = match (&app.services.clipboard, html) {
+        (Some(board), Some(html)) => board.put(html, &text),
+        _ => Err(String::new()),
+    };
+    if put.is_err() {
+        ctx.copy_text(text);
+    }
+}
+
+/// Where the line the character `at` is on begins and ends (its break not counted).
+fn line_start(text: &str, at: usize) -> usize {
+    text.chars().take(at).collect::<Vec<_>>().iter().rposition(|c| *c == '\n').map_or(0, |i| i + 1)
+}
+
+fn line_end(text: &str, at: usize) -> usize {
+    text.chars().skip(at).position(|c| c == '\n').map_or(text.chars().count(), |i| at + i)
+}
+
+/// Earlier and later by a word: over a run of spaces and then one of other characters.
+fn word_left(text: &str, at: usize) -> usize {
+    let chars: Vec<char> = text.chars().collect();
+    let mut i = at.min(chars.len());
+    while i > 0 && chars.get(i - 1).is_some_and(|c| c.is_whitespace()) {
+        i -= 1;
+    }
+    while i > 0 && chars.get(i - 1).is_some_and(|c| !c.is_whitespace()) {
+        i -= 1;
+    }
+    i
+}
+
+fn word_right(text: &str, at: usize) -> usize {
+    let chars: Vec<char> = text.chars().collect();
+    let mut i = at.min(chars.len());
+    while i < chars.len() && chars.get(i).is_some_and(|c| !c.is_whitespace()) {
+        i += 1;
+    }
+    while i < chars.len() && chars.get(i).is_some_and(|c| c.is_whitespace()) {
+        i += 1;
+    }
+    i
+}
+
 /// Run a command in the cell the window's caret is in; when the engine no longer has that cell
 /// (the message changed, or the click's was let go of), enter the cell the window shows once more
 /// and try again.
@@ -1834,6 +2025,20 @@ fn cell_event(event: &Event, html: Option<String>) -> Option<(&'static str, Valu
         Event::Key { key: Key::Escape, pressed: true, .. } => Some(("table.cellLeave", json!({}))),
         _ => None,
     }
+}
+
+/// The path of a picture file a paste names, when what is on the clipboard is just that: one
+/// line, an absolute path, and a picture's extension.
+fn picture_path(text: &str) -> Option<&str> {
+    let text = text.trim();
+    if text.is_empty() || text.contains(['\n', '\r']) {
+        return None;
+    }
+    let lower = text.to_ascii_lowercase();
+    let picture = ["png", "jpg", "jpeg", "gif", "webp", "bmp"].iter().any(|ext| lower.ends_with(&format!(".{ext}")));
+    let path =
+        text.starts_with('/') || (text.len() > 2 && text.as_bytes().get(1) == Some(&b':') && matches!(text.as_bytes().get(2), Some(b'\\' | b'/')));
+    (picture && path).then_some(text)
 }
 
 /// The HTML is one picture and nothing else that reads (a browser's Copy Image, #1217). A table

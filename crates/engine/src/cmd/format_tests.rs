@@ -889,3 +889,81 @@ fn a_picture_above_the_text_of_a_table_cell_goes_with_the_signature() {
     let html = mailcraft_mime_model::rich::signature_html(sig, &|p| format!("p{}", p.id));
     assert!(html.contains("<img src=\"cid:p") && html.contains("under"), "{html}");
 }
+
+/// The text of a table cell is selected and formatted like the message's own: bold over part of
+/// it, a colour, typing over the selection, and what is typed next in the style chosen.
+#[test]
+fn a_selection_in_a_table_cell_takes_formatting() {
+    let mut s = session();
+    run(&mut s, "mail.new", json!({}));
+    run(&mut s, "insert.table", json!({"rows": 1, "columns": 1}));
+    let (from, ..) = s.table_edit().expect("the first cell");
+    run(&mut s, "table.cellType", json!({"text": "hello world"}));
+
+    run(&mut s, "table.cellSelect", json!({"from": from, "row": 0, "cell": 0, "anchor": 0, "at": 5}));
+    assert_eq!(s.table_selection(), Some((from, 0, 0, 0, 5)));
+    let said = run(&mut s, "format.bold", json!({}));
+    assert_eq!(said["bold"], true);
+    let table = s.compose.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert_eq!(table.cell_all(0, 0, 0, 5, &|style| style.bold), Some(true), "the selection is bold");
+    assert_eq!(table.cell_all(0, 0, 5, 11, &|style| style.bold), Some(false), "the rest is not");
+    assert_eq!(table.cell_text(0, 0).as_deref(), Some("hello world"), "formatting changes no text");
+    // A second press takes it off again, all of it.
+    let said = run(&mut s, "format.bold", json!({}));
+    assert_eq!(said["bold"], false);
+    let table = s.compose.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert_eq!(table.cell_all(0, 0, 0, 5, &|style| style.bold), Some(false));
+
+    // Typing over the selection replaces it, and the caret goes after what was typed.
+    run(&mut s, "table.cellSelect", json!({"from": from, "row": 0, "cell": 0, "anchor": 0, "at": 5}));
+    run(&mut s, "table.cellType", json!({"text": "HI"}));
+    let table = s.compose.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert_eq!(table.cell_text(0, 0).as_deref(), Some("HI world"));
+    assert_eq!(s.table_edit().map(|(_, _, _, at)| at), Some(2));
+    assert_eq!(s.table_selection(), None, "the selection is let go of once it is typed over");
+
+    // With nothing selected, a colour is what the next typed character has.
+    run(&mut s, "format.color", json!({"value": "#ff0000"}));
+    run(&mut s, "table.cellType", json!({"text": "!"}));
+    let table = s.compose.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert_eq!(table.cell_style_at(0, 0, 2).map(|style| style.color), Some(Some("#ff0000".to_string())));
+    assert_eq!(table.cell_text(0, 0).as_deref(), Some("HI! world"));
+
+    // A cell is aligned whole, and the undo of an edit inside it works as the message's does.
+    run(&mut s, "format.align", json!({"value": "center"}));
+    let table = s.compose.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert_eq!(table.rows()[0][0].alignment, mailcraft_model::rich::CellAlignment::Center);
+    run(&mut s, "compose.undo", json!({}));
+    let table = s.compose.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert_eq!(table.rows()[0][0].alignment, mailcraft_model::rich::CellAlignment::Left, "the alignment is undone");
+    assert_eq!(table.cell_text(0, 0).as_deref(), Some("HI! world"));
+    // A typed character in a cell is an undo step of its own: the state before it comes back.
+    run(&mut s, "compose.undo", json!({}));
+    let table = s.compose.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert_eq!(table.cell_text(0, 0).as_deref(), Some("HI world"));
+}
+
+/// A cell's selection is copied and cut as the message's is.
+#[test]
+fn a_table_cells_selection_is_copied_and_cut() {
+    let mut s = session();
+    run(&mut s, "mail.new", json!({}));
+    run(&mut s, "insert.table", json!({"rows": 1, "columns": 1}));
+    let (from, ..) = s.table_edit().expect("the first cell");
+    run(&mut s, "table.cellPaste", json!({"html": "<p><b>Bold</b> plain</p>", "text": "Bold plain"}));
+    run(&mut s, "table.cellSelectAll", json!({}));
+    let got = run(&mut s, "table.cellCopy", json!({}));
+    assert_eq!(got["text"], "Bold plain");
+    let html = got["html"].as_str().unwrap_or_default();
+    assert!(html.contains("<b>Bold</b>"), "{html}");
+    // Copying changes nothing.
+    let table = s.compose.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert_eq!(table.cell_text(0, 0).as_deref(), Some("Bold plain"));
+    // Cutting takes it.
+    run(&mut s, "table.cellSelectAll", json!({}));
+    let got = run(&mut s, "table.cellCut", json!({}));
+    assert_eq!(got["text"], "Bold plain");
+    let table = s.compose.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert_eq!(table.cell_text(0, 0).as_deref(), Some(""));
+    assert!(s.run("table.cellCopy", &json!({})).is_err(), "nothing is selected any more");
+}

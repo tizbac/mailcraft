@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use egui::text::CCursor;
+use egui::text::{CCursor, CharIndex};
 use egui::{
     Color32, Painter, Pos2, Rect, Stroke, StrokeKind, Vec2, pos2,
     text::{Galley, LayoutJob},
@@ -32,6 +32,8 @@ struct Cell {
     text_at: Pos2,
     /// The picture above its text, with the size it is drawn at.
     image: Option<(u32, Vec2)>,
+    /// Its text, its lines' line breaks counted as characters.
+    string: String,
 }
 
 pub(super) struct TableLayout {
@@ -169,7 +171,15 @@ impl TableLayout {
                     .and_then(|id| pictures.iter().find(|p| p.id == id))
                     .map(|p| (p.id, super::size_of(ctx, p, (right - left - 2.0 * PADDING).max(8.0))));
                 let extra = image.map_or(0.0, |(_, size)| size.y + IMAGE_GAP);
-                Some(Cell { rect, text, background, borders, row, column: cell_index, text_at: pos2(x, rect.top() + PADDING + extra), image })
+                let string = table
+                    .rows()
+                    .get(row)
+                    .and_then(|row| row.get(cell_index))
+                    .map(|cell| {
+                        cell.lines.iter().map(|line| line.iter().map(|run| run.text.as_str()).collect::<String>()).collect::<Vec<_>>().join("\n")
+                    })
+                    .unwrap_or_default();
+                Some(Cell { rect, text, background, borders, row, column: cell_index, text_at: pos2(x, rect.top() + PADDING + extra), image, string })
             })
             .collect();
         Self { size: vec2(total * scale, heights.iter().sum()), cells, plain: None }
@@ -201,6 +211,42 @@ impl TableLayout {
         Some((cell.row, cell.column, index.min(cell.text.len())))
     }
 
+    /// A cell's text, its lines' line breaks counted as characters.
+    pub fn cell_text(&self, row: usize, column: usize) -> Option<String> {
+        let cell = self.cells.iter().find(|cell| cell.row == row && cell.column == column)?;
+        Some(cell.string.clone())
+    }
+
+    /// Where the word around character `at` of a cell begins and ends (a run of characters that
+    /// are not spaces), for a double click; `None` when there is no such cell.
+    pub fn cell_word_ends(&self, row: usize, column: usize, at: usize) -> Option<(usize, usize)> {
+        let text = self.cell_text(row, column)?;
+        let chars: Vec<char> = text.chars().collect();
+        if chars.is_empty() {
+            return Some((0, 0));
+        }
+        let at = at.min(chars.len());
+        let space = |c: char| c.is_whitespace();
+        let mut from = at.min(chars.len().saturating_sub(1));
+        while from > 0 && !space(chars.get(from).copied().unwrap_or(' ')) {
+            from -= 1;
+        }
+        let mut to = at;
+        while to < chars.len() && !space(chars.get(to).copied().unwrap_or(' ')) {
+            to += 1;
+        }
+        Some((from, to))
+    }
+
+    /// The character of the cell at `row`, `column` nearest to `at` (measured from the table's
+    /// own top left), for a drag inside it.
+    pub fn caret_at_in(&self, row: usize, column: usize, at: Vec2) -> Option<usize> {
+        let cell = self.cells.iter().find(|cell| cell.row == row && cell.column == column)?;
+        let point = at.to_pos2().clamp(cell.rect.min, cell.rect.max);
+        let index = cell.text.cursor_from_pos(point.to_vec2() - cell.text_at.to_vec2()).index.0;
+        Some(index.min(cell.text.len()))
+    }
+
     /// Where the caret stands for character `at` of the cell at `row`, `column`, measured from
     /// the table's own top left; a line as tall as the text there.
     pub fn caret_rect(&self, row: usize, column: usize, at: usize) -> Option<Rect> {
@@ -210,7 +256,16 @@ impl TableLayout {
         Some(r.translate(cell.text_at.to_vec2()))
     }
 
-    pub fn paint(&self, painter: &Painter, at: Pos2, tokens: &Tokens, selected: Option<(usize, usize)>, caret: Option<(usize, usize, usize)>) {
+    #[allow(clippy::too_many_arguments)]
+    pub fn paint(
+        &self,
+        painter: &Painter,
+        at: Pos2,
+        tokens: &Tokens,
+        selected: Option<(usize, usize)>,
+        caret: Option<(usize, usize, usize)>,
+        selection: Option<(usize, usize, usize, usize)>,
+    ) {
         if let Some(text) = &self.plain {
             painter.galley(at, text.clone(), tokens.text);
             return;
@@ -242,6 +297,12 @@ impl TableLayout {
                     painter.line_segment([rect.left_top(), rect.left_bottom()], line);
                 }
             }
+            // The text selected in this cell stands behind it, as the message's selection does.
+            if let Some((row, column, from, to)) = selection
+                && (row, column) == (cell.row, cell.column)
+            {
+                paint_cell_selection(painter, &cell.text, cell.text_at + at.to_vec2(), from, to, tokens.selection);
+            }
             painter.with_clip_rect(rect).galley(cell.text_at + at.to_vec2(), cell.text.clone(), tokens.text);
             if let Some((row, column, caret_at)) = caret
                 && (row, column) == (cell.row, cell.column)
@@ -251,5 +312,24 @@ impl TableLayout {
                 painter.line_segment([line.center_top(), line.center_bottom()], Stroke::new(1.5, tokens.accent_text));
             }
         }
+    }
+}
+
+/// The selected characters of a cell's text, behind it.
+fn paint_cell_selection(painter: &Painter, galley: &Galley, at: Pos2, from: usize, to: usize, fill: Color32) {
+    let (a, b) = (from.min(to), from.max(to));
+    let mut seen = 0usize;
+    for row in &galley.rows {
+        let n = row.char_count_including_newline().0;
+        let (rs, re) = (seen, seen + n);
+        seen = re;
+        let (lo, hi) = (a.max(rs), b.min(re));
+        if lo >= hi {
+            continue;
+        }
+        let x0 = row.pos.x + row.x_offset(CharIndex(lo.saturating_sub(rs)));
+        let x1 = row.pos.x + row.x_offset(CharIndex(hi.saturating_sub(rs)));
+        let r = Rect::from_min_max(pos2(x0, row.min_y()), pos2(x1, row.max_y())).translate(at.to_vec2());
+        painter.rect_filled(r, 0.0, fill);
     }
 }

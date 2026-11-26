@@ -1,0 +1,1 @@
+| 2026-11-28 | Copying text from a message being read puts HTML on the system's clipboard beside the text, with the message's own look (paragraphs, bold, italic, underline, strike-through, colours, sizes, fonts and links): `ui.copySelection` writes it through the window's clipboard, and a word processor or another mail keeps the formatting; a header is still copied as text |

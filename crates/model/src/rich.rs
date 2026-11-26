@@ -754,10 +754,17 @@ impl PastedTable {
     /// Put `text` in a cell at character `at` (counted with its lines' `\n`), in the style the
     /// character there has; `\n` in it starts a new line. Whether there was such a cell.
     pub fn cell_insert(&mut self, row: usize, cell: usize, at: usize, text: &str) -> bool {
+        let Some(style) = self.cell_style_at(row, cell, at) else { return false };
+        self.cell_insert_styled(row, cell, at, text, &style)
+    }
+
+    /// Put `text` in a cell at character `at` in `style`, which may be what the owner chose for
+    /// what they type next rather than what the character there has; `\n` starts a new line.
+    /// Whether there was such a cell.
+    pub fn cell_insert_styled(&mut self, row: usize, cell: usize, at: usize, text: &str, style: &Style) -> bool {
         let Some(cell) = self.rows.get_mut(row).and_then(|row| row.get_mut(cell)) else { return false };
         let mut chars = chars_of(&cell.lines);
         let at = at.min(chars.len());
-        let style = chars.get(at).or_else(|| chars.last()).map(|(_, style)| style.clone()).unwrap_or_default();
         let tail = chars.split_off(at);
         // (A cell is not a place to keep a message: what is typed into it is held to what a cell
         // of a message may hold.)
@@ -815,6 +822,86 @@ impl PastedTable {
         chars.drain(from..to);
         cell.lines = lines_of(&chars);
         true
+    }
+
+    /// The style of the character at `at` in a cell (the one before it at its end), as typing
+    /// there has it; `None` when there is no such cell.
+    pub fn cell_style_at(&self, row: usize, cell: usize, at: usize) -> Option<Style> {
+        let cell = self.rows.get(row)?.get(cell)?;
+        let chars = chars_of(&cell.lines);
+        Some(chars.get(at).or_else(|| chars.last()).map(|(_, style)| style.clone()).unwrap_or_default())
+    }
+
+    /// How each character of a cell between `from` and `to` looks, in order; `None` when there is
+    /// no such cell.
+    pub fn cell_styles(&self, row: usize, cell: usize, from: usize, to: usize) -> Option<Vec<Style>> {
+        let cell = self.rows.get(row)?.get(cell)?;
+        let chars = chars_of(&cell.lines);
+        let from = from.min(chars.len());
+        let to = to.max(from).min(chars.len());
+        Some(chars.get(from..to)?.iter().map(|(_, style)| style.clone()).collect())
+    }
+
+    /// Whether every character of a cell between `from` and `to` has what `f` asks (with nothing
+    /// between them, whether the style at `from` has it); `None` when there is no such cell.
+    pub fn cell_all(&self, row: usize, cell: usize, from: usize, to: usize, f: &dyn Fn(&Style) -> bool) -> Option<bool> {
+        let cell = self.rows.get(row)?.get(cell)?;
+        let chars = chars_of(&cell.lines);
+        let from = from.min(chars.len());
+        let to = to.max(from).min(chars.len());
+        if from == to {
+            return Some(chars.get(from).or_else(|| chars.last()).map(|(_, style)| f(style)).unwrap_or_else(|| f(&Style::default())));
+        }
+        Some(chars.get(from..to)?.iter().all(|(_, style)| f(style)))
+    }
+
+    /// Change how the characters of a cell between `from` and `to` look. Whether there was such a
+    /// cell (nothing between them changes nothing).
+    pub fn cell_format(&mut self, row: usize, cell: usize, from: usize, to: usize, change: &Format) -> bool {
+        let Some(cell) = self.rows.get_mut(row).and_then(|row| row.get_mut(cell)) else { return false };
+        let mut chars = chars_of(&cell.lines);
+        let from = from.min(chars.len());
+        let to = to.max(from).min(chars.len());
+        if from < to {
+            for (_, style) in chars.iter_mut().take(to).skip(from) {
+                change.apply(style);
+            }
+            cell.lines = lines_of(&chars);
+        }
+        true
+    }
+
+    /// The characters of a cell between `from` and `to` as rich text, its lines as paragraphs;
+    /// `None` when there is no such cell.
+    pub fn cell_fragment(&self, row: usize, cell: usize, from: usize, to: usize) -> Option<RichText> {
+        let cell = self.rows.get(row)?.get(cell)?;
+        let chars = chars_of(&cell.lines);
+        let from = from.min(chars.len());
+        let to = to.max(from).min(chars.len());
+        let mut paragraphs: Vec<Vec<Run>> = vec![Vec::new()];
+        for (c, style) in chars.get(from..to)? {
+            if *c == '\n' {
+                paragraphs.push(Vec::new());
+                continue;
+            }
+            let Some(runs) = paragraphs.last_mut() else { break };
+            match runs.last_mut() {
+                Some(run) if run.style == *style && run.picture.is_none() && run.table.is_none() => run.text.push(*c),
+                _ => runs.push(Run::new(c.to_string(), style.clone())),
+            }
+        }
+        Some(RichText::from_paragraphs(paragraphs.into_iter().map(|runs| Paragraph::new(runs, ListKind::None)).collect()))
+    }
+
+    /// Align a cell's text. Whether there was such a cell.
+    pub fn set_cell_alignment(&mut self, row: usize, cell: usize, alignment: CellAlignment) -> bool {
+        match self.rows.get_mut(row).and_then(|row| row.get_mut(cell)) {
+            Some(cell) => {
+                cell.alignment = alignment;
+                true
+            }
+            None => false,
+        }
     }
 
     /// The sides a cell at `row`, `cell` (its place in that row) has a line on; `None` when there
@@ -1098,7 +1185,8 @@ pub enum Format {
 }
 
 impl Format {
-    fn apply(&self, style: &mut Style) {
+    /// Change one style as this formatting says.
+    pub fn apply(&self, style: &mut Style) {
         match self {
             Format::Bold(on) => style.bold = *on,
             Format::Italic(on) => style.italic = *on,

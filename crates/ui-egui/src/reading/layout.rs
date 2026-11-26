@@ -210,6 +210,9 @@ pub struct TextItem {
     pub join: Join,
     /// What a copy that starts at its beginning writes in front of it: a list item's marker.
     pub lead: String,
+    /// The spans it was made of, with the look and the colours the message gave them (the job's
+    /// are the ones this window shows them in: a copy keeps the sender's).
+    pub spans: Arc<[Span]>,
 }
 
 /// A linked span and the ink used to underline it.
@@ -900,7 +903,16 @@ fn text_from(cx: &mut Cx<'_>, block: &Block, x: f32, y: f32, width: f32, paper: 
             _ => String::new(),
         };
         begun = true;
-        let item = TextItem { job: Arc::new(job), anchor, links, paper: paper.fill, chars: u32::try_from(chars).unwrap_or(u32::MAX), join, lead };
+        let item = TextItem {
+            job: Arc::new(job),
+            anchor,
+            links,
+            paper: paper.fill,
+            chars: u32::try_from(chars).unwrap_or(u32::MAX),
+            join,
+            lead,
+            spans: Arc::from(piece.as_slice()),
+        };
         cx.push_seg(Rect::from_min_size(pos2(x, y), vec2(width, height)), ItemKind::Text(item));
         cx.work += chars;
         cx.stats.texts += 1;
@@ -968,7 +980,16 @@ fn list_marker(cx: &mut Cx<'_>, marker: &Marker, depth: u8, y: f32, side: Hang, 
     };
     let rect = Rect::from_min_size(pos2(at_x, y), galley.size());
     // Not a text of the message: it is not selected, and a copy writes it with its item.
-    let number = TextItem { job: Arc::new(job), anchor: 0.0, links: Vec::new(), paper, chars: 0, join: Join::default(), lead: String::new() };
+    let number = TextItem {
+        job: Arc::new(job),
+        anchor: 0.0,
+        links: Vec::new(),
+        paper,
+        chars: 0,
+        join: Join::default(),
+        lead: String::new(),
+        spans: Arc::from([]),
+    };
     cx.push(rect, ItemKind::Text(number));
 }
 

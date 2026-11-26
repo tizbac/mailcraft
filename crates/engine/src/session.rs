@@ -1294,7 +1294,10 @@ pub(crate) struct TableEdit {
     pub from: usize,
     pub row: usize,
     pub cell: usize,
+    /// The caret: the character after what is selected.
     pub at: usize,
+    /// The other end of the selection; the same as `at` when nothing is selected.
+    pub anchor: usize,
 }
 
 pub struct Session {
@@ -1362,6 +1365,9 @@ pub struct Session {
     pub(crate) run_had: std::collections::HashMap<Id, std::collections::HashSet<String>>,
     /// Where the owner is typing inside a table, when they are ([`TableEdit`]). Never saved.
     pub(crate) table_edit: Option<TableEdit>,
+    /// The style chosen for what is typed next in the cell being edited, with nothing selected;
+    /// let go of when the cell or the selection changes.
+    pub(crate) table_pending: Option<mailcraft_model::rich::Style>,
     /// Messages of Microsoft and JMAP accounts the server wouldn't give whole this session (or, for
     /// JMAP, said it no longer has), by account and server id: the background passes them over
     /// (opening one still asks). Never saved.
@@ -1707,6 +1713,7 @@ impl Session {
             ews_run_cut: Default::default(),
             run_had: Default::default(),
             table_edit: None,
+            table_pending: None,
             graph_unfetchable: Default::default(),
             fetch_failed: Default::default(),
             kept_for_now: Default::default(),
@@ -2053,9 +2060,54 @@ impl Session {
     /// holds) of the table at `from`; `None` when there is no such cell there.
     pub(crate) fn set_table_edit(&mut self, from: usize, row: usize, cell: usize, at: usize) -> Option<TableEdit> {
         let length = self.doc()?.0.text().table_at(from)?.cell_len(row, cell)?;
-        let edit = TableEdit { doc: self.table_doc(), from, row, cell, at: at.min(length) };
+        let at = at.min(length);
+        let edit = TableEdit { doc: self.table_doc(), from, row, cell, at, anchor: at };
         self.table_edit = Some(edit);
+        self.table_pending = None;
         Some(edit)
+    }
+
+    /// Put the selection of the cell at `row`, `cell` between `anchor` and `head` (both clamped to
+    /// what it holds), for `table.cellSelect`; `None` when there is no such cell there.
+    pub(crate) fn set_table_selection(&mut self, from: usize, row: usize, cell: usize, anchor: usize, head: usize) -> Option<TableEdit> {
+        let length = self.doc()?.0.text().table_at(from)?.cell_len(row, cell)?;
+        let edit = TableEdit { doc: self.table_doc(), from, row, cell, at: head.min(length), anchor: anchor.min(length) };
+        self.table_edit = Some(edit);
+        self.table_pending = None;
+        Some(edit)
+    }
+
+    /// The characters selected in the cell being edited, as `[from, to)` in the text's order;
+    /// the same when nothing is selected.
+    pub(crate) fn table_selected(&self, edit: TableEdit) -> (usize, usize) {
+        (edit.anchor.min(edit.at), edit.anchor.max(edit.at))
+    }
+
+    /// The characters selected in the cell being edited, as (the table's place in the text, the
+    /// row, the cell, from, to), in the text's order; `None` when nothing is selected (or the
+    /// cell is gone).
+    pub fn table_selection(&self) -> Option<(usize, usize, usize, usize, usize)> {
+        let edit = self.table_edit?;
+        if edit.doc != self.table_doc() {
+            return None;
+        }
+        let length = self.doc()?.0.text().table_at(edit.from)?.cell_len(edit.row, edit.cell)?;
+        let (lo, hi) = self.table_selected(edit);
+        let (lo, hi) = (lo.min(length), hi.min(length));
+        (lo != hi).then_some((edit.from, edit.row, edit.cell, lo, hi))
+    }
+
+    /// The style of the characters selected in the cell being edited (or the style the next typed
+    /// character would have, when nothing is), each in order; `None` when no cell is being edited.
+    pub fn table_styles(&self) -> Option<Vec<mailcraft_model::rich::Style>> {
+        let edit = self.table_edit.filter(|edit| edit.doc == self.table_doc())?;
+        let table = self.doc()?.0.text().table_at(edit.from)?;
+        let (lo, hi) = self.table_selected(edit);
+        if lo == hi {
+            let style = self.table_pending.clone().or_else(|| table.cell_style_at(edit.row, edit.cell, edit.at))?;
+            return Some(vec![style]);
+        }
+        table.cell_styles(edit.row, edit.cell, lo, hi)
     }
 
     pub fn focused_message(&self) -> Option<&Message> {

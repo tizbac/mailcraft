@@ -105,6 +105,20 @@ pub fn specs() -> Vec<CommandSpec> {
             .pure()
             .params(r#"{"from": number (the table's place in the text), "row": number, "cell": number (both 0-based), "at"?: number (the character in the cell; default 0)} — the owner types in that cell: what follows is table.cellType, table.cellErase and table.cellEnter till table.cellLeave"#)
             .when_writing(needs_html),
+        CommandSpec::new("table.cellSelect", "Select in Cell", "Insert › Tables", cell_select)
+            .pure()
+            .params(r#"{"from": number (the table's place in the text), "row": number, "cell": number (both 0-based), "anchor": number, "at": number} — select the characters of that cell between two places in it (both clamped to what it holds)"#)
+            .when_writing(needs_html),
+        CommandSpec::new("table.cellSelectAll", "Select the Cell", "Insert › Tables", cell_select_all)
+            .pure()
+            .when_writing(needs_html),
+        CommandSpec::new("table.cellCopy", "Copy in Cell", "Insert › Tables", cell_copy)
+            .pure()
+            .params(r#"{} — the selected characters of the cell being edited, as {"html", "text"} for the clipboard"#)
+            .when_writing(needs_html),
+        CommandSpec::new("table.cellCut", "Cut in Cell", "Insert › Tables", cell_cut)
+            .params(r#"{} — as table.cellCopy, and takes it out of the cell"#)
+            .when_writing(needs_html),
         CommandSpec::new("table.cellType", "Type in Cell", "Insert › Tables", cell_type)
             .params(r#"{"text": string} — put in at the caret in the cell being edited, a `\n` starting a new line"#)
             .when_writing(needs_html),
@@ -291,16 +305,28 @@ fn step(s: &mut Session, redo: bool) -> Result<bool, CmdError> {
 }
 
 fn bold(s: &mut Session, v: &Value) -> CmdResult {
+    if cell_target(s, v).is_some() {
+        let on = cell_toggle(s, &|style| style.bold, Format::Bold(true), Format::Bold(false))?;
+        return Ok(json!({"bold": on}));
+    }
     let on = edit(s, v, |b| b.toggle_bold())?;
     Ok(json!({"bold": on}))
 }
 
 fn italic(s: &mut Session, v: &Value) -> CmdResult {
+    if cell_target(s, v).is_some() {
+        let on = cell_toggle(s, &|style| style.italic, Format::Italic(true), Format::Italic(false))?;
+        return Ok(json!({"italic": on}));
+    }
     let on = edit(s, v, |b| b.toggle_italic())?;
     Ok(json!({"italic": on}))
 }
 
 fn underline(s: &mut Session, v: &Value) -> CmdResult {
+    if cell_target(s, v).is_some() {
+        let on = cell_toggle(s, &|style| style.underline, Format::Underline(true), Format::Underline(false))?;
+        return Ok(json!({"underline": on}));
+    }
     let on = edit(s, v, |b| b.toggle_underline())?;
     Ok(json!({"underline": on}))
 }
@@ -311,6 +337,10 @@ fn color(s: &mut Session, v: &Value) -> CmdResult {
         Some(_) => Some(p::str(v, "value").and_then(safe_color).ok_or_else(|| bad("`value` is a colour written #rrggbb, or null"))?),
         None => return Err(bad("`value` (#rrggbb, or null) is required")),
     };
+    if cell_target(s, v).is_some() {
+        cell_apply(s, Format::Color(value.clone()))?;
+        return Ok(json!({"value": value}));
+    }
     edit(s, v, |b| b.format(Format::Color(value.clone())))?;
     Ok(json!({"value": value}))
 }
@@ -321,6 +351,10 @@ fn highlight(s: &mut Session, v: &Value) -> CmdResult {
         Some(_) => Some(p::str(v, "value").and_then(safe_color).ok_or_else(|| bad("`value` is a colour written #rrggbb, or null"))?),
         None => return Err(bad("`value` (#rrggbb, or null) is required")),
     };
+    if cell_target(s, v).is_some() {
+        cell_apply(s, Format::Highlight(value.clone()))?;
+        return Ok(json!({"value": value}));
+    }
     edit(s, v, |b| b.format(Format::Highlight(value.clone())))?;
     Ok(json!({"value": value}))
 }
@@ -395,6 +429,10 @@ fn font(s: &mut Session, v: &Value) -> CmdResult {
         Some(_) => Some(p::str(v, "value").and_then(Font::parse).ok_or_else(|| bad("`value` is a font family, or null"))?),
         None => return Err(bad("`value` (a font, or null) is required")),
     };
+    if cell_target(s, v).is_some() {
+        cell_apply(s, Format::Font(value.clone()))?;
+        return Ok(json!({"value": value.as_ref().map(|f| f.label().to_string())}));
+    }
     edit(s, v, |b| b.format(Format::Font(value.clone())))?;
     Ok(json!({"value": value.as_ref().map(|f| f.label().to_string())}))
 }
@@ -411,11 +449,18 @@ fn size(s: &mut Session, v: &Value) -> CmdResult {
         }
         None => return Err(bad("`size` (points, or null) is required")),
     };
+    if cell_target(s, v).is_some() {
+        cell_apply(s, Format::Size(size))?;
+        return Ok(json!({"size": size}));
+    }
     edit(s, v, |b| b.format(Format::Size(size)))?;
     Ok(json!({"size": size}))
 }
 
 fn list(s: &mut Session, v: &Value, kind: ListKind) -> CmdResult {
+    if cell_target(s, v).is_some() {
+        return Err(fail("a table cell holds lines of text, not a list"));
+    }
     let now = edit(s, v, |b| b.toggle_list(kind))?;
     Ok(json!({"list": now}))
 }
@@ -430,16 +475,42 @@ fn numbering(s: &mut Session, v: &Value) -> CmdResult {
 
 fn align(s: &mut Session, v: &Value) -> CmdResult {
     let align = p::str(v, "value").and_then(parse_enum::<Align>).ok_or_else(|| bad("`value` is left, center or right"))?;
+    if let Some((place, _, _)) = cell_target(s, v) {
+        // A cell is aligned whole: its lines are one block in the grid.
+        let cell_alignment = match align {
+            Align::Left => CellAlignment::Left,
+            Align::Center => CellAlignment::Center,
+            Align::Right => CellAlignment::Right,
+        };
+        edit(s, &json!({"from": place.from}), |body| {
+            body.edit_text(|text| {
+                let table = text.table_at_mut(place.from).ok_or_else(|| ModelError::Invalid("there is no table there".into()))?;
+                if table.set_cell_alignment(place.row, place.cell, cell_alignment) {
+                    Ok(())
+                } else {
+                    Err(ModelError::Invalid("there is no such cell in that table".into()))
+                }
+            })
+        })?;
+        return Ok(json!({"value": enum_code(&cell_alignment)}));
+    }
     edit(s, v, |b| b.set_align(align))?;
     Ok(json!({"value": s.doc().map(|(b, _)| enum_code(&b.text().align_at(b.selection().start())))}))
 }
 
 fn clear(s: &mut Session, v: &Value) -> CmdResult {
+    if cell_target(s, v).is_some() {
+        cell_apply(s, Format::Clear)?;
+        return Ok(state(s));
+    }
     edit(s, v, |b| b.clear_formatting())?;
     Ok(state(s))
 }
 
 fn link(s: &mut Session, v: &Value) -> CmdResult {
+    if cell_target(s, v).is_some() {
+        return Err(fail("a link is put on the text of the message, not inside a table cell"));
+    }
     let url = match v.get("url") {
         None | Some(Value::Null) => None,
         Some(Value::String(u)) => Some(u.clone()),
@@ -450,11 +521,17 @@ fn link(s: &mut Session, v: &Value) -> CmdResult {
 }
 
 fn indent(s: &mut Session, v: &Value) -> CmdResult {
+    if cell_target(s, v).is_some() {
+        return Err(fail("a table cell holds no list to indent"));
+    }
     edit(s, v, |b| b.indent(1))?;
     Ok(json!({"level": s.doc().map_or(0, |(b, _)| b.text().level_at(b.selection().start()))}))
 }
 
 fn outdent(s: &mut Session, v: &Value) -> CmdResult {
+    if cell_target(s, v).is_some() {
+        return Err(fail("a table cell holds no list to outdent"));
+    }
     edit(s, v, |b| b.indent(-1))?;
     let d = s.doc();
     Ok(json!({
@@ -595,7 +672,21 @@ fn cell_edit(s: &mut Session, v: &Value) -> CmdResult {
 
 fn cell_type(s: &mut Session, v: &Value) -> CmdResult {
     let text = p::str(v, "text").ok_or_else(|| bad("`text` (string) is required"))?.to_string();
-    cell_write(s, |table, edit| table.cell_insert(edit.row, edit.cell, edit.at, &text), text.chars().count())
+    let edit = s.table_edit_now().ok_or_else(|| fail("the owner isn't typing in a table cell"))?;
+    // What the owner chose for what they type next (a bold button with no text selected, say),
+    // else the style where the caret is.
+    let style = s.table_pending.clone().or_else(|| style_in_table(s, edit)).unwrap_or_default();
+    let advance = text.chars().count();
+    cell_write(
+        s,
+        move |table, edit, lo, hi| table.cell_erase(edit.row, edit.cell, lo, hi) && table.cell_insert_styled(edit.row, edit.cell, lo, &text, &style),
+        advance,
+    )
+}
+
+/// The style of the character where the caret is in the cell being edited.
+fn style_in_table(s: &Session, edit: crate::session::TableEdit) -> Option<Style> {
+    s.doc()?.0.text().table_at(edit.from)?.cell_style_at(edit.row, edit.cell, edit.at)
 }
 
 /// Paste into the cell being edited: the clipboard's HTML, with its formatting, or plain text in
@@ -603,12 +694,24 @@ fn cell_type(s: &mut Session, v: &Value) -> CmdResult {
 fn cell_paste(s: &mut Session, v: &Value) -> CmdResult {
     let text = p::str(v, "text").unwrap_or_default().to_string();
     let Some(html) = p::str(v, "html").filter(|html| !html.trim().is_empty()) else {
-        return cell_write(s, |table, edit| table.cell_insert(edit.row, edit.cell, edit.at, &text), text.chars().count());
+        let style = s.table_edit_now().and_then(|edit| s.table_pending.clone().or_else(|| style_in_table(s, edit))).unwrap_or_default();
+        let advance = text.chars().count();
+        return cell_write(
+            s,
+            move |table, edit, lo, hi| {
+                table.cell_erase(edit.row, edit.cell, lo, hi) && table.cell_insert_styled(edit.row, edit.cell, lo, &text, &style)
+            },
+            advance,
+        );
     };
     let rich = mailcraft_mime_model::rich::from_html_for_compose(html);
     let rich = if rich.is_empty() { RichText::from_plain(&text) } else { rich };
     let advance = rich.len();
-    cell_write(s, |table, edit| table.cell_insert_rich(edit.row, edit.cell, edit.at, &rich), advance)
+    cell_write(
+        s,
+        move |table, edit, lo, hi| table.cell_erase(edit.row, edit.cell, lo, hi) && table.cell_insert_rich(edit.row, edit.cell, lo, &rich),
+        advance,
+    )
 }
 
 /// Put a picture above the text of the cell being edited: in the signature open or the message
@@ -627,25 +730,39 @@ fn cell_picture(s: &mut Session, v: &Value) -> CmdResult {
         sig.set_body(e.body.text().clone()).map_err(model)?;
         let id = sig.store_picture(file, bytes, alt).map_err(model)?;
         e.signature = sig;
-        if let Some(table) = e.body.text_mut().table_at_mut(edit.from)
-            && table.set_cell_image(edit.row, edit.cell, Some(id))
+        if e.body
+            .edit_text(|text| {
+                let table = text.table_at_mut(edit.from).ok_or_else(|| ModelError::Invalid("there is no such cell in that table".into()))?;
+                if table.set_cell_image(edit.row, edit.cell, Some(id)) {
+                    Ok(())
+                } else {
+                    Err(ModelError::Invalid("there is no such cell in that table".into()))
+                }
+            })
+            .is_err()
         {
-            e.dirty = true;
-            id
-        } else {
             return Err(fail("there is no such cell in that table"));
         }
+        e.dirty = true;
+        id
     } else if let Some(c) = s.compose.as_mut() {
         let held: std::collections::HashSet<u32> = c.body.text().pictures().into_iter().collect();
         let id = mailcraft_model::pictures::add(&mut c.pictures, &mut c.picture_seq, &held, file, bytes, alt, None).map_err(model)?;
-        if let Some(table) = c.body.text_mut().table_at_mut(edit.from)
-            && table.set_cell_image(edit.row, edit.cell, Some(id))
+        if c.body
+            .edit_text(|text| {
+                let table = text.table_at_mut(edit.from).ok_or_else(|| ModelError::Invalid("there is no such cell in that table".into()))?;
+                if table.set_cell_image(edit.row, edit.cell, Some(id)) {
+                    Ok(())
+                } else {
+                    Err(ModelError::Invalid("there is no such cell in that table".into()))
+                }
+            })
+            .is_err()
         {
-            c.dirty = true;
-            id
-        } else {
             return Err(fail("there is no such cell in that table"));
         }
+        c.dirty = true;
+        id
     } else {
         return Err(fail("no message is being written"));
     };
@@ -661,24 +778,32 @@ fn cell_erase(s: &mut Session, v: &Value) -> CmdResult {
         .and_then(|(body, _)| body.text().table_at(edit.from))
         .and_then(|table| table.cell_len(edit.row, edit.cell))
         .ok_or_else(|| fail("there is no such cell in that table"))?;
-    let (from, to) = match to {
-        Some(to) => (edit.at.min(length), to.min(length)),
-        None if forward => (edit.at.min(length), edit.at.saturating_add(1).min(length)),
-        None => (edit.at.saturating_sub(1), edit.at.min(length)),
+    let (lo, hi) = s.table_selected(edit);
+    let (from, to, new_at) = if to.is_none() && !forward && lo != hi {
+        // Backspace or Delete over a selection takes it, as in the text of a message.
+        (lo.min(length), hi.min(length), lo)
+    } else {
+        let (from, to) = match to {
+            Some(to) => (edit.at.min(length), to.min(length)),
+            None if forward => (edit.at.min(length), edit.at.saturating_add(1).min(length)),
+            None => (edit.at.saturating_sub(1), edit.at.min(length)),
+        };
+        let (from, to) = (from.min(to), from.max(to));
+        let removed = to.saturating_sub(from);
+        let new_at = if from < edit.at { edit.at.saturating_sub(removed) } else { edit.at };
+        (from, to, new_at)
     };
-    let (from, to) = (from.min(to), from.max(to));
-    let removed = to.saturating_sub(from);
-    let mut new_at = edit.at;
-    if from < edit.at {
-        new_at = edit.at.saturating_sub(removed);
-    }
-    let result = cell_write_at(s, |table, edit| table.cell_erase(edit.row, edit.cell, from, to), new_at, 0)?;
-    Ok(result)
+    cell_write_at(s, |table, edit| table.cell_erase(edit.row, edit.cell, from, to), new_at)
 }
 
 fn cell_enter(s: &mut Session, v: &Value) -> CmdResult {
     let _ = v;
-    cell_write(s, |table, edit| table.cell_insert(edit.row, edit.cell, edit.at, "\n"), 1)
+    let style = s.table_edit_now().and_then(|edit| s.table_pending.clone().or_else(|| style_in_table(s, edit))).unwrap_or_default();
+    cell_write(
+        s,
+        move |table, edit, lo, hi| table.cell_erase(edit.row, edit.cell, lo, hi) && table.cell_insert_styled(edit.row, edit.cell, lo, "\n", &style),
+        1,
+    )
 }
 
 fn cell_leave(s: &mut Session, _: &Value) -> CmdResult {
@@ -686,36 +811,154 @@ fn cell_leave(s: &mut Session, _: &Value) -> CmdResult {
     Ok(json!({"editing": false}))
 }
 
-/// Edit the cell the owner is in, and move the caret on by `advance` characters.
+/// Edit the cell the owner is in, over its selection, and put the caret `advance` characters
+/// after where the selection began.
 fn cell_write(
     s: &mut Session,
-    f: impl FnOnce(&mut mailcraft_model::rich::PastedTable, crate::session::TableEdit) -> bool,
+    f: impl FnOnce(&mut mailcraft_model::rich::PastedTable, crate::session::TableEdit, usize, usize) -> bool,
     advance: usize,
 ) -> CmdResult {
     let edit = s.table_edit_now().ok_or_else(|| fail("the owner isn't typing in a table cell"))?;
-    cell_write_at(s, f, edit.at.saturating_add(advance), advance)
+    let (lo, hi) = s.table_selected(edit);
+    let new_at = lo.saturating_add(advance);
+    cell_write_at(s, move |table, edit| f(table, edit, lo, hi), new_at)
 }
 
 fn cell_write_at(
     s: &mut Session,
     f: impl FnOnce(&mut mailcraft_model::rich::PastedTable, crate::session::TableEdit) -> bool,
     new_at: usize,
-    _advance: usize,
 ) -> CmdResult {
     let place = s.table_edit_now().ok_or_else(|| fail("the owner isn't typing in a table cell"))?;
     edit(s, &json!({"from": place.from}), |body| {
-        let table = body.text_mut().table_at_mut(place.from).ok_or_else(|| ModelError::Invalid("there is no table there".into()))?;
-        if f(table, place) { Ok(()) } else { Err(ModelError::Invalid("there is no such cell in that table".into())) }
+        body.edit_text(|text| {
+            let table = text.table_at_mut(place.from).ok_or_else(|| ModelError::Invalid("there is no table there".into()))?;
+            if f(table, place) { Ok(()) } else { Err(ModelError::Invalid("there is no such cell in that table".into())) }
+        })
     })?;
     if let Some(edit) = s.table_edit.as_mut() {
         edit.at = new_at;
+        edit.anchor = new_at;
     }
     Ok(cell_caret(s, s.table_edit.unwrap_or(place)))
 }
 
 fn cell_caret(s: &Session, edit: crate::session::TableEdit) -> Value {
     let length = s.doc().and_then(|(body, _)| body.text().table_at(edit.from)).and_then(|table| table.cell_len(edit.row, edit.cell)).unwrap_or(0);
-    json!({"from": edit.from, "row": edit.row, "cell": edit.cell, "at": edit.at.min(length), "length": length})
+    json!({
+        "from": edit.from,
+        "row": edit.row,
+        "cell": edit.cell,
+        "at": edit.at.min(length),
+        "anchor": edit.anchor.min(length),
+        "length": length,
+    })
+}
+
+/// Select the characters of a cell between two places in it.
+fn cell_select(s: &mut Session, v: &Value) -> CmdResult {
+    let (from, row, cell) = cell_of(s, v)?;
+    let n = |key: &str| p::u64(v, key).and_then(|n| usize::try_from(n).ok()).ok_or_else(|| bad(format!("`{key}` is a character of the cell")));
+    let (anchor, at) = (n("anchor")?, n("at")?);
+    let edit = s.set_table_selection(from, row, cell, anchor, at).ok_or_else(|| fail("there is no such cell in that table"))?;
+    Ok(cell_caret(s, edit))
+}
+
+/// Select all the text of the cell being edited.
+fn cell_select_all(s: &mut Session, _: &Value) -> CmdResult {
+    let edit = s.table_edit_now().ok_or_else(|| fail("the owner isn't typing in a table cell"))?;
+    let length = s
+        .doc()
+        .and_then(|(body, _)| body.text().table_at(edit.from))
+        .and_then(|table| table.cell_len(edit.row, edit.cell))
+        .ok_or_else(|| fail("there is no such cell in that table"))?;
+    let edit = s.set_table_selection(edit.from, edit.row, edit.cell, 0, length).ok_or_else(|| fail("there is no such cell in that table"))?;
+    Ok(cell_caret(s, edit))
+}
+
+/// The selected characters of the cell being edited as the clipboard takes them: HTML of the
+/// set, and its plain text.
+fn cell_clipboard(s: &mut Session) -> Result<(Option<String>, String), CmdError> {
+    let edit = s.table_edit_now().ok_or_else(|| fail("the owner isn't typing in a table cell"))?;
+    let (lo, hi) = s.table_selected(edit);
+    if lo == hi {
+        return Err(fail("nothing is selected in the cell"));
+    }
+    let (plain, part) = {
+        let (body, plain) = s.doc().ok_or_else(|| fail("no message is being written"))?;
+        let table = body.text().table_at(edit.from).ok_or_else(|| fail("there is no table there"))?;
+        let part = table.cell_fragment(edit.row, edit.cell, lo, hi).ok_or_else(|| fail("there is no such cell in that table"))?;
+        (plain, part)
+    };
+    let html = (!plain).then(|| mailcraft_mime_model::rich::to_html(&part));
+    Ok((html, part.to_plain()))
+}
+
+fn cell_copy(s: &mut Session, _: &Value) -> CmdResult {
+    let (html, text) = cell_clipboard(s)?;
+    Ok(json!({"html": html, "text": text}))
+}
+
+fn cell_cut(s: &mut Session, _: &Value) -> CmdResult {
+    let (html, text) = cell_clipboard(s)?;
+    let edit = s.table_edit_now().ok_or_else(|| fail("the owner isn't typing in a table cell"))?;
+    let (lo, hi) = s.table_selected(edit);
+    cell_write_at(s, |table, edit| table.cell_erase(edit.row, edit.cell, lo, hi), lo)?;
+    Ok(json!({"html": html, "text": text}))
+}
+
+/// The cell the owner is in and its selected characters, when a command names no range of the
+/// text (the format commands the ribbon and the keys run with none).
+fn cell_target(s: &mut Session, v: &Value) -> Option<(crate::session::TableEdit, usize, usize)> {
+    let names = |key: &str| v.get(key).is_some_and(|x| !x.is_null());
+    if names("from") || names("to") {
+        return None;
+    }
+    let edit = s.table_edit_now()?;
+    let (lo, hi) = s.table_selected(edit);
+    Some((edit, lo, hi))
+}
+
+/// Change how the selected characters of the cell being edited look, or, with nothing selected,
+/// the style the next typed character will have.
+fn cell_apply(s: &mut Session, change: Format) -> Result<(), CmdError> {
+    let place = s.table_edit_now().ok_or_else(|| fail("the owner isn't typing in a table cell"))?;
+    let (lo, hi) = s.table_selected(place);
+    if lo == hi {
+        let mut style = s.table_pending.clone().or_else(|| style_in_table(s, place)).unwrap_or_default();
+        change.apply(&mut style);
+        s.table_pending = Some(style);
+        return Ok(());
+    }
+    edit(s, &json!({"from": place.from}), |body| {
+        body.edit_text(|text| {
+            let table = text.table_at_mut(place.from).ok_or_else(|| ModelError::Invalid("there is no table there".into()))?;
+            if table.cell_format(place.row, place.cell, lo, hi, &change) {
+                Ok(())
+            } else {
+                Err(ModelError::Invalid("there is no such cell in that table".into()))
+            }
+        })
+    })
+}
+
+/// Turn something on or off over the selection of the cell being edited (the next typed
+/// character's style with nothing selected): on unless all of it has it already. Whether it is
+/// on now.
+fn cell_toggle(s: &mut Session, has: &dyn Fn(&Style) -> bool, on: Format, off: Format) -> Result<bool, CmdError> {
+    let edit = s.table_edit_now().ok_or_else(|| fail("the owner isn't typing in a table cell"))?;
+    let (lo, hi) = s.table_selected(edit);
+    let already = if lo == hi {
+        let style = s.table_pending.clone().or_else(|| style_in_table(s, edit)).unwrap_or_default();
+        has(&style)
+    } else {
+        let (body, _) = s.doc().ok_or_else(|| fail("no message is being written"))?;
+        let table = body.text().table_at(edit.from).ok_or_else(|| fail("there is no table there"))?;
+        table.cell_all(edit.row, edit.cell, lo, hi, has).ok_or_else(|| fail("there is no such cell in that table"))?
+    };
+    let now = !already;
+    cell_apply(s, if now { on } else { off })?;
+    Ok(now)
 }
 
 /// The sides a table cell has a line on, as the window's selected cell names it.
@@ -741,8 +984,10 @@ fn table_borders(s: &mut Session, v: &Value) -> CmdResult {
         }
     }
     edit(s, &json!({"from": from}), |body| {
-        let table = body.text_mut().table_at_mut(from).ok_or_else(|| ModelError::Invalid("there is no table there".into()))?;
-        if table.set_borders(row, cell, borders) { Ok(()) } else { Err(ModelError::Invalid("there is no such cell in that table".into())) }
+        body.edit_text(|text| {
+            let table = text.table_at_mut(from).ok_or_else(|| ModelError::Invalid("there is no table there".into()))?;
+            if table.set_borders(row, cell, borders) { Ok(()) } else { Err(ModelError::Invalid("there is no such cell in that table".into())) }
+        })
     })?;
     Ok(cell_answer(from, row, cell, borders))
 }

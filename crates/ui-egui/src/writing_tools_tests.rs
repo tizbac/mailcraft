@@ -406,3 +406,176 @@ fn a_pasted_picture_goes_above_the_table_cell_text() {
     assert!(table.cell_image(0, 0).is_some(), "the picture is above the first cell");
     assert!(h.state().session.compose.as_ref().unwrap().pictures.iter().any(|p| p.id == table.cell_image(0, 0).unwrap_or(0)));
 }
+
+/// What the system's clipboard was given.
+struct Recorder(std::sync::Arc<std::sync::Mutex<Option<(String, String)>>>);
+
+impl RichClipboard for Recorder {
+    fn put(&self, html: &str, text: &str) -> Result<(), String> {
+        *self.0.lock().unwrap() = Some((html.to_string(), text.to_string()));
+        Ok(())
+    }
+
+    fn html(&self) -> Option<String> {
+        None
+    }
+}
+
+/// Shift and an arrow key select inside the cell being typed in, and a format command the ribbon
+/// or the keys run changes only what is selected there.
+#[test]
+fn shift_and_the_arrow_keys_select_in_a_table_cell() {
+    let mut app = writing();
+    app.execute("compose.set", json!({"body": ""})).unwrap();
+    app.execute("insert.table", json!({"rows": 1, "columns": 1})).unwrap();
+    let from = {
+        let body = &app.session.compose.as_ref().unwrap().body;
+        (0..body.text().len()).find(|at| body.text().table_at(*at).is_some()).expect("the table")
+    };
+    let mut h = window(app);
+    h.state_mut().want_body_focus();
+    h.run_steps(2);
+    h.event(egui::Event::Text("word".into()));
+    h.run_steps(3);
+    for _ in 0..3 {
+        h.event(egui::Event::Key { key: egui::Key::ArrowLeft, physical_key: None, pressed: true, repeat: false, modifiers: egui::Modifiers::SHIFT });
+        h.run_steps(1);
+    }
+    assert_eq!(h.state().session.table_selection(), Some((from, 0, 0, 1, 4)), "three characters are selected");
+    // The ribbon's Underline (and the key's) run `format.underline`, which acts in the cell.
+    let said = h.state_mut().execute("format.underline", json!({})).unwrap();
+    assert_eq!(said["underline"], true);
+    let table = h.state().session.compose.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert_eq!(table.cell_all(0, 0, 0, 1, &|style| style.underline), Some(false), "the first character is not underlined");
+    assert_eq!(table.cell_all(0, 0, 1, 4, &|style| style.underline), Some(true), "the selection is");
+    // The window shows the selection, and the ribbon reads the cell's look.
+    assert_eq!(h.state().ui.table_anchor.map(|(_, _, _, at)| at), Some(4), "the selection began where the caret was");
+    assert!(crate::ribbon::look_now(h.state()).underline, "the ribbon says the selection is underlined");
+}
+
+/// A copy of text selected in a table cell goes to the clipboard as HTML and text, with its look.
+#[test]
+fn copying_a_selection_in_a_table_cell_keeps_its_formatting() {
+    let mut app = writing();
+    app.execute("compose.set", json!({"body": ""})).unwrap();
+    app.execute("insert.table", json!({"rows": 1, "columns": 1})).unwrap();
+    let from = {
+        let body = &app.session.compose.as_ref().unwrap().body;
+        (0..body.text().len()).find(|at| body.text().table_at(*at).is_some()).expect("the table")
+    };
+    let kept = std::sync::Arc::new(std::sync::Mutex::new(None));
+    app.services.clipboard = Some(Box::new(Recorder(kept.clone())));
+    let mut h = window(app);
+    h.state_mut().want_body_focus();
+    h.run_steps(2);
+    h.event(egui::Event::Text("bold plain".into()));
+    h.run_steps(3);
+    h.state_mut().execute("table.cellSelect", json!({"from": from, "row": 0, "cell": 0, "anchor": 0, "at": 4})).unwrap();
+    h.state_mut().execute("format.bold", json!({})).unwrap();
+    h.run_steps(1);
+    h.event(egui::Event::Copy);
+    h.run_steps(2);
+    let (html, text) = kept.lock().unwrap().clone().expect("the cell's selection went to the clipboard");
+    assert_eq!(text, "bold");
+    assert!(html.contains("<b>") || html.contains("font-weight:bold"), "{html}");
+    assert!(html.contains("bold"), "{html}");
+}
+
+/// An image copied from a browser (its HTML is that picture alone) goes into the cell being typed
+/// in, from the picture the clipboard holds, rather than pasting its web address as a link.
+#[test]
+fn a_picture_copied_from_a_browser_goes_above_the_table_cell_text() {
+    let mut app = writing();
+    app.execute("compose.set", json!({"body": ""})).unwrap();
+    app.execute("insert.table", json!({"rows": 1, "columns": 1})).unwrap();
+    let from = {
+        let body = &app.session.compose.as_ref().unwrap().body;
+        (0..body.text().len()).find(|at| body.text().table_at(*at).is_some()).expect("the table")
+    };
+    app.services.clipboard = Some(Box::new(PictureBoard));
+    let mut h = window(app);
+    h.state_mut().want_body_focus();
+    h.run_steps(2);
+    h.event(egui::Event::Paste(String::new()));
+    h.run_steps(3);
+    let table = h.state().session.compose.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert!(table.cell_image(0, 0).is_some(), "the picture is above the cell's text");
+}
+
+/// A browser's Copy Image: HTML that is one `<img>` alone, and the picture itself.
+struct PictureBoard;
+
+impl RichClipboard for PictureBoard {
+    fn put(&self, _: &str, _: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn html(&self) -> Option<String> {
+        Some("<img src=\"https://example.org/cat.png\">".to_string())
+    }
+
+    fn image(&self) -> Option<Vec<u8>> {
+        Some(b"\x89PNG\r\n\x1a\nIHDR....".to_vec())
+    }
+}
+
+/// A drag across the text of a table cell selects it, as a drag in the message's own text does.
+#[test]
+fn a_drag_in_a_table_cell_selects_its_text() {
+    let mut app = writing();
+    app.execute("compose.set", json!({"body": ""})).unwrap();
+    app.execute("insert.table", json!({"rows": 1, "columns": 1})).unwrap();
+    let from = {
+        let body = &app.session.compose.as_ref().unwrap().body;
+        (0..body.text().len()).find(|at| body.text().table_at(*at).is_some()).expect("the table")
+    };
+    let mut h = window(app);
+    h.state_mut().want_body_focus();
+    h.run_steps(2);
+    h.event(egui::Event::Text("hello world".into()));
+    h.run_steps(3);
+    let body = h.state().hit.rect("composeBody", 0).expect("the body is drawn");
+    let from_at = body.min + egui::vec2(20.0, 12.0);
+    let to_at = body.min + egui::vec2(62.0, 12.0);
+    h.event(egui::Event::PointerMoved(from_at));
+    h.step();
+    h.event(egui::Event::PointerButton { pos: from_at, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
+    h.step();
+    h.event(egui::Event::PointerMoved(to_at));
+    h.step();
+    h.event(egui::Event::PointerMoved(to_at));
+    h.step();
+    h.event(egui::Event::PointerButton { pos: to_at, button: egui::PointerButton::Primary, pressed: false, modifiers: egui::Modifiers::NONE });
+    h.run_steps(2);
+    let selection = h.state().session.table_selection().expect("the drag selected some of the cell");
+    assert_eq!((selection.0, selection.1, selection.2), (from, 0, 0));
+    assert!(selection.3 <= 2, "from near the beginning: {selection:?}");
+    assert!(selection.4 > selection.3, "some characters are selected: {selection:?}");
+    // And the window draws it: its own ends agree with the engine's.
+    assert!(h.state().ui.table_anchor.is_some(), "the window knows the selection began there");
+}
+
+/// A picture file copied in a file manager comes as its path: pasted with the caret in a table
+/// cell, the picture goes above the cell's text.
+#[test]
+fn a_picture_file_copied_in_a_file_manager_goes_into_the_cell() {
+    let dir = std::env::temp_dir().join(format!("mailcraft-cell-paste-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("a temporary folder");
+    let path = dir.join("cat.png");
+    std::fs::write(&path, b"\x89PNG\r\n\x1a\nIHDR....").expect("a picture file");
+    let mut app = writing();
+    app.execute("compose.set", json!({"body": ""})).unwrap();
+    app.execute("insert.table", json!({"rows": 1, "columns": 1})).unwrap();
+    let from = {
+        let body = &app.session.compose.as_ref().unwrap().body;
+        (0..body.text().len()).find(|at| body.text().table_at(*at).is_some()).expect("the table")
+    };
+    let mut h = window(app);
+    h.state_mut().want_body_focus();
+    h.run_steps(2);
+    h.event(egui::Event::Paste(path.to_string_lossy().to_string()));
+    h.run_steps(3);
+    let table = h.state().session.compose.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert!(table.cell_image(0, 0).is_some(), "the picture is above the cell's text");
+    std::fs::remove_dir_all(&dir).ok();
+}
