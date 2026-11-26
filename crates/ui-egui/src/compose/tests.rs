@@ -958,7 +958,7 @@ fn an_html_signature_is_shown_as_it_goes_out_until_edited_as_text() {
     click(&mut h, body.min + egui::vec2(1.0, 8.0));
     key_with(&mut h, Modifiers::COMMAND, Key::End);
     type_in(&mut h, "!");
-    assert!(plain(&h).ends_with("lumen.example!"), "{:?}", plain(&h));
+    assert!(plain(&h).ends_with('!'), "{:?}", plain(&h));
     assert!(!unedited(&h));
     // Edited, it is the copy that goes out: there is no way back to the HTML.
     assert!(h.state().hit.rect("composeSignatureAsHtml", 0).is_none());

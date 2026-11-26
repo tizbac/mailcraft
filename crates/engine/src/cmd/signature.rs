@@ -382,7 +382,7 @@ fn html(s: &mut Session, v: &Value) -> CmdResult {
     // What a message being written shows of it: its words and look as rich text, or for HTML
     // with no words (a logo alone) its pictures' descriptions.
     let stand_in = html.as_deref().map(|h| {
-        let rich = mailcraft_mime_model::rich::from_html(h);
+        let rich = mailcraft_mime_model::rich::from_html_for_compose(h);
         if rich.to_plain().trim().is_empty() { RichText::from_plain(mailcraft_html::to_text(h).trim()) } else { rich }
     });
     if let Some(text) = &stand_in {
