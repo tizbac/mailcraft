@@ -1173,7 +1173,7 @@ msgid "Add a task to {address} (it waits here until To Do is allowed)"
 msgstr "将任务添加到 {address}（授权使用 To Do 前，任务会保留在此计算机上）"
 
 #. android
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
 #, fuzzy
 msgid "Add account"
 msgstr "添加账户"
@@ -1183,6 +1183,11 @@ msgstr "添加账户"
 #, fuzzy
 msgid "Add address"
 msgstr "添加地址"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Add an IMAP account"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/account_setup.rs
@@ -1665,6 +1670,11 @@ msgstr "智能体正在请求"
 #, fuzzy
 msgid "An Exchange server or IMAP?"
 msgstr "Exchange 服务器还是 IMAP？"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "An IMAP server to read mail, and an SMTP server to send it. Your password goes to those servers only, and is kept on this phone when sign-ins are remembered."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/security.rs
@@ -5638,8 +5648,8 @@ msgstr "通过邮件发送日历"
 msgid "Email Message"
 msgstr "电子邮件"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Email address"
 msgstr "电子邮件地址"
@@ -5705,6 +5715,16 @@ msgstr "启用规则"
 #. ribbon, ribbon location
 #: crates/engine/src/cmd/signing.rs crates/ui-egui/src/ribbon.rs
 msgid "Encrypt"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Encrypted from the first byte (TLS)"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Encrypted from the first byte (off uses STARTTLS)"
 msgstr ""
 
 #. interface
@@ -7447,6 +7467,11 @@ msgstr "我是管理员：为我的组织批准 MailCraft"
 msgid "I'm an administrator: approve it for my organisation"
 msgstr "我是管理员：为我的组织批准"
 
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "IMAP account"
+msgstr ""
+
 #. ribbon
 #: crates/ui-egui/src/ribbon.rs
 #, fuzzy
@@ -7885,11 +7910,16 @@ msgstr "包含诊断信息"
 msgid "Include the original message when replying"
 msgstr "回复时包含原始邮件"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Incoming mail (IMAP)"
 msgstr "接收邮件（IMAP）"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
+msgid "Incoming server"
+msgstr ""
 
 #. command label, ribbon
 #: crates/engine/src/cmd/format.rs crates/ui-egui/src/ribbon.rs
@@ -10539,8 +10569,8 @@ msgstr "名称"
 msgid "Name (A–Z)"
 msgstr "名称(A–Z)"
 
-#. interface
-#: crates/ui-egui/src/account_setup/senders.rs crates/ui-egui/src/dialogs.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup/senders.rs crates/ui-egui/src/dialogs.rs
 #, fuzzy
 msgid "Name (optional)"
 msgstr "名称（可选）"
@@ -12798,11 +12828,16 @@ msgstr "外出"
 msgid "Outbox"
 msgstr "发件箱"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Outgoing mail (SMTP)"
 msgstr "外发邮件（SMTP）"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
+msgid "Outgoing server"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/backstage.rs
@@ -12964,8 +12999,8 @@ msgstr "此邮件的一部分由 {signer} 数字签名且已验证；其余部�
 msgid "Part of your mailbox is damaged"
 msgstr "您的邮箱部分损坏"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Password"
 msgstr "密码"
@@ -13262,6 +13297,11 @@ msgstr "弹出"
 #, fuzzy
 msgid "Pop Out"
 msgstr "弹出"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Port"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs
@@ -15854,6 +15894,11 @@ msgstr "9月"
 msgid "September"
 msgstr "9月"
 
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Server"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 #, fuzzy
@@ -16694,8 +16739,8 @@ msgstr "使用用户名和密码登录 Exchange 服务器"
 msgid "Signs in with Microsoft · folders kept in step through Microsoft Graph (testing)"
 msgstr "使用 Microsoft 登录 · 通过 Microsoft Graph 保持文件夹同步（测试）"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Signs in with a password"
 msgstr "使用密码登录"
@@ -21617,6 +21662,16 @@ msgstr "使用 {address}"
 #, fuzzy
 msgid "User name"
 msgstr "用户名"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
+msgid "User name (optional)"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "User name (optional, the address if empty)"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/ews_setup.rs

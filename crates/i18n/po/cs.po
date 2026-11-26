@@ -1174,7 +1174,7 @@ msgid "Add a task to {address} (it waits here until To Do is allowed)"
 msgstr "Přidat úkol do {address} (počká zde, dokud nebude povolen To Do)"
 
 #. android
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
 #, fuzzy
 msgid "Add account"
 msgstr "Přidat účet"
@@ -1184,6 +1184,11 @@ msgstr "Přidat účet"
 #, fuzzy
 msgid "Add address"
 msgstr "Přidat adresu"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Add an IMAP account"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/account_setup.rs
@@ -1660,6 +1665,11 @@ msgstr "Agent žádá"
 #, fuzzy
 msgid "An Exchange server or IMAP?"
 msgstr "Server Exchange, nebo IMAP?"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "An IMAP server to read mail, and an SMTP server to send it. Your password goes to those servers only, and is kept on this phone when sign-ins are remembered."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/security.rs
@@ -5640,8 +5650,8 @@ msgstr "Poslat kalendář e-mailem"
 msgid "Email Message"
 msgstr "E-mailová zpráva"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Email address"
 msgstr "E-mailová adresa"
@@ -5707,6 +5717,16 @@ msgstr "Zapnout pravidlo"
 #. ribbon, ribbon location
 #: crates/engine/src/cmd/signing.rs crates/ui-egui/src/ribbon.rs
 msgid "Encrypt"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Encrypted from the first byte (TLS)"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Encrypted from the first byte (off uses STARTTLS)"
 msgstr ""
 
 #. interface
@@ -7471,6 +7491,11 @@ msgstr "Jsem správce: schválit MailCraft pro mou organizaci"
 msgid "I'm an administrator: approve it for my organisation"
 msgstr "Jsem správce: schválit ho pro mou organizaci"
 
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "IMAP account"
+msgstr ""
+
 #. ribbon
 #: crates/ui-egui/src/ribbon.rs
 #, fuzzy
@@ -7911,11 +7936,16 @@ msgstr "Připojit diagnostiku"
 msgid "Include the original message when replying"
 msgstr "Při odpovědi zahrnout původní zprávu"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Incoming mail (IMAP)"
 msgstr "Příchozí pošta (IMAP)"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
+msgid "Incoming server"
+msgstr ""
 
 #. command label, ribbon
 #: crates/engine/src/cmd/format.rs crates/ui-egui/src/ribbon.rs
@@ -10570,8 +10600,8 @@ msgstr "Název"
 msgid "Name (A–Z)"
 msgstr "Název (A–Z)"
 
-#. interface
-#: crates/ui-egui/src/account_setup/senders.rs crates/ui-egui/src/dialogs.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup/senders.rs crates/ui-egui/src/dialogs.rs
 #, fuzzy
 msgid "Name (optional)"
 msgstr "Jméno (nepovinné)"
@@ -12827,11 +12857,16 @@ msgstr "Mimo kancelář"
 msgid "Outbox"
 msgstr "Pošta k odeslání"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Outgoing mail (SMTP)"
 msgstr "Odchozí pošta (SMTP)"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
+msgid "Outgoing server"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/backstage.rs
@@ -12992,8 +13027,8 @@ msgstr "Část této zprávy digitálně podepsal(a) {signer}, ověřeno; zbytek
 msgid "Part of your mailbox is damaged"
 msgstr "Část vaší poštovní schránky je poškozená"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Password"
 msgstr "Heslo"
@@ -13292,6 +13327,11 @@ msgstr ""
 #, fuzzy
 msgid "Pop Out"
 msgstr "Otevřít samostatně"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Port"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs
@@ -15887,6 +15927,11 @@ msgstr "zář"
 msgid "September"
 msgstr "září"
 
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Server"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 #, fuzzy
@@ -16731,8 +16776,8 @@ msgstr "Přihlašuje se k serveru Exchange uživatelským jménem a heslem"
 msgid "Signs in with Microsoft · folders kept in step through Microsoft Graph (testing)"
 msgstr "Přihlašuje se přes Microsoft · složky synchronizované přes Microsoft Graph (testování)"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Signs in with a password"
 msgstr "Přihlašuje se heslem"
@@ -21696,6 +21741,16 @@ msgstr "Použít {address}"
 #, fuzzy
 msgid "User name"
 msgstr "Uživatelské jméno"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
+msgid "User name (optional)"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "User name (optional, the address if empty)"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/ews_setup.rs

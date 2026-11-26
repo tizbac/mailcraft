@@ -1177,7 +1177,7 @@ msgid "Add a task to {address} (it waits here until To Do is allowed)"
 msgstr "Feladat hozzáadása ehhez a fiókhoz: {address}. A feladat helyben vár a To Do engedélyezéséig."
 
 #. android
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
 #, fuzzy
 msgid "Add account"
 msgstr "Fiók hozzáadása"
@@ -1187,6 +1187,11 @@ msgstr "Fiók hozzáadása"
 #, fuzzy
 msgid "Add address"
 msgstr "Cím hozzáadása"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Add an IMAP account"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/account_setup.rs
@@ -1669,6 +1674,11 @@ msgstr "Egy ügynök kérdezi"
 #, fuzzy
 msgid "An Exchange server or IMAP?"
 msgstr "Egy csere szerver vagy IMAP?"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "An IMAP server to read mail, and an SMTP server to send it. Your password goes to those servers only, and is kept on this phone when sign-ins are remembered."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/security.rs
@@ -5636,8 +5646,8 @@ msgstr "e-mail naptár"
 msgid "Email Message"
 msgstr "E-mail"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Email address"
 msgstr "e-mail cím"
@@ -5701,6 +5711,16 @@ msgstr "Szabályok engedélyezése"
 #. ribbon, ribbon location
 #: crates/engine/src/cmd/signing.rs crates/ui-egui/src/ribbon.rs
 msgid "Encrypt"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Encrypted from the first byte (TLS)"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Encrypted from the first byte (off uses STARTTLS)"
 msgstr ""
 
 #. interface
@@ -7448,6 +7468,11 @@ msgstr "Felelős vagyok: jóváhagyja MailCraft az én szervezetem számára"
 msgid "I'm an administrator: approve it for my organisation"
 msgstr "Ügyvezető vagyok: hagyja jóvá a szervezetem számára."
 
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "IMAP account"
+msgstr ""
+
 #. ribbon
 #: crates/ui-egui/src/ribbon.rs
 #, fuzzy
@@ -7887,11 +7912,16 @@ msgstr "A diagnosztika felvétele"
 msgid "Include the original message when replying"
 msgstr "Az eredeti üzenet beillesztése válaszadáskor"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Incoming mail (IMAP)"
 msgstr "Bejövő levél (IMAP)"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
+msgid "Incoming server"
+msgstr ""
 
 #. command label, ribbon
 #: crates/engine/src/cmd/format.rs crates/ui-egui/src/ribbon.rs
@@ -10543,8 +10573,8 @@ msgstr "Név"
 msgid "Name (A–Z)"
 msgstr "Név (A–Z)"
 
-#. interface
-#: crates/ui-egui/src/account_setup/senders.rs crates/ui-egui/src/dialogs.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup/senders.rs crates/ui-egui/src/dialogs.rs
 #, fuzzy
 msgid "Name (optional)"
 msgstr "Név (nem kötelező)"
@@ -12802,11 +12832,16 @@ msgstr "Házon kívül"
 msgid "Outbox"
 msgstr "Postázandó üzenetek"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Outgoing mail (SMTP)"
 msgstr "Kimenő posta (SMTP)"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
+msgid "Outgoing server"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/backstage.rs
@@ -12968,8 +13003,8 @@ msgstr "Az üzenet egy részét digitálisan írta alá {signer}, és ellenőriz
 msgid "Part of your mailbox is damaged"
 msgstr "A postafiókád egy része megsérült."
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Password"
 msgstr "Jelszó"
@@ -13268,6 +13303,11 @@ msgstr ""
 #, fuzzy
 msgid "Pop Out"
 msgstr "Megnyitás külön ablakban"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Port"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs
@@ -15856,6 +15896,11 @@ msgstr "szept."
 msgid "September"
 msgstr "szeptember"
 
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Server"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 #, fuzzy
@@ -16698,8 +16743,8 @@ msgstr "Jelek egy Exchange szerverhez felhasználónévvel és jelszóval"
 msgid "Signs in with Microsoft · folders kept in step through Microsoft Graph (testing)"
 msgstr "Jelek Microsoft · mappák lépést tartva Microsoft Graph (tesztelés)"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Signs in with a password"
 msgstr "Jelek jelszóval"
@@ -21642,6 +21687,16 @@ msgstr "{address} használata"
 #, fuzzy
 msgid "User name"
 msgstr "Felhasználónév"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
+msgid "User name (optional)"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "User name (optional, the address if empty)"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/ews_setup.rs

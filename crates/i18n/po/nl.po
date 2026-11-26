@@ -1151,7 +1151,7 @@ msgid "Add a task to {address} (it waits here until To Do is allowed)"
 msgstr "Een taak aan {address} toevoegen (deze wacht hier tot To Do is toegestaan)"
 
 #. android
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
 #, fuzzy
 msgid "Add account"
 msgstr "Account toevoegen"
@@ -1161,6 +1161,11 @@ msgstr "Account toevoegen"
 #, fuzzy
 msgid "Add address"
 msgstr "Adres toevoegen"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Add an IMAP account"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/account_setup.rs
@@ -1627,6 +1632,11 @@ msgstr "Een agent vraagt"
 #: crates/ui-egui/src/account_setup/exchange.rs
 msgid "An Exchange server or IMAP?"
 msgstr "Een Exchange-server of IMAP?"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "An IMAP server to read mail, and an SMTP server to send it. Your password goes to those servers only, and is kept on this phone when sign-ins are remembered."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/security.rs
@@ -5444,8 +5454,8 @@ msgstr "Agenda e-mailen"
 msgid "Email Message"
 msgstr "E-mailbericht"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Email address"
 msgstr "E-mailadres"
@@ -5506,6 +5516,16 @@ msgstr "Regel inschakelen"
 #. ribbon, ribbon location
 #: crates/engine/src/cmd/signing.rs crates/ui-egui/src/ribbon.rs
 msgid "Encrypt"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Encrypted from the first byte (TLS)"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Encrypted from the first byte (off uses STARTTLS)"
 msgstr ""
 
 #. interface
@@ -7180,6 +7200,11 @@ msgstr "Ik ben beheerder: MailCraft voor mijn organisatie goedkeuren"
 msgid "I'm an administrator: approve it for my organisation"
 msgstr "Ik ben beheerder: het voor mijn organisatie goedkeuren"
 
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "IMAP account"
+msgstr ""
+
 #. ribbon
 #: crates/ui-egui/src/ribbon.rs
 msgid "Icons"
@@ -7613,11 +7638,16 @@ msgstr "Diagnose opnemen"
 msgid "Include the original message when replying"
 msgstr "Het oorspronkelijke bericht opnemen bij het beantwoorden"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Incoming mail (IMAP)"
 msgstr "Inkomende e-mail (IMAP)"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
+msgid "Incoming server"
+msgstr ""
 
 #. command label, ribbon
 #: crates/engine/src/cmd/format.rs crates/ui-egui/src/ribbon.rs
@@ -10193,8 +10223,8 @@ msgstr "Naam"
 msgid "Name (A–Z)"
 msgstr "Naam (A–Z)"
 
-#. interface
-#: crates/ui-egui/src/account_setup/senders.rs crates/ui-egui/src/dialogs.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup/senders.rs crates/ui-egui/src/dialogs.rs
 #, fuzzy
 msgid "Name (optional)"
 msgstr "Naam (optioneel)"
@@ -12404,11 +12434,16 @@ msgstr "Niet aanwezig"
 msgid "Outbox"
 msgstr "Postvak UIT"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Outgoing mail (SMTP)"
 msgstr "Uitgaande e-mail (SMTP)"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
+msgid "Outgoing server"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/backstage.rs
@@ -12565,8 +12600,8 @@ msgstr "Een deel van dit bericht is digitaal ondertekend door {signer} en geveri
 msgid "Part of your mailbox is damaged"
 msgstr "Een deel van uw postvak is beschadigd"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Password"
 msgstr "Wachtwoord"
@@ -12854,6 +12889,11 @@ msgstr ""
 #: crates/engine/src/cmd/compose.rs crates/ui-egui/src/compose.rs
 msgid "Pop Out"
 msgstr "Loskoppelen"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Port"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs
@@ -15344,6 +15384,11 @@ msgstr "sep"
 msgid "September"
 msgstr "september"
 
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Server"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup.rs
 #, fuzzy
@@ -16162,8 +16207,8 @@ msgstr "Meldt aan bij een Exchange-server met een gebruikersnaam en een wachtwoo
 msgid "Signs in with Microsoft · folders kept in step through Microsoft Graph (testing)"
 msgstr "Meldt aan met Microsoft · mappen bijgehouden via Microsoft Graph (testen)"
 
-#. interface
-#: crates/ui-egui/src/account_setup.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Signs in with a password"
 msgstr "Meldt aan met een wachtwoord"
@@ -21051,6 +21096,16 @@ msgstr "{address} gebruiken"
 #, fuzzy
 msgid "User name"
 msgstr "Gebruikersnaam"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt
+msgid "User name (optional)"
+msgstr ""
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "User name (optional, the address if empty)"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/ews_setup.rs
