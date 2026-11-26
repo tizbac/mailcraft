@@ -47,7 +47,7 @@ fn centered_and_right_aligned_text_stay_inside_their_cells() {
     let ctx = egui::Context::default();
     let mut frame = ctx.run_ui(egui::RawInput::default(), |ui| {
         let tokens = Tokens::light();
-        table::TableLayout::new(ui.ctx(), source, &tokens, 240.0).paint(ui.painter(), pos2(40.0, 40.0), &tokens, None, None);
+        table::TableLayout::new(ui.ctx(), source, &tokens, 240.0, &[]).paint(ui.painter(), pos2(40.0, 40.0), &tokens, None, None);
     });
     frame.textures_delta.clear();
     let shapes = frame.shapes.iter().filter_map(|clipped| match &clipped.shape {
@@ -114,6 +114,7 @@ fn plain_mode_draws_the_actual_table_text_in_one_object() {
 fn the_cell_under_the_pointer_is_known() {
     let cell = |n: usize| mailcraft_model::rich::TableCell {
         lines: vec![vec![mailcraft_model::rich::CellText { text: format!("{n}"), style: mailcraft_model::rich::Style::default() }]],
+        image: None,
         header: false,
         colspan: 1,
         rowspan: 1,
@@ -127,7 +128,7 @@ fn the_cell_under_the_pointer_is_known() {
     let tokens = Tokens::light();
     let mut layout = None;
     let mut frame = ctx.run_ui(egui::RawInput::default(), |ui| {
-        layout = Some(table::TableLayout::new(ui.ctx(), &source, &tokens, 240.0));
+        layout = Some(table::TableLayout::new(ui.ctx(), &source, &tokens, 240.0, &[]));
     });
     frame.textures_delta.clear();
     let layout = layout.expect("a layout");

@@ -465,8 +465,9 @@ impl Signature {
         Ok(mime)
     }
 
-    /// Add a picture at text position `at` (the end when it is past it): its id.
-    pub fn add_picture(&mut self, name: &str, data: Vec<u8>, alt: Option<&str>, at: Option<usize>) -> Result<u32, ModelError> {
+    /// Take a picture into the signature without putting it in the text (a table cell shows it):
+    /// its id.
+    pub fn store_picture(&mut self, name: &str, data: Vec<u8>, alt: Option<&str>) -> Result<u32, ModelError> {
         if self.html.is_some() {
             return Err(ModelError::Invalid("an HTML signature shows pictures from their web address: switch it to rich text to add one".into()));
         }
@@ -475,11 +476,17 @@ impl Signature {
         let name: String = name.chars().filter(|c| !c.is_control()).take(255).collect();
         // By default the file's name without its extension describes it.
         let alt = alt.map_or_else(|| name.rsplit_once('.').map_or(name.as_str(), |(stem, _)| stem).replace(['_', '-'], " "), str::to_string);
+        self.pictures.push(Picture { id, name, mime: mime.to_string(), data: Arc::new(data), width: None, alt: clean_alt(&alt) });
+        Ok(id)
+    }
+
+    /// Add a picture at text position `at` (the end when it is past it): its id.
+    pub fn add_picture(&mut self, name: &str, data: Vec<u8>, alt: Option<&str>, at: Option<usize>) -> Result<u32, ModelError> {
+        let id = self.store_picture(name, data, alt)?;
         let at = at.unwrap_or(usize::MAX).min(self.body.len());
         let mut text = self.body.clone();
         let fragment = RichText::from_paragraphs(vec![Paragraph::new(vec![Run::picture(id, Style::default())], Default::default())]);
         text.insert_rich(at, &fragment)?;
-        self.pictures.push(Picture { id, name, mime: mime.to_string(), data: Arc::new(data), width: None, alt: clean_alt(&alt) });
         self.body = text;
         Ok(id)
     }

@@ -170,7 +170,7 @@ fn borders_of(sides: mailcraft_html::Sides) -> mailcraft_model::rich::CellBorder
 }
 
 /// Write the table using fixed markup and the same escaped text runs as the rest of the body.
-fn write_table(out: &mut String, table: &PastedTable) {
+fn write_table(out: &mut String, table: &PastedTable, pictures: &dyn Fn(u32) -> Option<Img>) {
     // The fixed grid makes cell boundaries visible in the editor and in the mail it sends. A cell
     // that keeps only some of its sides says so itself, over the table's own border.
     out.push_str("<table data-mailcraft-grid=\"1\" border=\"1\" cellpadding=\"4\" cellspacing=\"0\" style=\"border-collapse:collapse\">");
@@ -203,12 +203,21 @@ fn write_table(out: &mut String, table: &PastedTable) {
                 out.push('"');
             }
             out.push('>');
+            // A picture above the cell's words; the words, if any, are under it.
+            if let Some(id) = cell.image
+                && let Some(found) = pictures(id)
+            {
+                img(out, &found);
+                if cell.lines.iter().flatten().any(|run| !run.text.is_empty()) {
+                    out.push_str("<br>");
+                }
+            }
             for (i, line) in cell.lines.iter().enumerate() {
                 if i > 0 {
                     out.push_str("<br>");
                 }
                 let text = Paragraph::new(line.iter().map(|run| Run::new(&run.text, run.style.clone())).collect(), ListKind::None);
-                runs(out, &text, &|_| None);
+                runs(out, &text, pictures);
             }
             out.push_str(&format!("</{tag}>"));
         }
@@ -315,7 +324,7 @@ fn runs(out: &mut String, p: &Paragraph, pictures: &dyn Fn(u32) -> Option<Img>) 
     for run in &p.runs {
         let style = run.style.clone().clean();
         if let Some(table) = &run.table {
-            write_table(out, table);
+            write_table(out, table, pictures);
             index += 1;
             after_space = true;
             continue;
@@ -673,11 +682,19 @@ impl Reader {
                 reader.blocks(&cell.blocks);
                 copies = reader.copies;
                 spans += reader.out.iter().map(|p| p.runs.len()).sum::<usize>();
-                if spans > MAX_PASTED_SPANS || reader.out.iter().flat_map(|p| &p.runs).any(|run| run.picture.is_some()) {
+                if spans > MAX_PASTED_SPANS {
                     return None;
                 }
-                let lines =
-                    reader.out.into_iter().map(|p| p.runs.into_iter().map(|run| CellText { text: run.text, style: run.style }).collect()).collect();
+                // (One picture above the cell's words; any others are left out, as the cell holds
+                // one.)
+                let image = reader.out.iter().flat_map(|p| &p.runs).find_map(|run| run.picture);
+                let lines = reader
+                    .out
+                    .into_iter()
+                    .map(|p| {
+                        p.runs.into_iter().filter(|run| run.picture.is_none()).map(|run| CellText { text: run.text, style: run.style }).collect()
+                    })
+                    .collect();
                 let alignment = match cell.blocks.first().map(|block| block.align) {
                     Some(mailcraft_html::Align::Center) => CellAlignment::Center,
                     Some(mailcraft_html::Align::Right) => CellAlignment::Right,
@@ -686,6 +703,7 @@ impl Reader {
                 let background = cell.background.or(source.background).map(|c| format!("#{:02x}{:02x}{:02x}", c.0, c.1, c.2));
                 cells.push(TableCell {
                     lines,
+                    image,
                     header: cell.header,
                     colspan: cell.colspan,
                     rowspan: cell.rowspan,

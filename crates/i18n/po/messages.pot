@@ -11006,6 +11006,11 @@ msgstr ""
 msgid "Picture beside text"
 msgstr ""
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Picture in Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/compose/picture_size.rs
 msgid "Picture size"
@@ -20465,7 +20470,7 @@ msgid "personal"
 msgstr ""
 
 #. what a command says
-#: crates/engine/src/cmd/picture.rs crates/engine/src/cmd/signature.rs
+#: crates/engine/src/cmd/format.rs crates/engine/src/cmd/picture.rs crates/engine/src/cmd/signature.rs
 msgid "pictures from the web are not downloaded: save the picture and add it from the file"
 msgstr ""
 
