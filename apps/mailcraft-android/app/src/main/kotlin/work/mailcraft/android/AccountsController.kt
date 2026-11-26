@@ -7,6 +7,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import uniffi.mailcraft_mobile.CoreException
+import uniffi.mailcraft_mobile.ImapAccountSettings
+import uniffi.mailcraft_mobile.MailServer
 
 /**
  * What happens on the account screens: Add Account, the permission questions, Remove account. It
@@ -40,6 +43,11 @@ internal class AccountsController(
         onCancelSignIn = ::cancelSignIn,
         onCopyMessage = ::copyMessage,
         onLeaveAdd = ::leaveAdd,
+        onChooseImap = ::chooseImap,
+        onImapField = ::imapField,
+        onImapIncomingTls = ::imapIncomingTls,
+        onImapOutgoingTls = ::imapOutgoingTls,
+        onAddImap = ::addImap,
         onSignInAgain = ::signInAgain,
         onAsk = { account, permission -> askFor(account.id, permission) },
         onAllow = ::allow,
@@ -95,8 +103,128 @@ internal class AccountsController(
         if (add is AddAccountState.Form) state.copy(add = add.copy(keep = change(add.keep))) else state
     }
 
+    /** The form for a mail server that signs in with a password, its servers guessed from the address. */
+    private fun chooseImap() = ui.update { state ->
+        val email = (state.add as? AddAccountState.Form)?.email.orEmpty()
+        val domain = email.substringAfter('@', "").trim()
+        val prefix = if (domain.isEmpty()) "" else "."
+        state.copy(
+            add = AddAccountState.Imap(
+                email = email,
+                incomingHost = if (domain.isEmpty()) "" else "imap$prefix$domain",
+                outgoingHost = if (domain.isEmpty()) "" else "smtp$prefix$domain",
+            ),
+        )
+    }
+
+    /** One field of the mail-server form, typed: held within what a server name or a password may be. */
+    private fun imapField(field: ImapField, value: String) = ui.update { state ->
+        val add = state.add as? AddAccountState.Imap ?: return@update state
+        val room = when (field) {
+            ImapField.Password -> MAX_PASSWORD
+            ImapField.IncomingPort, ImapField.OutgoingPort -> MAX_PORT_DIGITS
+            ImapField.Email -> MAX_EMAIL
+            else -> MAX_HOST
+        }
+        val value = value.take(room)
+        state.copy(
+            add = when (field) {
+                ImapField.Email -> add.copy(email = value, notice = null)
+                ImapField.DisplayName -> add.copy(displayName = value, notice = null)
+                ImapField.Username -> add.copy(username = value, notice = null)
+                ImapField.Password -> add.copy(password = value, notice = null)
+                ImapField.IncomingHost -> add.copy(incomingHost = value, notice = null)
+                ImapField.IncomingPort -> add.copy(incomingPort = value, notice = null)
+                ImapField.OutgoingHost -> add.copy(outgoingHost = value, notice = null)
+                ImapField.OutgoingPort -> add.copy(outgoingPort = value, notice = null)
+            },
+        )
+    }
+
+    /** Whether the incoming server is encrypted from the first byte; its usual port follows. */
+    private fun imapIncomingTls(on: Boolean) = ui.update { state ->
+        val add = state.add as? AddAccountState.Imap ?: return@update state
+        val port = if (add.incomingPort == (if (on) "143" else "993")) (if (on) "993" else "143") else add.incomingPort
+        state.copy(add = add.copy(incomingTls = on, incomingPort = port, notice = null))
+    }
+
+    /** Whether the outgoing server is encrypted from the first byte; its usual port follows. */
+    private fun imapOutgoingTls(on: Boolean) = ui.update { state ->
+        val add = state.add as? AddAccountState.Imap ?: return@update state
+        val port = if (add.outgoingPort == (if (on) "587" else "465")) (if (on) "465" else "587") else add.outgoingPort
+        state.copy(add = add.copy(outgoingTls = on, outgoingPort = port, notice = null))
+    }
+
+    /** Adds the account the mail-server form describes; a password never leaves the core after this. */
+    private fun addImap() {
+        val add = ui.value.add as? AddAccountState.Imap ?: return
+        if (add.working) return
+        val ready = imapReady(add) ?: return
+        ui.update { state ->
+            (state.add as? AddAccountState.Imap)?.let {
+                state.copy(add = it.copy(working = true, notice = null))
+            } ?: state
+        }
+        scope.launch {
+            val id = try {
+                api.addImap(imapSettings(ready.add, ready.incoming, ready.outgoing))
+            } catch (e: CoreException) {
+                failedImap(e.message.orEmpty())
+                return@launch
+            }
+            changed()
+            ui.update { it.copy(add = AddAccountState.Done(id)) }
+            // The first Send/Receive goes through the app's account path, as a sign-in's does.
+            scope.launch { signedIn(id, KeepChoice(), true) }
+        }
+    }
+
+    private data class ImapReady(val add: AddAccountState.Imap, val incoming: UShort, val outgoing: UShort)
+
+    /** The form's fields as a whole, or null with what it still lacks said on it. */
+    private fun imapReady(add: AddAccountState.Imap): ImapReady? {
+        val incoming = add.incomingPort.toUShortOrNull()
+        val outgoing = add.outgoingPort.toUShortOrNull()
+        val problem = imapProblem(add, incoming, outgoing)
+        if (problem != null) refuseImap(problem)
+        return if (problem == null && incoming != null && outgoing != null) ImapReady(add, incoming, outgoing) else null
+    }
+
+    /** What the form still lacks, or null when it can be sent; the ports are checked apart. */
+    private fun imapProblem(add: AddAccountState.Imap, incoming: UShort?, outgoing: UShort?): String? = when {
+        add.email.trim().isEmpty() -> "Type the account's address."
+        add.password.isEmpty() -> "Type the account's password."
+        add.incomingHost.isBlank() -> "Type the incoming server's address."
+        add.outgoingHost.isBlank() -> "Type the outgoing server's address."
+        incoming == null || incoming == 0u.toUShort() -> "Type the incoming server's port."
+        outgoing == null || outgoing == 0u.toUShort() -> "Type the outgoing server's port."
+        else -> null
+    }
+
+    private fun imapSettings(add: AddAccountState.Imap, incoming: UShort, outgoing: UShort) = ImapAccountSettings(
+        email = add.email.trim(),
+        displayName = add.displayName.trim(),
+        username = add.username.trim(),
+        password = add.password,
+        incoming = MailServer(add.incomingHost.trim(), incoming, if (add.incomingTls) "tls" else "starttls"),
+        outgoing = MailServer(add.outgoingHost.trim(), outgoing, if (add.outgoingTls) "tls" else "starttls"),
+    )
+
+    private fun refuseImap(problem: String) = ui.update { state ->
+        (state.add as? AddAccountState.Imap)?.let {
+            state.copy(add = it.copy(notice = Notice.Failed(problem)))
+        } ?: state
+    }
+
+    private fun failedImap(reason: String) = ui.update { state ->
+        (state.add as? AddAccountState.Imap)?.let {
+            state.copy(add = it.copy(working = false, notice = Notice.Failed(reason)))
+        } ?: state
+    }
+
     private fun keepOf(add: AddAccountState): KeepChoice = when (add) {
         is AddAccountState.Form -> add.keep
+        is AddAccountState.Imap -> KeepChoice()
         is AddAccountState.Approval -> add.keep
         is AddAccountState.Waiting -> add.keep
         is AddAccountState.Done -> KeepChoice()
@@ -104,6 +232,7 @@ internal class AccountsController(
 
     private fun emailOf(add: AddAccountState): String? = when (add) {
         is AddAccountState.Form -> add.email
+        is AddAccountState.Imap -> add.email
         is AddAccountState.Approval -> add.email
         is AddAccountState.Waiting, is AddAccountState.Done -> null
     }
@@ -265,7 +394,7 @@ internal class AccountsController(
 
     /** Asks the core where each permission of each account stands (the Accounts page is on screen). */
     private fun refreshStatuses(shown: List<AccountItem>) {
-        shown.forEach { account ->
+        shown.filter { it.kind == "microsoft" }.forEach { account ->
             PermissionKind.entries.forEach { kind ->
                 val key = StatusKey(account.id, kind)
                 // (Not known yet, or couldn't be told the last time.)
@@ -295,5 +424,14 @@ internal class AccountsController(
 
     private companion object {
         const val MAX_EMAIL = 254
+
+        /** The longest a server's name, a user name or a display name may be. */
+        const val MAX_HOST = 255
+
+        /** The most a password may be (the platform's store takes a bounded secret). */
+        const val MAX_PASSWORD = 1_024
+
+        /** The most digits a port may be typed in (65535 is five). */
+        const val MAX_PORT_DIGITS = 5
     }
 }

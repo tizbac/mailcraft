@@ -71,6 +71,7 @@ internal fun AddAccountScreen(texts: Texts, state: AddAccountState, actions: Acc
         ) {
             when (state) {
                 is AddAccountState.Form -> AddAccountForm(texts, state, actions)
+                is AddAccountState.Imap -> ImapAccountForm(texts, state, actions)
                 is AddAccountState.Waiting -> SignInWaiting(texts, actions.onCancelSignIn)
                 is AddAccountState.Approval -> ApprovalHelp(texts, state, actions)
                 is AddAccountState.Done -> Unit
@@ -100,6 +101,9 @@ private fun AddAccountForm(texts: Texts, state: AddAccountState.Form, actions: A
     state.notice?.let { NoticeCard(it.text(texts)) }
     Button(onClick = actions.onSignIn, modifier = Modifier.fillMaxWidth()) {
         Text(texts.t("Sign in with Microsoft"))
+    }
+    OutlinedButton(onClick = actions.onChooseImap, modifier = Modifier.fillMaxWidth()) {
+        Text(texts.t("Add an IMAP account"))
     }
 }
 
@@ -211,12 +215,20 @@ internal fun AccountsPage(texts: Texts, accounts: List<AccountItem>, ui: Account
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            PermissionKind.entries.forEach { kind ->
-                PermissionRow(texts, account, kind, ui.statuses[StatusKey(account.id, kind)] ?: PermissionStatus.Checking, actions) {
-                    // Add Account opens with the address as its hint.
-                    actions.onSignInAgain(account)
-                    onAdd()
+            if (account.kind == "microsoft") {
+                PermissionKind.entries.forEach { kind ->
+                    PermissionRow(texts, account, kind, ui.statuses[StatusKey(account.id, kind)] ?: PermissionStatus.Checking, actions) {
+                        // Add Account opens with the address as its hint.
+                        actions.onSignInAgain(account)
+                        onAdd()
+                    }
                 }
+            } else {
+                Text(
+                    texts.t("Signs in with a password"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             TextButton(onClick = { actions.onRemoveAsk(account) }) { Text(texts.t("Remove account")) }
         }

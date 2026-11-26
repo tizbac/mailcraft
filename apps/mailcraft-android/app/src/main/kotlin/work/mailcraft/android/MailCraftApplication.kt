@@ -19,6 +19,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import uniffi.mailcraft_mobile.Core
 import uniffi.mailcraft_mobile.CoreException
 import uniffi.mailcraft_mobile.Event
+import uniffi.mailcraft_mobile.SyncAnswer
 
 /** The tag of the device log's lines on how long Send/Receive took (`adb logcat -s MailCraftSync`). */
 private const val SYNC_LOG_TAG = "MailCraftSync"
@@ -207,9 +208,9 @@ class MailCraftApplication : Application() {
                 scope = scope,
                 save = { core.saveNow() },
                 copy = { text -> copyToClipboard(applicationContext, text) },
-                sync = { account -> core.refreshMail(account) },
+                sync = { account -> syncAll(core, owner = true, account) },
                 mailIn = { account -> core.mailIn(account) },
-                firstRound = { core.syncKeepingHolds() },
+                firstRound = { syncAll(core, owner = false) },
                 roomFor = { account, storageMb -> settings?.roomForFirstSync(account, storageMb) ?: false },
                 holds = holds,
             )
@@ -282,3 +283,21 @@ internal suspend fun nextEvent(core: Core): uniffi.mailcraft_mobile.Event? =
     } catch (_: CoreException) {
         null
     }
+
+/**
+ * Send/Receive: the Microsoft ones through their round (the one account the owner pulled, or every
+ * one), then the ones that sign in with a password (IMAP to read, SMTP to send). `owner` is the
+ * owner's ask (a pull to refresh), which lets go of the accounts held back. It says it started
+ * when either ran.
+ */
+private suspend fun syncAll(core: Core, owner: Boolean, account: ULong? = null): SyncAnswer {
+    val graph = if (owner) core.refreshMail(account) else core.syncKeepingHolds()
+    val imap = try {
+        core.syncImapNow(120_000uL)
+    } catch (_: CoreException) {
+        null
+    }
+    if (graph.started || imap?.ran == true) return SyncAnswer(started = true, message = "")
+    val why = graph.message.ifBlank { imap?.errors?.firstOrNull().orEmpty() }
+    return SyncAnswer(started = false, message = why)
+}
