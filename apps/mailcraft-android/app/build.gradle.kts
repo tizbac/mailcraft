@@ -18,6 +18,11 @@ plugins {
 }
 
 val appVersion = (findProperty("versionName") as String?) ?: "0.12.0"
+// The package Google Play installs. A machine can build beside it with its own
+// `mailcraft.applicationId` (in `~/.gradle/gradle.properties`, never in this file): that copy is a
+// separate app, so the store's updates never overwrite it. The release workflow passes nothing and
+// gets this one.
+val appId: String = providers.gradleProperty("mailcraft.applicationId").getOrElse("work.mailcraft.android")
 val repoRoot: File = rootProject.projectDir.resolve("../..").canonicalFile
 
 // The end-to-end run on an emulator (MB3.15; `-Pmailcraft.e2e=true`): the Rust library is built
@@ -34,7 +39,7 @@ android {
     ndkVersion = "28.2.13676358"
 
     defaultConfig {
-        applicationId = "work.mailcraft.android"
+        applicationId = appId
         minSdk = 29
         targetSdk = 36
         // The release workflow passes both (-PversionCode, -PversionName) from the tag's version;

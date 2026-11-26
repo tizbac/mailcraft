@@ -35,6 +35,22 @@ are still in line stay there. A pull in a shared mailbox's folder brings the acc
 to. A background run that comes while a pull runs adds the other accounts to the round, so it
 brings all of them as before.
 
+## Building beside the store's copy
+
+The package is `work.mailcraft.android`, the one Google Play updates. A machine can build a copy
+that installs beside it, which the store never replaces, by naming its own package in
+`~/.gradle/gradle.properties` (not in this repository, so a release build keeps the store's):
+
+```properties
+mailcraft.applicationId=work.mailcraft.android.dev
+```
+
+The copy is an app of its own, with its own data and its own attachment provider
+(`<package>.files`). Its accounts keep the `work.mailcraft.android` type, so with both copies
+installed the phone's Calendar and Contacts apps may bind to the store copy's sync adapter;
+remove that copy where the system sync matters. The sign-in's redirect scheme stays the project's
+registered one either way.
+
 ## The phone's own Calendar and Contacts
 
 A CalDAV and CardDAV account (`kind: dav` in the mailbox) is also an Android account
