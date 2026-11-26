@@ -850,3 +850,22 @@ fn a_table_after_a_line_break_is_a_cell_to_type_in() {
     let table = s.compose.as_ref().unwrap().body.text().table_at(from).and_then(|table| table.cell_text(0, 0));
     assert_eq!(table.as_deref(), Some("x"));
 }
+
+/// What is pasted into a cell keeps its formatting: bold, colours, links, sizes and its lines.
+#[test]
+fn a_paste_into_a_table_cell_keeps_its_formatting() {
+    let mut s = session();
+    run(&mut s, "mail.new", json!({}));
+    run(&mut s, "insert.table", json!({"rows": 2, "columns": 2}));
+    let (from, ..) = s.table_edit().expect("the first cell");
+    let html = r#"<p><b>Bold</b> <span style="color:#ff0000">Red</span> <a href="https://lumen.example/">Link</a></p><p>Second</p>"#;
+    run(&mut s, "table.cellPaste", json!({"html": html, "text": "Bold Red Link\nSecond"}));
+    let table = s.compose.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    let cell = &table.rows()[0][0];
+    assert_eq!(cell.lines.len(), 3, "{:?}", cell.lines);
+    let first = &cell.lines[0];
+    assert!(first.iter().any(|run| run.text == "Bold" && run.style.bold), "{first:?}");
+    assert!(first.iter().any(|run| run.text == "Red" && run.style.color.as_deref() == Some("#ff0000")), "{first:?}");
+    assert!(first.iter().any(|run| run.text == "Link" && run.style.link.as_deref() == Some("https://lumen.example/")), "{first:?}");
+    assert_eq!(table.cell_text(0, 0).as_deref(), Some("Bold Red Link\n\nSecond"));
+}
