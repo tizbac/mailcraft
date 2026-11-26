@@ -33,13 +33,18 @@ pub enum ResponseClass {
 }
 
 impl ResponseClass {
-    /// The class a document names; none for a word the schema does not have.
+    /// The class a document names; none for a word the schema does not have. (Read without regard
+    /// to case or space: a server that writes `success` has said the same.)
     pub fn from_name(name: &str) -> Option<Self> {
-        match name {
-            "Success" => Some(Self::Success),
-            "Warning" => Some(Self::Warning),
-            "Error" => Some(Self::Error),
-            _ => None,
+        let name = name.trim();
+        if name.eq_ignore_ascii_case("Success") {
+            Some(Self::Success)
+        } else if name.eq_ignore_ascii_case("Warning") {
+            Some(Self::Warning)
+        } else if name.eq_ignore_ascii_case("Error") {
+            Some(Self::Error)
+        } else {
+            None
         }
     }
 }

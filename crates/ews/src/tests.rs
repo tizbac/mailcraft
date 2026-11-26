@@ -814,3 +814,35 @@ fn a_response_message_without_a_code_is_read() {
     let reply = Reply::parse(error.as_bytes()).unwrap();
     assert_eq!(crate::items::GetItemMime::new("item").answer(&reply).unwrap_err(), Error::Server(ResponseCode::Other(String::new())));
 }
+
+/// Some servers leave `ResponseClass` off a success too (Grommunio and others answer `GetItem`
+/// that way), with no code beside it: the answer is still the request's, and the message is read.
+/// A code that names an error is an error even without a class.
+#[test]
+fn a_response_message_without_a_class_is_read() {
+    let body = format!(
+        "{ENVELOPE_OPEN}<m:GetItemResponse xmlns:m=\"http://schemas.microsoft.com/exchange/services/2006/messages\" xmlns:t=\"http://schemas.microsoft.com/exchange/services/2006/types\">\
+         <m:ResponseMessages><m:GetItemResponseMessage><m:Items><t:Message>\
+         <t:MimeContent CharacterSet=\"UTF-8\">SGVsbG8=</t:MimeContent><t:ItemId Id=\"item\"/></t:Message></m:Items>\
+         </m:GetItemResponseMessage></m:ResponseMessages></m:GetItemResponse>{ENVELOPE_CLOSE}"
+    );
+    let reply = Reply::parse(body.as_bytes()).unwrap();
+    assert_eq!(crate::items::GetItemMime::new("item").answer(&reply).unwrap(), b"Hello");
+    // A code alone, naming an error, is the error it names.
+    let error = format!(
+        "{ENVELOPE_OPEN}<m:GetItemResponse xmlns:m=\"http://schemas.microsoft.com/exchange/services/2006/messages\" xmlns:t=\"http://schemas.microsoft.com/exchange/services/2006/types\">\
+         <m:ResponseMessages><m:GetItemResponseMessage><m:ResponseCode>ErrorItemNotFound</m:ResponseCode>\
+         </m:GetItemResponseMessage></m:ResponseMessages></m:GetItemResponse>{ENVELOPE_CLOSE}"
+    );
+    let reply = Reply::parse(error.as_bytes()).unwrap();
+    assert_eq!(crate::items::GetItemMime::new("item").answer(&reply).unwrap_err(), Error::Server(ResponseCode::ItemNotFound));
+    // A success with `NoError` alone is a success.
+    let success = format!(
+        "{ENVELOPE_OPEN}<m:GetItemResponse xmlns:m=\"http://schemas.microsoft.com/exchange/services/2006/messages\" xmlns:t=\"http://schemas.microsoft.com/exchange/services/2006/types\">\
+         <m:ResponseMessages><m:GetItemResponseMessage><m:ResponseCode>NoError</m:ResponseCode><m:Items><t:Message>\
+         <t:MimeContent CharacterSet=\"UTF-8\">SGVsbG8=</t:MimeContent></t:Message></m:Items></m:GetItemResponseMessage>\
+         </m:ResponseMessages></m:GetItemResponse>{ENVELOPE_CLOSE}"
+    );
+    let reply = Reply::parse(success.as_bytes()).unwrap();
+    assert_eq!(crate::items::GetItemMime::new("item").answer(&reply).unwrap(), b"Hello");
+}
