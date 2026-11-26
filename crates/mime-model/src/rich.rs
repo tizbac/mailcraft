@@ -396,7 +396,8 @@ pub fn from_html_for_compose(html: &str) -> RichText {
 /// An `<img src="cid:…">` of an HTML draft this program wrote.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ImgRef {
-    /// The Content-ID, without `cid:`.
+    /// The Content-ID, without `cid:`; or, for [`from_html_with_pictures_any`], the address as
+    /// the HTML gave it.
     pub cid: String,
     /// The `width` it was written with.
     pub width: Option<u16>,
@@ -412,12 +413,21 @@ pub struct ImgRef {
 /// `ms-settings:` they wrote comes back); [`from_html`] holds to what a reader follows. Never for
 /// received mail.
 pub fn from_html_with_pictures(html: &str, claim: &mut dyn FnMut(&ImgRef) -> Option<u32>) -> RichText {
-    read(&mark_pictures(html, claim), true, true)
+    read_marked(&mark_pictures(html, claim, false), true, true, true)
+}
+
+/// [`from_html`] for HTML the owner pasted into a signature: each `<img>` whose `src` `claim`
+/// takes (it answers the id the picture has in the text) stands in the text where it was, as a
+/// picture run; a picture whose address is not one `claim` knows is left out. The address is the
+/// `src` whole (an `https:` one included), the pictures themselves having been fetched before
+/// this is called. Never for received mail.
+pub fn from_html_with_pictures_any(html: &str, claim: &mut dyn FnMut(&ImgRef) -> Option<u32>) -> RichText {
+    read_marked(&mark_pictures(html, claim, true), true, true, false)
 }
 
 /// `html` with each picture `claim` takes written as `OBJECT id OBJECT` in its place, and no
 /// other `OBJECT` (nothing but this puts one in the text).
-fn mark_pictures(html: &str, claim: &mut dyn FnMut(&ImgRef) -> Option<u32>) -> String {
+fn mark_pictures(html: &str, claim: &mut dyn FnMut(&ImgRef) -> Option<u32>, any_src: bool) -> String {
     // No more than the reading after this looks at.
     let html = cut(html, mailcraft_html::MAX_INPUT_WITH_PICTURES).replace(OBJECT, "");
     let lower = html.to_ascii_lowercase();
@@ -442,7 +452,7 @@ fn mark_pictures(html: &str, claim: &mut dyn FnMut(&ImgRef) -> Option<u32>) -> S
         };
         out.push_str(html.get(at..start).unwrap_or(""));
         let tag = html.get(after..end).unwrap_or("");
-        match img_ref(tag).and_then(|img| claim(&img)) {
+        match img_ref(tag, any_src).and_then(|img| claim(&img)) {
             Some(id) => out.push_str(&format!("{OBJECT}{id}{OBJECT}")),
             None => out.push_str(html.get(start..end).unwrap_or("")),
         }
@@ -474,8 +484,9 @@ fn tag_end(html: &str, from: usize) -> Result<usize, usize> {
     Err(limit)
 }
 
-/// The `src`, `width` and `alt` of an `<img>` whose attributes are `attrs`, when `src` is a `cid:`.
-fn img_ref(attrs: &str) -> Option<ImgRef> {
+/// The `src`, `width` and `alt` of an `<img>` whose attributes are `attrs`, when `src` is a `cid:`
+/// or, with `any_src`, any address at all.
+fn img_ref(attrs: &str, any_src: bool) -> Option<ImgRef> {
     let chars: Vec<char> = attrs.trim_end_matches('>').chars().collect();
     let (mut i, mut img, mut src) = (0usize, ImgRef::default(), None);
     while i < chars.len() {
@@ -522,14 +533,27 @@ fn img_ref(attrs: &str) -> Option<ImgRef> {
     }
     let src = src?;
     let src = src.trim();
-    let cid = src.get(..4).filter(|p| p.eq_ignore_ascii_case("cid:")).and_then(|_| src.get(4..))?;
+    let cid = if any_src {
+        // (Any address the owner's HTML gives: `claim` decides which it takes.)
+        (!src.is_empty()).then_some(src)?
+    } else {
+        src.get(..4).filter(|p| p.eq_ignore_ascii_case("cid:")).and_then(|_| src.get(4..))?
+    };
     img.cid = cid.to_string();
     Some(img)
 }
 
 fn read(html: &str, pictures: bool, tables: bool) -> RichText {
+    read_marked(html, pictures, tables, pictures)
+}
+
+/// [`read`], with whether the tables are only the ones this program's drafts mark (a draft's, so
+/// that a layout table never becomes a grid) or every table (HTML the owner pasted, which is all
+/// their own).
+fn read_marked(html: &str, pictures: bool, tables: bool, marked_tables: bool) -> RichText {
     // The look and the text only: pictures written into the HTML are not decoded for this.
-    let blocks = if tables { mailcraft_html::parse_text_with_tables(html, pictures.then_some(safe_link)) } else { mailcraft_html::parse_text(html) };
+    let own: Option<fn(&str) -> Option<String>> = if pictures && marked_tables { Some(safe_link) } else { None };
+    let blocks = if tables { mailcraft_html::parse_text_with_tables(html, own) } else { mailcraft_html::parse_text(html) };
     let read = html.len().min(mailcraft_html::MAX_INPUT_WITH_PICTURES);
     let copies = read.saturating_mul(COPY_ALLOWANCE).saturating_add(COPY_FLOOR);
     let mut reader = Reader { out: Vec::new(), pictures, copies, tables };

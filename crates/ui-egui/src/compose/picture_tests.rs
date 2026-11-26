@@ -404,3 +404,31 @@ fn a_picture_is_drawn_in_the_body() {
     // (The test PNG has no pixels to decode: it is drawn as a frame, and laying it out did not fail.)
     assert_eq!(pictures(&h), 1);
 }
+
+/// A signature pasted from an HTML page: its pictures on the web are downloaded and embedded, and
+/// its table comes in as a table to type in.
+#[test]
+fn a_pasted_signature_downloads_and_embeds_the_pictures_its_html_names() {
+    let board = PictureBoard::default();
+    *board.0.borrow_mut() =
+        (None, Some(r#"<p>Logo <img src="https://lumen.example/logo.png"></p><table><tr><td>One</td><td>Two</td></tr></table>"#.into()));
+    let mut a = app();
+    a.services.clipboard = Some(Box::new(board.clone()));
+    a.services.pictures = Some(Box::new(|_url: String| {
+        let (send, receive) = std::sync::mpsc::channel();
+        let _ = send.send(Ok(png(40)));
+        receive
+    }));
+    a.execute("signature.open", json!({"name": "Standard"})).unwrap();
+    a.execute("ui.backstage", json!({"value": true, "page": "signatures"})).unwrap();
+    a.want_body_focus();
+    let mut h = window(a);
+    h.run_steps(3);
+    h.event(Event::Paste(String::new()));
+    h.run_steps(8);
+    let e = h.state().session.signature_edit.as_ref().expect("the signature is open");
+    assert_eq!(e.signature.pictures().len(), 1, "the picture on the web is the signature's own");
+    assert_eq!(e.body.text().pictures().len(), 1, "and it stands in the text where it was");
+    let table = { (0..e.body.text().len()).find(|at| e.body.text().table_at(*at).is_some()) };
+    assert!(table.is_some(), "the table is an object to type in: {:?}", e.body.text());
+}

@@ -99,7 +99,7 @@ pub fn specs() -> Vec<CommandSpec> {
             .when_writing(needs_doc),
         CommandSpec::new("edit.paste", "Paste", "Message › Clipboard", paste)
             .pure()
-            .params(r#"{"html"?: string, "spreadsheet"?: string (Excel's "XML Spreadsheet" clipboard data, made into a table), "text"?: string} — over the selection; supported HTML formatting includes bold, italic, underline, font, size, colours, links, lists and a paragraph's indent and alignment. The HTML composer keeps bounded tables as selectable objects. Tables flatten to text in plain-text messages and signatures. HTML that comes to no text gives way to `text`; text alone that is a spreadsheet's Copy (two or more rows of lines with the same number of tab-separated cells) becomes a table in an HTML message. Nothing to paste changes nothing"#)
+            .params(r#"{"html"?: string, "spreadsheet"?: string (Excel's "XML Spreadsheet" clipboard data, made into a table), "text"?: string, "pictures"?: [{"url": string, "data": base64, "file"?: string, "alt"?: string}] (a signature: the pictures of its pasted HTML, downloaded beforehand, each put where its `url` stands in the HTML)} — over the selection; supported HTML formatting includes bold, italic, underline, font, size, colours, links, lists and a paragraph's indent and alignment. The HTML composer and a signature keep bounded tables as selectable objects. Tables flatten to text in plain-text messages. HTML that comes to no text gives way to `text`; text alone that is a spreadsheet's Copy (two or more rows of lines with the same number of tab-separated cells) becomes a table in an HTML message. Nothing to paste changes nothing"#)
             .when_writing(needs_doc),
         CommandSpec::new("table.cellEdit", "Edit Cell", "Insert › Tables", cell_edit)
             .pure()
@@ -505,17 +505,39 @@ fn paste(s: &mut Session, v: &Value) -> CmdResult {
         return Err(bad("`html`, `spreadsheet` or `text` (string) is required"));
     }
     let too_much = || fail("that is too much to paste into one message");
-    // The HTML when there is some, reduced to the set; when it comes to nothing at all (a picture
-    // alone, which a text can't hold), the text beside it, weighed only then; and nothing at all
-    // changes nothing, the selection included. Lines left blank on purpose are something. (What
-    // is looked at is what would be pasted, once cleaned of what a text never keeps.)
+    // A signature's pictures, downloaded by the window before this (the engine asks no server):
+    // each is put in the signature, and stands in the pasted text where its address was. One
+    // that isn't a picture, or is over the signature's caps, is left where it was not.
+    let pasted_pictures = v.get("pictures").and_then(Value::as_array).cloned().unwrap_or_default();
+    let mut by_url = std::collections::HashMap::new();
+    if !pasted_pictures.is_empty()
+        && let Some(open) = s.signature_edit.as_mut()
+        && open.signature.html().is_none()
+    {
+        let mut sig = open.signature.clone();
+        sig.set_body(open.body.text().clone()).map_err(model)?;
+        for pic in &pasted_pictures {
+            let Some(url) = p::str(pic, "url") else { continue };
+            let (_, bytes) = super::source(pic)?;
+            let file = p::str(pic, "file").unwrap_or("picture");
+            if let Ok(id) = sig.add_picture(file, bytes, p::str(pic, "alt"), None) {
+                by_url.insert(url.to_string(), id);
+            }
+        }
+        open.signature = sig;
+        open.dirty = true;
+    }
     let from_html = match html {
         Some(html) if html.len() > MAX_PASTE => return Err(too_much()),
         Some(html) => {
-            let rich = if !plain && s.signature_edit.is_none() {
+            // A table the HTML holds stays an object to type in, in a message and in a
+            // signature alike (the cells of a pasted signature are the owner's to edit).
+            let rich = if plain {
+                mailcraft_mime_model::rich::from_html(&html)
+            } else if by_url.is_empty() {
                 mailcraft_mime_model::rich::from_html_for_compose(&html)
             } else {
-                mailcraft_mime_model::rich::from_html(&html)
+                mailcraft_mime_model::rich::from_html_with_pictures_any(&html, &mut |img| by_url.get(&img.cid).copied())
             };
             Some(if plain { RichText::from_plain(&rich.text()) } else { rich }).filter(|rich| !rich.is_empty())
         }
@@ -532,10 +554,10 @@ fn paste(s: &mut Session, v: &Value) -> CmdResult {
     }
     edit(s, &json!({}), |b| b.paste(&fragment))?;
     let mut out = state(s);
-    // A signature's pictures come from files only (nothing is fetched); say so when the paste
-    // had some.
-    let pictures = p::str(v, "html").is_some_and(|h| h.to_ascii_lowercase().contains("<img"));
-    if pictures
+    // A signature's pictures come from files or from the window's downloads; when neither brought
+    // any, say so for the ones the HTML had.
+    let left_out = pasted_pictures.is_empty() && p::str(v, "html").is_some_and(|h| h.to_ascii_lowercase().contains("<img"));
+    if left_out
         && s.signature_edit.is_some()
         && let Some(o) = out.as_object_mut()
     {

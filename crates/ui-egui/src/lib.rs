@@ -1734,6 +1734,9 @@ pub struct MailApp {
     signatures_shown: bool,
     /// What File › Signatures last said of a picture (a refusal, or that it was made smaller).
     signature_note: Option<signatures::Note>,
+    /// A paste into a signature whose pictures are still being downloaded from the web: the HTML,
+    /// the selection and a channel for each address, taken up when they arrive.
+    pub(crate) signature_paste: Option<compose::editor::PendingSignaturePaste>,
     /// File › Signatures › Rename: the name being typed for a signature, until it is kept.
     signature_rename: Option<signatures::Rename>,
     /// The last input the window was given, by kind only (never what was typed), for
@@ -2126,6 +2129,7 @@ impl MailApp {
             signature_focus_wanted: false,
             signatures_shown: false,
             signature_note: None,
+            signature_paste: None,
             signature_rename: None,
             input_trail: std::collections::VecDeque::new(),
             reveal_selection: false,
