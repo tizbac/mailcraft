@@ -142,6 +142,21 @@ pub struct ImapAccountSettings {
     pub outgoing: MailServer,
 }
 
+/// An Exchange server account: Exchange Web Services to read, send and keep its calendars and
+/// address books in step, with the password the owner types.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct ExchangeAccountSettings {
+    pub email: String,
+    /// What the folder pane calls it; empty: the address.
+    pub display_name: String,
+    /// The name the server knows the owner by (`DOMAIN\user` or a UPN); empty: the address.
+    pub username: String,
+    pub password: String,
+    /// The `https://` address of the server's Exchange Web Services
+    /// (`…/EWS/Exchange.asmx`).
+    pub url: String,
+}
+
 /// What the sign-ins of a core hold: the host's (where the redirect lands, and the one that is
 /// under way), and for the tests a token server and a page of their own.
 #[derive(Default)]
@@ -548,6 +563,60 @@ impl Core {
             {
                 // (A store that refuses doesn't undo the account: the password stays in memory
                 // for this session, and the owner is asked again at the next start.)
+                let _ = store.set(mailcraft_host::secrets::secret_key("password", &account), settings.password);
+            }
+            Ok(id)
+        })
+        .await
+    }
+
+    /// Add an Exchange server account: Exchange Web Services for its mail, calendars and address
+    /// books. Its password is kept in memory for this session and, when the owner lets sign-ins
+    /// be remembered, in the phone's secure store. Nothing is read here: the caller's Send/Receive
+    /// does that.
+    pub async fn add_exchange_account(&self, settings: ExchangeAccountSettings) -> Result<u64, CoreError> {
+        let sync = self.sync.clone();
+        let platform = self.platform.clone();
+        let remember = sync.remembers();
+        self.call(move |s| {
+            let email = settings.email.trim().chars().take(254).collect::<String>();
+            if email.is_empty() {
+                return Err(CoreError::BadRequest { reason: "the account's address is empty".to_string() });
+            }
+            if settings.password.is_empty() || settings.password.len() > 1024 {
+                return Err(CoreError::BadRequest { reason: "the account's password is empty or too long".to_string() });
+            }
+            let url = settings.url.trim().to_string();
+            if !(url.starts_with("https://") || url.starts_with("http://127.0.0.1:") || url.starts_with("http://[::1]:")) {
+                return Err(CoreError::BadRequest { reason: "the server's address is an https:// address".to_string() });
+            }
+            let server = mailcraft_model::EwsServer { url: url.clone(), ..Default::default() };
+            if server.host().is_some_and(mailcraft_model::is_exchange_online) {
+                return Err(CoreError::BadRequest { reason: "this server is Microsoft's: add it as a Microsoft account".to_string() });
+            }
+            let username = if settings.username.trim().is_empty() { email.clone() } else { settings.username.trim().to_string() };
+            let mut params = json!({
+                "email": email,
+                "username": username,
+                "auth": "password",
+                "kind": "exchange",
+                "ews": {"url": url, "username": username},
+            });
+            if !settings.display_name.trim().is_empty() {
+                params["displayName"] = json!(settings.display_name.trim().chars().take(254).collect::<String>());
+            }
+            let id = s
+                .run("account.add", &params)?
+                .get("id")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| CoreError::Failed { reason: "the account was added but the core didn't say which".to_string() })?;
+            let account = s
+                .mailbox
+                .account(id)
+                .cloned()
+                .ok_or_else(|| CoreError::Failed { reason: "the account was added but is not in the mailbox".to_string() })?;
+            sync.keep_password(id, settings.password.clone());
+            if remember && let Ok(Some(store)) = platform.secrets() {
                 let _ = store.set(mailcraft_host::secrets::secret_key("password", &account), settings.password);
             }
             Ok(id)

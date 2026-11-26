@@ -29,6 +29,8 @@ private class HubApi(val gate: CompletableDeferred<Unit>) : AccountsApi {
 
     override suspend fun addImap(settings: uniffi.mailcraft_mobile.ImapAccountSettings): ULong = 8u
 
+    override suspend fun addExchange(settings: uniffi.mailcraft_mobile.ExchangeAccountSettings): ULong = 9u
+
     override suspend fun grant(account: ULong, permission: PermissionKind): GrantResult = GrantResult.Granted
 
     override suspend fun status(account: ULong, permission: PermissionKind) = PermissionStatus.Allowed

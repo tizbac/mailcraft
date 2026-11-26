@@ -66,6 +66,8 @@ mod compose_share_tests;
 #[cfg(test)]
 mod compose_tests;
 #[cfg(test)]
+mod ews_fetch_tests;
+#[cfg(test)]
 mod fake_tests;
 #[cfg(test)]
 mod fetch_review_tests;

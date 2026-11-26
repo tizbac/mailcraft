@@ -86,6 +86,28 @@ fn an_imap_account_is_added_and_its_mail_comes_down() {
 }
 
 #[test]
+fn an_exchange_account_is_added_with_its_password_kept_and_removed() {
+    let platform = FakePlatform::new();
+    let core = Core::start_with(platform.clone(), Session::empty, SendReceive::new()).expect("a core");
+    let id = block_on(core.add_exchange_account(crate::accounts::ExchangeAccountSettings {
+        email: "ada@example.org".into(),
+        display_name: "Ada".into(),
+        username: String::new(),
+        password: PASSWORD.into(),
+        url: "https://mail.example.org/EWS/Exchange.asmx".into(),
+    }))
+    .expect("the account is added");
+    let account = block_on(core.call(move |s| Ok(s.mailbox.account(id).cloned()))).unwrap().expect("the account");
+    assert_eq!(account.kind, mailcraft_model::AccountKind::Exchange);
+    assert_eq!(account.ews.as_ref().map(|s| s.url.as_str()), Some("https://mail.example.org/EWS/Exchange.asmx"));
+    let key = mailcraft_host::secrets::secret_key("password", &account);
+    assert!(platform.secrets.kept.lock().unwrap().iter().any(|(k, v)| *k == key && v == PASSWORD), "the password is not kept");
+    block_on(core.remove_account(id)).unwrap();
+    assert!(!platform.secrets.kept.lock().unwrap().iter().any(|(k, _)| *k == key), "the password is still kept");
+    core.shutdown();
+}
+
+#[test]
 fn without_a_password_an_imap_account_is_not_sent_and_received() {
     let platform = FakePlatform::new();
     let core = Core::start_with(platform, Session::empty, SendReceive::new()).expect("a core");

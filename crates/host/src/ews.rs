@@ -1,0 +1,733 @@
+// SPDX-FileCopyrightText: MailCraft contributors
+// SPDX-License-Identifier: MIT OR Apache-2.0
+//! The host's side of an Exchange server account (#252, E6): `mailcraft-ews` runs its requests over
+//! [`Transport`], which is one HTTPS exchange of `mailcraft_net::https` at a time, on a thread of
+//! the run's own, and the pieces of the run reach the window through a channel.
+//!
+//! **The credential** is the account's user name (the settings', else its address) and the password
+//! the window hands over with the job. It lives in memory for the length of the run, is not written
+//! anywhere, and is in no log line.
+//!
+//! **Signing in** is chosen from what the server offers (`mailcraft_ews::auth::choose`, NTLM before
+//! Basic). The first request of a run goes with no credential at all; the server's 401 says how to
+//! sign in. Basic then sends the credential with each request, over TLS. NTLM (MS-NLMP) runs over
+//! one held connection (`mailcraft_net::https::Connection`): the three legs, then the run's
+//! requests on the same connection. A server that offers Kerberos (Negotiate) alone is told in
+//! words ([`AuthProblem`]) and nothing is retried. A challenge the server sent is never shown or
+//! logged.
+//!
+//! **A connection that closes** is opened again and signed in again, but only for a request that
+//! is the same however often it is made (a read, a set of a property): a request that makes or
+//! sends something (`HttpRequest::is_repeatable` is false) whose answer was lost after it went out
+//! is never sent again ([`TransportError::Lost`]): a send is held, and the rest is checked
+//! against the server by the next run.
+//!
+//! **The certificate.** The system's trust first; a certificate the system doesn't trust is accepted
+//! only when it is exactly the one the account trusts (its fingerprint). When it is not accepted the
+//! first request does not go, so no password has gone either, and `mailcraft_net::NetError::Certificate`
+//! comes out of `https::send`. It is *not* a plain TLS error here: the transport keeps what it says
+//! ([`Transport::problem`]) and the run's last piece carries the question (`EwsMailResult::untrusted`
+//! is the fingerprint of a certificate the owner may be asked to trust, or that has changed since
+//! they did), so that the window stops and the account says it needs the certificate question. A
+//! certificate nobody may trust (expired, for another name) is told in words and never offered.
+//!
+//! **Waiting.** A busy server asks the run to wait; the thread sleeps in small steps, so that Cancel
+//! is heard, and gives up only when the run is called off.
+//!
+//! **Timings** (#276, #748). Each piece carries the time since the piece before and the requests
+//! made meanwhile, as the phase of what the piece brings (`phase_of`): Send/Receive Progress and
+//! Help › Copy Diagnostics say how long an Exchange run took, as for a Microsoft account.
+
+use std::future::{Future, ready};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll, Waker};
+use std::time::{Duration, Instant};
+
+use mailcraft_ews::{
+    AuthError, Candidate, Client, HttpExchange, HttpRequest, HttpResponse, NtlmCredentials, RecipientKind, ResolveNames, Scheme, Secret,
+    TransportError, auth, ntlm,
+};
+use mailcraft_model::sync::{
+    DirectoryKind, DirectoryPerson, EwsDirectoryRequest, EwsDirectoryResult, EwsFetchRequest, EwsMailRequest, EwsMailResult, EwsResolveRequest,
+    EwsResolveResult, EwsResolved, GraphFetchResult, MAX_RESOLVE_PEOPLE, MAX_RESOLVE_TEXTS, SyncPhase, Timings,
+};
+use mailcraft_net::https::Connection;
+use mailcraft_net::{CertificateProblem, NetError};
+
+/// What the run says when the secure connection could not be had for a reason the owner can't
+/// answer (an expired certificate, one for another server): in words with nothing of the certificate.
+const NO_SECURE_LINE: &str = "Couldn't set up a secure connection with the server";
+
+/// The longest a name lookup waits for a busy server.
+const MOST_RESOLVE_WAIT_MS: u32 = 10_000;
+
+/// Why the sign-in could not be had, in words for the run's last line.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AuthProblem {
+    /// The server offers Kerberos (Negotiate) and nothing MailCraft speaks.
+    NegotiateOnly,
+    /// The server offers no way of signing in that MailCraft speaks.
+    NothingSupported,
+    /// The NTLM sign-in could not be completed (the server's challenge was not one, or the user
+    /// name or the password cannot be sent that way).
+    NtlmFailed,
+}
+
+impl AuthProblem {
+    /// The line the run ends with. Names neither the server nor the user.
+    pub(crate) fn words(self) -> &'static str {
+        match self {
+            Self::NegotiateOnly => "The server only signs in with Kerberos (Negotiate), which MailCraft does not speak yet",
+            Self::NothingSupported => "The server offers no way of signing in that MailCraft speaks (NTLM or Basic)",
+            Self::NtlmFailed => "The NTLM sign-in with the server could not be completed",
+        }
+    }
+}
+
+/// How the run signs in, once the server has said.
+#[derive(Default)]
+struct SignIn {
+    scheme: Option<Scheme>,
+    /// The held connection of an NTLM run, signed in.
+    connection: Option<Connection>,
+}
+
+/// One HTTPS exchange after another with the server of one account.
+pub(crate) struct Transport {
+    /// The fingerprint of the certificate the account trusts besides the system's; empty for none.
+    trusted: String,
+    /// Why the server's certificate was not accepted, when that is what stopped an exchange.
+    stopped_at: Mutex<Option<CertificateProblem>>,
+    /// The key NTLM signs in with, when the user name and password can be sent that way.
+    ntlm: Option<NtlmCredentials>,
+    sign_in: Mutex<SignIn>,
+    /// Why the sign-in could not be had, when that is what stopped the run.
+    auth_problem: Mutex<Option<AuthProblem>>,
+    /// What the last exchange's connection said when it could not get an answer, in a few of its
+    /// own words ("the server refused the connection"): for the line naming which server could not
+    /// be reached. Cleared with every new request.
+    trouble: Mutex<Option<String>>,
+    /// How many EWS requests the run has made, for its timings ([`Transport::requests_asked`]).
+    asked: AtomicU32,
+}
+
+/// The host of an address (`mail.example.org` of `https://mail.example.org:444/EWS/…`), for the
+/// target name of an NTLM sign-in.
+fn host_of(url: &str) -> &str {
+    let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    match authority.strip_prefix('[') {
+        Some(inside) => inside.split(']').next().unwrap_or(""),
+        None => authority.split(':').next().unwrap_or(""),
+    }
+}
+
+impl Transport {
+    pub(crate) fn new(trusted: &str) -> Self {
+        Self {
+            trusted: trusted.trim().to_owned(),
+            stopped_at: Mutex::new(None),
+            ntlm: None,
+            sign_in: Mutex::new(SignIn::default()),
+            auth_problem: Mutex::new(None),
+            asked: AtomicU32::new(0),
+            trouble: Mutex::new(None),
+        }
+    }
+
+    /// With the key NTLM signs in with, for a server that offers it.
+    #[must_use]
+    pub(crate) fn with_ntlm(mut self, credentials: Option<NtlmCredentials>) -> Self {
+        self.ntlm = credentials;
+        self
+    }
+
+    /// What the certificate question is, when the run was stopped by one.
+    pub(crate) fn problem(&self) -> Option<CertificateProblem> {
+        self.stopped_at.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone()
+    }
+
+    /// How the run signed in, `basic` or `ntlm`, once the server has said; `None` before.
+    pub(crate) fn scheme_name(&self) -> Option<&'static str> {
+        match self.sign_in.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).scheme {
+            Some(Scheme::Ntlm) => Some("ntlm"),
+            Some(Scheme::Basic) => Some("basic"),
+            None => None,
+        }
+    }
+
+    /// How many EWS requests the run has made so far, held at `u32::MAX` as Graph's count is. One is
+    /// counted for each request the run asks, not for each HTTP round trip: the legs a sign-in
+    /// takes (Basic's first try without the password, NTLM's two on a new connection) are part of
+    /// the request they sign in, so a run's number is how many things it asked the server.
+    pub(crate) fn requests_asked(&self) -> u32 {
+        self.asked.load(Ordering::Relaxed)
+    }
+
+    /// One more request asked ([`Transport::requests_asked`]).
+    fn count_request(&self) {
+        let _ = self.asked.try_update(Ordering::Relaxed, Ordering::Relaxed, |n| Some(n.saturating_add(1)));
+    }
+
+    /// Why the sign-in could not be had, when that stopped the run.
+    pub(crate) fn auth_problem(&self) -> Option<AuthProblem> {
+        *self.auth_problem.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    fn note(&self, problem: AuthProblem) {
+        *self.auth_problem.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(problem);
+    }
+
+    /// The fields of `request` to send: its own, with the `Authorization` given (none: no credential).
+    fn fields<'r>(request: &'r HttpRequest, authorization: Option<&'r str>) -> Vec<(&'r str, &'r str)> {
+        let mut fields: Vec<(&str, &str)> = request.fields().filter(|(name, _)| !name.eq_ignore_ascii_case("authorization")).collect();
+        if let Some(value) = authorization {
+            fields.push(("Authorization", value));
+        }
+        fields
+    }
+
+    pub(crate) fn response(answer: mailcraft_net::https::Response) -> HttpResponse {
+        let mut response = HttpResponse::new(answer.status, answer.body);
+        if let Some(location) = &answer.location {
+            response = response.with_field("Location", location);
+        }
+        for challenge in &answer.challenges {
+            response = response.with_field("WWW-Authenticate", challenge);
+        }
+        if let Some(wait) = &answer.retry_after {
+            response = response.with_field("Retry-After", wait);
+        }
+        if let Some(why) = &answer.policy_reason {
+            response = response.with_field("X-EWS-Policy-Reason", why);
+        }
+        response
+    }
+
+    /// One request on a connection of its own (no sign-in held): with the request's own credential
+    /// (Basic), or with none.
+    fn alone(&self, request: &HttpRequest, with_credential: bool) -> Result<mailcraft_net::https::Response, TransportError> {
+        self.alone_with(request, with_credential, request.body())
+    }
+
+    /// [`Transport::alone`] with `body` in place of the request's own.
+    fn alone_with(&self, request: &HttpRequest, with_credential: bool, body: &[u8]) -> Result<mailcraft_net::https::Response, TransportError> {
+        let authorization = with_credential.then(|| request.field("authorization")).flatten();
+        let fields = Self::fields(request, authorization);
+        let ask = mailcraft_net::https::Request {
+            method: request.method().as_str(),
+            url: request.url(),
+            fields: &fields,
+            body,
+            max_response: request.max_response_bytes(),
+            trusted: &self.trusted,
+        };
+        mailcraft_net::https::send(&ask).map_err(|error| self.judged_for(error, request))
+    }
+
+    fn send(&self, request: &HttpRequest) -> Result<HttpResponse, TransportError> {
+        let mut state = self.sign_in.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        match state.scheme {
+            Some(Scheme::Basic) => self.alone(request, true).map(Self::response),
+            Some(Scheme::Ntlm) => self.over_ntlm(&mut state, request),
+            None => {
+                // The first request goes with no credential: the server says how to sign in. It goes
+                // with no body (a message being sent is not uploaded to be turned away, and then
+                // uploaded again): its answer is the probe's, and the request itself is made
+                // only once the way to sign in is known.
+                let answer = self.alone_with(request, false, &[])?;
+                if answer.status != 401 {
+                    state.scheme = Some(Scheme::Basic);
+                    return self.alone(request, true).map(Self::response);
+                }
+                match auth::choose(&answer.challenges) {
+                    Ok(Scheme::Basic) => {
+                        state.scheme = Some(Scheme::Basic);
+                        self.alone(request, true).map(Self::response)
+                    }
+                    Ok(Scheme::Ntlm) => {
+                        state.scheme = Some(Scheme::Ntlm);
+                        self.over_ntlm(&mut state, request)
+                    }
+                    Err(error) => {
+                        self.note(match error {
+                            AuthError::NegotiateOnly => AuthProblem::NegotiateOnly,
+                            AuthError::NothingSupported => AuthProblem::NothingSupported,
+                        });
+                        // (Not a password the server turned down: no challenge goes with the answer.)
+                        Ok(HttpResponse::new(401, Vec::new()))
+                    }
+                }
+            }
+        }
+    }
+
+    /// A request on the held connection, opened and signed in when there is none. A connection that
+    /// has closed is opened again, for a request that may be made again; one whose request may have
+    /// gone out and is not to be repeated is [`TransportError::Lost`]. A request the server turns
+    /// down with 401 on a connection signed in earlier (a server that keeps a sign-in for one
+    /// request only, #1085) is signed in again on a new connection and sent once more.
+    fn over_ntlm(&self, state: &mut SignIn, request: &HttpRequest) -> Result<HttpResponse, TransportError> {
+        let Some(credentials) = &self.ntlm else {
+            self.note(AuthProblem::NtlmFailed);
+            return Ok(HttpResponse::new(401, Vec::new()));
+        };
+        for attempt in 0..2 {
+            let fresh = !state.connection.as_ref().is_some_and(Connection::is_open);
+            let mut third: Option<Secret> = None;
+            if fresh {
+                state.connection = None;
+                let mut connection = Connection::open(request.url(), &self.trusted).map_err(|e| self.judged_for(e, request))?;
+                let hash = connection.end_point_hash();
+                let context = ntlm::Context {
+                    client_challenge: mailcraft_net::https::client_challenge().map_err(|_| TransportError::Other)?,
+                    unix_seconds: u64::try_from(mailcraft_time::now()).unwrap_or(0),
+                    host: host_of(request.url()),
+                    channel_binding: hash.as_deref(),
+                };
+                let signed = ntlm::sign_in(credentials, &context, |negotiate| {
+                    let fields = [("Authorization", negotiate.expose()), ("Content-Type", "text/xml; charset=utf-8")];
+                    let ask = mailcraft_net::https::Request {
+                        method: "POST",
+                        url: request.url(),
+                        fields: &fields,
+                        body: &[],
+                        max_response: request.max_response_bytes().min(64 * 1024),
+                        trusted: &self.trusted,
+                    };
+                    connection.send(&ask).map(|answer| ntlm::Leg { status: answer.status, challenges: answer.challenges })
+                });
+                match signed {
+                    Ok(secret) => third = Some(secret),
+                    // (The connection failed before the request went: nothing was done.)
+                    Err(ntlm::SignInError::Exchange(error)) => return Err(self.judged_for(error, request)),
+                    // The server answered something else than a challenge: that answer is the run's.
+                    Err(ntlm::SignInError::Unexpected(status)) => return Ok(HttpResponse::new(status, Vec::new())),
+                    Err(ntlm::SignInError::Ntlm(_)) => {
+                        self.note(AuthProblem::NtlmFailed);
+                        return Ok(HttpResponse::new(401, Vec::new()));
+                    }
+                }
+                state.connection = Some(connection);
+            }
+            let Some(connection) = state.connection.as_mut() else { return Err(TransportError::Other) };
+            let fields = Self::fields(request, third.as_ref().map(Secret::expose));
+            let ask = mailcraft_net::https::Request {
+                method: request.method().as_str(),
+                url: request.url(),
+                fields: &fields,
+                body: request.body(),
+                max_response: request.max_response_bytes(),
+                trusted: &self.trusted,
+            };
+            match connection.send(&ask) {
+                // A server that keeps no sign-in past one request (IIS `Persistent-Auth: false`)
+                // answers a request sent on a signed-in connection without credentials with 401:
+                // the server did nothing with it, so sign in again on a new connection and send
+                // the request with the third leg, once. A 401 to the third leg itself is a refused
+                // sign-in, and goes back to the run as it always has.
+                Ok(answer) if answer.status == 401 && third.is_none() && attempt == 0 => {
+                    state.connection = None;
+                }
+                Ok(answer) => return Ok(Self::response(answer)),
+                Err(error) if mailcraft_net::https::is_closed(&error) => {
+                    state.connection = None;
+                    if !request.is_repeatable() {
+                        // (It may have gone out before the connection closed.)
+                        return Err(TransportError::Lost);
+                    }
+                    if fresh || attempt > 0 {
+                        return Err(TransportError::Unreachable);
+                    }
+                    // A connection the server closed while it was idle: a new one, signed in again.
+                }
+                Err(error) => {
+                    state.connection = None;
+                    return Err(self.judged_for(error, request));
+                }
+            }
+        }
+        Err(TransportError::Unreachable)
+    }
+
+    /// What a failed exchange is to the run, for `request`: a request that is never repeated and may
+    /// have gone out is lost, not a failure to connect.
+    fn judged_for(&self, error: NetError, request: &HttpRequest) -> TransportError {
+        // (Not reached the server, or not past the handshake: nothing of the request went out.)
+        let after_write = !request.is_repeatable()
+            && !matches!(error, NetError::Connect { .. } | NetError::Certificate(_) | NetError::Tls { .. } | NetError::Config(_));
+        let judged = self.judged(error);
+        if after_write { TransportError::Lost } else { judged }
+    }
+
+    /// What a failed exchange is to the run. A certificate that is not accepted is kept apart (never
+    /// a plain TLS error to the run's machine: it ends the run at once and asks); the rest is
+    /// told by its kind. A connection that could not be made at all keeps a few of its own words,
+    /// so that the line naming the server can say what went wrong ([`HttpExchange::trouble`](crate::http::HttpExchange)).
+    fn judged(&self, error: NetError) -> TransportError {
+        // What the connection itself said is kept for the line naming the server, whatever its kind.
+        if let Some(said) = mailcraft_net::https::connection_words(&error) {
+            self.note_trouble(&said);
+        }
+        // A server that took too long, or answered more than the request may read, or hung up, is
+        // its own kind of trouble, not one the transport has no words for.
+        if mailcraft_net::https::is_timed_out(&error) {
+            return TransportError::TimedOut;
+        }
+        if mailcraft_net::https::is_too_long(&error) {
+            return TransportError::BodyTooLarge;
+        }
+        if mailcraft_net::https::is_closed(&error) {
+            return TransportError::Unreachable;
+        }
+        match error {
+            NetError::Certificate(problem) => {
+                *self.stopped_at.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(*problem);
+                TransportError::Tls
+            }
+            NetError::Tls { .. } => TransportError::Tls,
+            NetError::Connect { .. } => TransportError::Unreachable,
+            // The account's own settings name a server that is not one: nothing went out, the
+            // network is not the thing to blame, and asking again changes nothing.
+            NetError::Config(_) => TransportError::Config,
+            _ => TransportError::Other,
+        }
+    }
+
+    /// A few words of what the connection itself said, for the line that says which server could
+    /// not be reached. Words only: control characters gone, at most 200 of them, nothing of the
+    /// owner's mail or of a credential (what a server answers is never kept here).
+    fn note_trouble(&self, said: &str) {
+        let clean: String = said.chars().take(200).filter(|c| !c.is_control()).collect();
+        let clean = clean.trim();
+        if !clean.is_empty() {
+            *self.trouble.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(clean.to_owned());
+        }
+    }
+
+    /// Nothing is known about the last connection: the next request's failure says its own thing.
+    fn forget_trouble(&self) {
+        *self.trouble.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+    }
+}
+
+impl HttpExchange for Transport {
+    fn exchange(&self, request: &HttpRequest) -> impl Future<Output = Result<HttpResponse, TransportError>> {
+        // (The call blocks, on the run's own thread.)
+        self.count_request();
+        // A new request: what an earlier connection said is no longer the thing to say about this
+        // one, even if this one gets an answer.
+        self.forget_trouble();
+        ready(self.send(request))
+    }
+
+    fn trouble(&self) -> Option<String> {
+        self.trouble.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone()
+    }
+}
+
+/// The last piece of a run, with the certificate question in it when a certificate stopped the run:
+/// the fingerprint of one the owner may be asked about, else the words that it can't be trusted. The
+/// line the run wrote for the secure connection that failed is replaced, not added to.
+pub(crate) fn settled(mut piece: EwsMailResult, problem: Option<&CertificateProblem>, auth: Option<AuthProblem>) -> EwsMailResult {
+    // A sign-in that could not be had is told in words, and is no password to ask for again.
+    if let Some(auth) = auth.filter(|_| !piece.partial) {
+        piece.auth_refused = false;
+        piece.whole = false;
+        if !piece.errors.iter().any(|line| line == auth.words()) {
+            piece.errors.insert(0, auth.words().to_owned());
+        }
+        return piece;
+    }
+    let Some(problem) = problem.filter(|_| !piece.partial) else { return piece };
+    piece.errors.retain(|line| line != NO_SECURE_LINE);
+    piece.whole = false;
+    if problem.can_be_trusted() {
+        piece.untrusted = problem.info().fingerprint.clone();
+    } else {
+        piece.errors.insert(0, format!("{problem}"));
+    }
+    piece
+}
+
+/// The same for a batch fetched: no question can be asked from there, so it is told in words.
+pub(crate) fn settled_fetch(mut result: GraphFetchResult, problem: Option<&CertificateProblem>, auth: Option<AuthProblem>) -> GraphFetchResult {
+    if let Some(auth) = auth {
+        result.errors.insert(0, format!("Couldn't download the messages from the server: {}", auth.words()));
+        return result;
+    }
+    if let Some(problem) = problem {
+        result.errors.retain(|line| !line.ends_with(NO_SECURE_LINE));
+        result.errors.insert(0, format!("Couldn't download the messages from the server: {problem}"));
+    }
+    result
+}
+
+/// The same for a read of the calendar alone (#1274): the certificate question as a run's last
+/// piece has it, and a sign-in that could not be had in words.
+pub(crate) fn settled_directory(
+    mut result: EwsDirectoryResult,
+    problem: Option<&CertificateProblem>,
+    auth: Option<AuthProblem>,
+) -> EwsDirectoryResult {
+    if let Some(auth) = auth {
+        result.auth_refused = false;
+        if !result.errors.iter().any(|line| line == auth.words()) {
+            result.errors.insert(0, auth.words().to_owned());
+        }
+        return result;
+    }
+    let Some(problem) = problem else { return result };
+    result.errors.retain(|line| line != NO_SECURE_LINE);
+    if problem.can_be_trusted() {
+        result.untrusted = problem.info().fingerprint.clone();
+    } else {
+        result.errors.insert(0, format!("{problem}"));
+    }
+    result
+}
+
+/// The Basic credential of `username` (the address when it is empty) and `password`, as a client for
+/// `url`. Why not: words that name neither.
+pub(crate) fn client(url: &str, username: &str, email: &str, password: &str) -> Result<Client, &'static str> {
+    // A mailbox file is hostile too: an account that names a Microsoft host is never signed in to
+    // here, whatever the file says (its mailbox is a Microsoft account).
+    if on_microsoft(url) {
+        return Err("This server is Microsoft's: add the mailbox as a Microsoft account instead");
+    }
+    let name = if username.trim().is_empty() { email.trim() } else { username.trim() };
+    let secret = Secret::basic(name, password).map_err(|_| "The user name or the password can't be used to sign in")?;
+    Client::new(url, secret).map_err(|_| "The server's address can't be used")
+}
+
+/// The NTLM key for the same user name and password, when they can be sent that way.
+pub(crate) fn ntlm_key(username: &str, email: &str, password: &str) -> Option<NtlmCredentials> {
+    let name = if username.trim().is_empty() { email.trim() } else { username.trim() };
+    NtlmCredentials::new(name, password).ok()
+}
+
+/// Sleeps `ms` milliseconds in small steps; false when the run was called off meanwhile.
+fn wait(cancel: &AtomicBool, ms: u32) -> bool {
+    let mut left = u64::from(ms);
+    while left > 0 {
+        if cancel.load(Ordering::Relaxed) {
+            return false;
+        }
+        let step = left.min(100);
+        std::thread::sleep(Duration::from_millis(step));
+        left = left.saturating_sub(step);
+    }
+    !cancel.load(Ordering::Relaxed)
+}
+
+/// Runs an Exchange run on a thread of its own, handing the pieces to the window as they come.
+fn phase_of(inbox_pass: bool, piece: &EwsMailResult, before: SyncPhase) -> SyncPhase {
+    if inbox_pass {
+        SyncPhase::Inbox
+    } else if !piece.pages.is_empty() || piece.progress.is_some() {
+        SyncPhase::NewMail
+    } else if piece.folders.is_some() {
+        SyncPhase::Folders
+    } else if piece.directory.is_some() {
+        SyncPhase::CalendarAndContacts
+    } else if !piece.sent.is_empty() {
+        SyncPhase::Sending
+    } else if !(piece.changes.is_empty() && piece.messages.is_empty() && piece.drafts.is_empty() && piece.placed.is_empty()) {
+        SyncPhase::Folders
+    } else {
+        before
+    }
+}
+
+/// The time and requests since the last piece was handed on, for the run's timings.
+struct Lap {
+    from: Instant,
+    requests: u32,
+    phase: SyncPhase,
+}
+
+impl Lap {
+    fn start(requests: u32) -> Lap {
+        Lap { from: Instant::now(), requests, phase: SyncPhase::Folders }
+    }
+
+    /// What has gone since the last lap, as `phase`'s time, with `requests` asked in all so far; the
+    /// next lap begins now.
+    fn take(&mut self, phase: SyncPhase, requests: u32) -> Timings {
+        let mut timings = Timings::default();
+        timings.add_time(phase, self.from.elapsed(), requests.saturating_sub(self.requests));
+        *self = Lap { from: Instant::now(), requests, phase };
+        timings
+    }
+}
+
+/// [`run_mail`] on this thread: every piece through `emit`.
+pub fn run_mail_with(request: &EwsMailRequest, password: &str, cancel: &AtomicBool, emit: &mut dyn FnMut(EwsMailResult)) {
+    let client = match client(&request.url, &request.username, &request.email, password) {
+        Ok(client) => client,
+        Err(why) => return emit(mailcraft_ews::failed_run(request, why)),
+    };
+    let transport = Transport::new(&request.trusted).with_ntlm(ntlm_key(&request.username, &request.email, password));
+    let mut pause = |ms: u32| wait(cancel, ms);
+    let mut lap = Lap::start(transport.requests_asked());
+    block_on(mailcraft_ews::sync_mail(&client, &transport, request, cancel, &mut pause, &mut |piece| {
+        let mut piece = settled(piece, transport.problem().as_ref(), transport.auth_problem());
+        piece.timings = lap.take(phase_of(request.inbox_pass, &piece, lap.phase), transport.requests_asked());
+        // How it signed in: File › Info says so.
+        if let Some(scheme) = transport.scheme_name() {
+            scheme.clone_into(&mut piece.signed_in_with);
+        }
+        emit(piece);
+    }));
+}
+
+/// Fetches messages of an Exchange server account whole on a thread of its own.
+pub fn run_fetch_with(request: &EwsFetchRequest, password: &str, cancel: &Arc<AtomicBool>) -> GraphFetchResult {
+    let client = match client(&request.url, &request.username, &request.email, password) {
+        Ok(client) => client,
+        Err(why) => {
+            return GraphFetchResult { account: request.account, email: request.email.clone(), errors: vec![why.to_owned()], ..Default::default() };
+        }
+    };
+    let transport = Transport::new(&request.trusted).with_ntlm(ntlm_key(&request.username, &request.email, password));
+    let mut pause = |ms: u32| wait(cancel, ms);
+    let result = block_on(mailcraft_ews::fetch_messages(&client, &transport, request, cancel, &mut pause));
+    settled_fetch(result, transport.problem().as_ref(), transport.auth_problem())
+}
+
+/// Looks names up in the address list of an Exchange server account on a thread of its own
+/// (#1262): `ResolveNames` for each name of the job, which reads and changes nothing.
+pub fn run_resolve_with(request: &EwsResolveRequest, password: &str, cancel: &Arc<AtomicBool>) -> EwsResolveResult {
+    let mut out = EwsResolveResult { account: request.account, ..Default::default() };
+    let client = match client(&request.url, &request.username, &request.email, password) {
+        Ok(client) => client,
+        Err(why) => {
+            out.error = Some(why.to_owned());
+            return out;
+        }
+    };
+    let transport = Transport::new(&request.trusted).with_ntlm(ntlm_key(&request.username, &request.email, password));
+    for text in request.texts.iter().take(MAX_RESOLVE_TEXTS) {
+        let Some(lookup) = ResolveNames::new(text) else { continue };
+        let mut tries = 0u8;
+        let answer = loop {
+            if cancel.load(Ordering::Relaxed) {
+                return out;
+            }
+            tries = tries.saturating_add(1);
+            match block_on(client.resolve_names(&transport, &lookup)) {
+                Err(mailcraft_ews::Error::Busy { back_off_ms }) if tries < 2 => {
+                    if !wait(cancel, back_off_ms.min(MOST_RESOLVE_WAIT_MS)) {
+                        return out;
+                    }
+                }
+                answer => break answer,
+            }
+        };
+        match answer {
+            Ok(resolved) => out.found.push(EwsResolved {
+                text: text.clone(),
+                people: resolved.candidates.into_iter().filter_map(|c| directory_person(c).checked()).take(MAX_RESOLVE_PEOPLE).collect(),
+                more: resolved.more,
+            }),
+            Err(error) => {
+                out.auth_refused = matches!(error, mailcraft_ews::Error::Unauthorized) && transport.auth_problem().is_none();
+                out.error = Some(resolve_words(&error, transport.problem().as_ref(), transport.auth_problem()));
+                return out;
+            }
+        }
+    }
+    out
+}
+
+/// The person a candidate of the address list is to the window.
+fn directory_person(c: Candidate) -> DirectoryPerson {
+    let kind = match c.kind {
+        RecipientKind::Mailbox => DirectoryKind::Mailbox,
+        RecipientKind::List => DirectoryKind::List,
+        RecipientKind::Contact => DirectoryKind::Contact,
+        RecipientKind::Group => DirectoryKind::Group,
+        RecipientKind::PublicFolder => DirectoryKind::PublicFolder,
+        _ => DirectoryKind::Other,
+    };
+    DirectoryPerson {
+        name: c.name,
+        email: c.email,
+        kind,
+        company: c.company,
+        department: c.department,
+        title: c.title,
+        phone: c.phone,
+        mobile: c.mobile,
+        office: c.office,
+    }
+}
+
+/// Why a look-up stopped, in words for the owner.
+fn resolve_words(error: &mailcraft_ews::Error, problem: Option<&CertificateProblem>, auth: Option<AuthProblem>) -> String {
+    use mailcraft_ews::Error;
+    const LINE: &str = "Couldn't look the names up in the organisation's address list";
+    if let Some(auth) = auth {
+        return format!("{LINE}: {}", auth.words());
+    }
+    if let Some(problem) = problem {
+        return format!("{LINE}: {problem}");
+    }
+    let why = match error {
+        Error::Unauthorized => "the server turned the password down",
+        Error::Busy { .. } => "the server is busy; try again in a moment",
+        Error::Blocked(_) | Error::Forbidden => "the server doesn't allow it",
+        Error::Transport(TransportError::Unreachable) => "the server can't be reached",
+        Error::Transport(_) => "the connection to the server failed",
+        Error::Server(_) => "the server refused",
+        _ => "the server's answer can't be read",
+    };
+    format!("{LINE}: {why}")
+}
+
+/// The calendar, contacts and to-dos of an Exchange server account, on this thread.
+pub fn run_calendar_with(request: &EwsDirectoryRequest, password: &str, cancel: &AtomicBool) -> EwsDirectoryResult {
+    let client = match client(&request.url, &request.username, &request.email, password) {
+        Ok(client) => client,
+        Err(why) => {
+            return EwsDirectoryResult { account: request.account, email: request.email.clone(), errors: vec![why.to_owned()], ..Default::default() };
+        }
+    };
+    let transport = Transport::new(&request.trusted).with_ntlm(ntlm_key(&request.username, &request.email, password));
+    let mut pause = |ms: u32| wait(cancel, ms);
+    let result = block_on(mailcraft_ews::sync_directory(&client, &transport, request, cancel, &mut pause));
+    let mut result = settled_directory(result, transport.problem().as_ref(), transport.auth_problem());
+    if let Some(scheme) = transport.scheme_name() {
+        scheme.clone_into(&mut result.signed_in_with);
+    }
+    result
+}
+
+/// One future to its end on this thread: the exchange crate's runs are futures, and a host's
+/// thread waits for its own.
+fn block_on<F: Future>(future: F) -> F::Output {
+    let mut future = std::pin::pin!(future);
+    let waker = Waker::from(std::sync::Arc::new(Unpark(std::thread::current())));
+    let mut cx = Context::from_waker(&waker);
+    loop {
+        match future.as_mut().poll(&mut cx) {
+            Poll::Ready(out) => return out,
+            Poll::Pending => std::thread::park(),
+        }
+    }
+}
+
+struct Unpark(std::thread::Thread);
+impl std::task::Wake for Unpark {
+    fn wake(self: std::sync::Arc<Self>) {
+        self.0.unpark();
+    }
+}
+
+/// Whether a server's address is Microsoft 365's, which is a Microsoft account, never an
+/// Exchange server account signed in to here.
+fn on_microsoft(url: &str) -> bool {
+    let server = mailcraft_model::EwsServer { url: url.trim().to_owned(), ..Default::default() };
+    server.host().is_some_and(mailcraft_model::is_exchange_online)
+}

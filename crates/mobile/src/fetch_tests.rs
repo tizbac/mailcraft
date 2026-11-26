@@ -125,14 +125,15 @@ pub(crate) fn runner(serve: Arc<Serve>, found: Arc<Find>, open: bool) -> (FetchR
     let asked = Arc::new(Mutex::new(Vec::new()));
     let gate = Arc::new((Mutex::new(open), Condvar::new()));
     let (log, held_gate) = (asked.clone(), gate.clone());
-    let run: FetchRunner = Arc::new(move |access: Access, work: Work, _cancel: Arc<AtomicBool>| {
+    let run: FetchRunner = Arc::new(move |access: Option<Access>, work: Work, _cancel: Arc<AtomicBool>| {
         let (held, refresh) = match &access {
-            Access::Held(_) => (true, String::new()),
-            Access::Renew { refresh, .. } => (false, refresh.clone()),
+            Some(Access::Held(_)) | None => (true, String::new()),
+            Some(Access::Renew { refresh, .. }) => (false, refresh.clone()),
         };
         match &work {
             Work::Messages(request) => log.lock().unwrap().push(Asked::Fetch { held, refresh, request: request.clone() }),
             Work::Search(request) => log.lock().unwrap().push(Asked::Search { next: request.next.clone() }),
+            Work::EwsMessages { .. } => (),
         }
         {
             let (lock, cv) = &*held_gate;
@@ -159,6 +160,7 @@ pub(crate) fn runner(serve: Arc<Serve>, found: Arc<Find>, open: bool) -> (FetchR
                 (result.account, result.ticket) = (request.account, request.ticket);
                 Answer::Search(result)
             }
+            Work::EwsMessages { request, .. } => Answer::Messages(GraphFetchResult { account: request.account, ..Default::default() }),
         };
         FetchDone { answer: Some(answer), renewal }
     });

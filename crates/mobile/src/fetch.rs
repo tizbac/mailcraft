@@ -32,11 +32,11 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use mailcraft_engine::Session;
-use mailcraft_engine::cmd::{device_limits, graph_mail, search_server};
+use mailcraft_engine::cmd::{device_limits, ews_mail, graph_mail, search_server};
 use mailcraft_host::NetworkState;
 use mailcraft_host::fetch::{Access, Renewal};
 use mailcraft_host::sync::Adopted;
-use mailcraft_model::sync::{GraphFetchRequest, GraphFetchResult, GraphSearchRequest, GraphSearchResult};
+use mailcraft_model::sync::{EwsFetchRequest, GraphFetchRequest, GraphFetchResult, GraphSearchRequest, GraphSearchResult};
 use mailcraft_model::{AccountKind, Id};
 
 use crate::CoreError;
@@ -122,6 +122,12 @@ pub struct ServerSearchAnswer {
 /// What a job asks of the server.
 pub(crate) enum Work {
     Messages(GraphFetchRequest),
+    /// An Exchange server account's messages, with the password the run signs in with (held in
+    /// memory only, and in no log line).
+    EwsMessages {
+        request: Box<EwsFetchRequest>,
+        password: String,
+    },
     Search(GraphSearchRequest),
 }
 
@@ -138,7 +144,7 @@ pub(crate) struct FetchDone {
 }
 
 /// How a job is run: over the network, or as a test says.
-pub(crate) type FetchRunner = Arc<dyn Fn(Access, Work, Arc<AtomicBool>) -> FetchDone + Send + Sync>;
+pub(crate) type FetchRunner = Arc<dyn Fn(Option<Access>, Work, Arc<AtomicBool>) -> FetchDone + Send + Sync>;
 
 /// The runner a core starts with: over the network, and never in a test's build, where a test that
 /// doesn't swap its own in reaches nobody.
@@ -155,10 +161,24 @@ pub(crate) fn default_runner() -> FetchRunner {
 #[cfg_attr(test, allow(dead_code))]
 pub(crate) fn real_runner() -> FetchRunner {
     Arc::new(|access, work, cancel| {
-        let (answer, renewal) = mailcraft_host::fetch::with_access(access, |token| match work {
-            Work::Messages(request) => Answer::Messages(mailcraft_net::graph::fetch_messages(token, &request, &cancel)),
-            Work::Search(request) => Answer::Search(mailcraft_net::graph::search_messages(token, &request)),
-        });
+        let (answer, renewal) = match work {
+            Work::EwsMessages { request, password } => {
+                let result = mailcraft_host::ews::run_fetch_with(&request, &password, &cancel);
+                (Some(Answer::Messages(result)), Renewal::default())
+            }
+            Work::Messages(request) => match access {
+                Some(access) => mailcraft_host::fetch::with_access(access, |token| {
+                    Answer::Messages(mailcraft_net::graph::fetch_messages(token, &request, &cancel))
+                }),
+                None => (None, Renewal::default()),
+            },
+            Work::Search(request) => match access {
+                Some(access) => {
+                    mailcraft_host::fetch::with_access(access, |token| Answer::Search(mailcraft_net::graph::search_messages(token, &request)))
+                }
+                None => (None, Renewal::default()),
+            },
+        };
         FetchDone { answer, renewal }
     })
 }
@@ -332,9 +352,9 @@ impl SyncHost {
         })
     }
 
-    /// Whether the phone fetches `account`'s mail: a Microsoft account of its own.
+    /// Whether the phone fetches `account`'s mail: a Microsoft or Exchange account of its own.
     fn runs(&self, session: &Session, account: Id) -> bool {
-        session.mailbox.account(account).is_some_and(|a| a.kind == AccountKind::Microsoft && !a.is_shared())
+        session.mailbox.account(account).is_some_and(|a| matches!(a.kind, AccountKind::Microsoft | AccountKind::Exchange) && !a.is_shared())
     }
 
     /// A call waits for `message` to come whole (asked for when it isn't yet). `None` when it is
@@ -523,7 +543,7 @@ impl SyncHost {
                         }));
                         continue;
                     };
-                    self.start(inner, session, account, What::Search(reply), access, Work::Search(request), 0, 0);
+                    self.start(inner, session, account, What::Search(reply), Some(access), Work::Search(request), 0, 0);
                 }
             }
         }
@@ -531,6 +551,24 @@ impl SyncHost {
     }
 
     fn start_open(&self, inner: &mut Inner, session: &mut Session, account: Id, message: Id) {
+        if session.mailbox.account(account).is_some_and(|a| a.kind == AccountKind::Exchange) {
+            let request = match ews_mail::ews_fetch_request(session, account, Some(message), 1) {
+                Ok(request) => request,
+                Err(_) => return self.failed(inner, message, FetchFailure::Gone),
+            };
+            if request.ids.is_empty() {
+                // Whole by now (a batch brought it), or no longer the server's to give.
+                return match session.mailbox.message(message) {
+                    Some(m) if !m.unfetched => self.fetched(inner, message),
+                    _ => self.failed(inner, message, FetchFailure::Gone),
+                };
+            }
+            let Some(password) = self.exchange_password(inner, session, account) else {
+                return self.failed(inner, message, FetchFailure::SignInNeeded);
+            };
+            let work = Work::EwsMessages { request: Box::new(request), password };
+            return self.start(inner, session, account, What::Open(message), None, work, OPEN_MOST_BYTES, OPEN_MOST_BYTES);
+        }
         let mut request = match graph_mail::graph_fetch_request(session, account, Some(message), 1) {
             Ok(request) => request,
             Err(_) => return self.failed(inner, message, FetchFailure::Gone),
@@ -547,7 +585,23 @@ impl SyncHost {
             return self.failed(inner, message, FetchFailure::SignInNeeded);
         };
         (request.most_bytes, request.most_total) = (OPEN_MOST_BYTES, OPEN_MOST_BYTES);
-        self.start(inner, session, account, What::Open(message), access, Work::Messages(request), OPEN_MOST_BYTES, OPEN_MOST_BYTES);
+        self.start(inner, session, account, What::Open(message), Some(access), Work::Messages(request), OPEN_MOST_BYTES, OPEN_MOST_BYTES);
+    }
+
+    /// The password of an Exchange account: typed into Add Account this session, else read from
+    /// the credential store (and kept for the next open of a message).
+    fn exchange_password(&self, inner: &mut Inner, session: &Session, account: Id) -> Option<String> {
+        if let Some(password) = inner.passwords.get(&account) {
+            return Some(password.clone());
+        }
+        let a = session.mailbox.account(account)?;
+        let store = self.host.platform().secrets()?;
+        let password = store.get(&mailcraft_host::secrets::secret_key("password", a))?;
+        if password.is_empty() {
+            return None;
+        }
+        inner.passwords.insert(account, password.clone());
+        Some(password)
     }
 
     /// A background batch of one account, when it is due and the phone has room for it.
@@ -562,22 +616,33 @@ impl SyncHost {
         if !unmetered || !session.fetch_background_due(now) || !room_for_more(session) {
             return;
         }
-        let accounts = session.fetch_background_accounts(|kind| kind == AccountKind::Microsoft, now);
+        let accounts = session.fetch_background_accounts(|kind| matches!(kind, AccountKind::Microsoft | AccountKind::Exchange), now);
         for account in accounts {
             if inner.fetch.running.contains_key(&account) || !self.runs(session, account) || inner.sr.held(account) {
                 continue;
             }
-            let Ok(mut request) = graph_mail::graph_fetch_request(session, account, None, BACKGROUND_BATCH) else { continue };
-            if request.ids.is_empty() {
-                continue;
-            }
-            let Some(access) = self.access(inner, session, account) else { continue };
             // Each message within the account's Download messages in full (the server's size isn't
             // known before it comes: a delta gives none), the batch within its own room.
             let most = session.mailbox.account(account).and_then(|a| a.download_in_full.limit()).unwrap_or(OPEN_MOST_BYTES).min(OPEN_MOST_BYTES);
             let total = BACKGROUND_TOTAL.max(most);
-            (request.most_bytes, request.most_total) = (most, total);
-            self.start(inner, session, account, What::Background, access, Work::Messages(request), most, total);
+            let (access, work) = if session.mailbox.account(account).is_some_and(|a| a.kind == AccountKind::Exchange) {
+                let Ok(mut request) = ews_mail::ews_fetch_request(session, account, None, BACKGROUND_BATCH) else { continue };
+                if request.ids.is_empty() {
+                    continue;
+                }
+                request.background = true;
+                let Some(password) = self.exchange_password(inner, session, account) else { continue };
+                (None, Work::EwsMessages { request: Box::new(request), password })
+            } else {
+                let Ok(mut request) = graph_mail::graph_fetch_request(session, account, None, BACKGROUND_BATCH) else { continue };
+                if request.ids.is_empty() {
+                    continue;
+                }
+                let Some(access) = self.access(inner, session, account) else { continue };
+                (request.most_bytes, request.most_total) = (most, total);
+                (Some(access), Work::Messages(request))
+            };
+            self.start(inner, session, account, What::Background, access, work, most, total);
             return;
         }
         session.driver.fetch.found_nothing(now);
@@ -598,7 +663,17 @@ impl SyncHost {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn start(&self, inner: &mut Inner, session: &Session, account: Id, what: What, access: Access, work: Work, most_bytes: u64, most_total: u64) {
+    fn start(
+        &self,
+        inner: &mut Inner,
+        session: &Session,
+        account: Id,
+        what: What,
+        access: Option<Access>,
+        work: Work,
+        most_bytes: u64,
+        most_total: u64,
+    ) {
         let cancel = Arc::new(AtomicBool::new(false));
         let runner = self.fetch_runner.lock().unwrap_or_else(PoisonError::into_inner).clone();
         let flag = cancel.clone();

@@ -224,7 +224,7 @@ pub(crate) struct Inner {
     pub(crate) jobs: crate::jobs::Jobs,
     /// Passwords typed into Add Account this session, by account: kept in memory only, and in the
     /// platform's credential store when the owner lets sign-ins be remembered.
-    passwords: std::collections::HashMap<u64, String>,
+    pub(crate) passwords: std::collections::HashMap<u64, String>,
     /// How many of those jobs the end of the round under way has started: it waits for them, up
     /// to [`MOST_TAIL_STARTS`], before it is over.
     tail_starts: u32,
@@ -652,7 +652,7 @@ impl SyncHost {
             }
             if inner.sr.eligible(session, id) {
                 supported.push(id);
-            } else if let Some(a) = session.mailbox.account(id).filter(|a| a.kind != AccountKind::Imap) {
+            } else if let Some(a) = session.mailbox.account(id).filter(|a| !matches!(a.kind, AccountKind::Imap | AccountKind::Exchange)) {
                 inner.unsupported.insert(id, a.kind);
             }
         }
@@ -750,7 +750,7 @@ impl SyncHost {
             .into_iter()
             .filter(|id| !inner.sr.held(*id) && !inner.sr.eligible(session, *id))
             .filter_map(|id| session.mailbox.account(id).map(|a| (id, a.kind)))
-            .filter(|(_, kind)| *kind != AccountKind::Imap)
+            .filter(|(_, kind)| !matches!(kind, AccountKind::Imap | AccountKind::Exchange))
             .collect();
         if !inner.sr.busy() && inner.run_mark.is_none() {
             inner.idle_mark = Some(arrivals::mark(&session.mailbox));

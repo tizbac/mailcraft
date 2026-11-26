@@ -7,6 +7,7 @@ package work.mailcraft.android
 import uniffi.mailcraft_mobile.Core
 import uniffi.mailcraft_mobile.CoreException
 import uniffi.mailcraft_mobile.DownloadSettings
+import uniffi.mailcraft_mobile.ExchangeAccountSettings
 import uniffi.mailcraft_mobile.ImapAccountSettings
 import uniffi.mailcraft_mobile.KeepWindow
 import uniffi.mailcraft_mobile.MailServer
@@ -164,6 +165,9 @@ internal interface AccountsApi {
     /** Adds an account that signs in with a password (IMAP to read, SMTP to send): its id. */
     suspend fun addImap(settings: ImapAccountSettings): ULong
 
+    /** Adds an Exchange server account (Exchange Web Services): its id. */
+    suspend fun addExchange(settings: ExchangeAccountSettings): ULong
+
     suspend fun grant(account: ULong, permission: PermissionKind): GrantResult
 
     suspend fun status(account: ULong, permission: PermissionKind): PermissionStatus
@@ -202,6 +206,8 @@ internal class CoreAccounts(private val core: Core, private val handback: SignIn
     }
 
     override suspend fun addImap(settings: ImapAccountSettings): ULong = core.addImapAccount(settings)
+
+    override suspend fun addExchange(settings: ExchangeAccountSettings): ULong = core.addExchangeAccount(settings)
 
     override suspend fun grant(account: ULong, permission: PermissionKind): GrantResult {
         val ticket = handback.begin() ?: return GrantResult.Failed("")
@@ -296,6 +302,17 @@ internal sealed interface AddAccountState {
         val outgoingHost: String = "",
         val outgoingPort: String = "587",
         val outgoingTls: Boolean = false,
+        val notice: Notice? = null,
+        val working: Boolean = false,
+    ) : AddAccountState
+
+    /** An Exchange server account (Exchange Web Services): the form, and why the last try ended. */
+    data class Exchange(
+        val email: String = "",
+        val displayName: String = "",
+        val username: String = "",
+        val password: String = "",
+        val url: String = "",
         val notice: Notice? = null,
         val working: Boolean = false,
     ) : AddAccountState
@@ -414,6 +431,15 @@ internal enum class ImapField {
     }
 }
 
+/** Which field of the Exchange form was changed. */
+internal enum class ExchangeField {
+    Email,
+    DisplayName,
+    Username,
+    Password,
+    Url,
+}
+
 @Suppress("LongParameterList")
 internal class AccountActions(
     val onEmail: (String) -> Unit = {},
@@ -431,6 +457,10 @@ internal class AccountActions(
     val onImapIncomingTls: (Boolean) -> Unit = {},
     val onImapOutgoingTls: (Boolean) -> Unit = {},
     val onAddImap: () -> Unit = {},
+    /** Opens the form for an Exchange server account. */
+    val onChooseExchange: () -> Unit = {},
+    val onExchangeField: (ExchangeField, String) -> Unit = { _, _ -> },
+    val onAddExchange: () -> Unit = {},
     /** A sign-in again for an account the owner has; the address is the form's hint. */
     val onSignInAgain: (AccountItem) -> Unit = {},
     val onAsk: (AccountItem, PermissionKind) -> Unit = { _, _ -> },

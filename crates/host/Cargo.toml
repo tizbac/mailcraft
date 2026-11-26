@@ -23,6 +23,10 @@ mailcraft-model = { workspace = true }
 mailcraft-net = { workspace = true }
 mailcraft-time = { workspace = true }
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# An Exchange server account's runs, which need sockets (never the browser build).
+mailcraft-ews = { workspace = true }
+
 [dev-dependencies]
 # The stand-in for Microsoft Graph, to show that a job sends nothing it must not.
 mailcraft-net = { workspace = true, features = ["stand-in"] }

@@ -72,6 +72,7 @@ internal fun AddAccountScreen(texts: Texts, state: AddAccountState, actions: Acc
             when (state) {
                 is AddAccountState.Form -> AddAccountForm(texts, state, actions)
                 is AddAccountState.Imap -> ImapAccountForm(texts, state, actions)
+                is AddAccountState.Exchange -> ExchangeAccountForm(texts, state, actions)
                 is AddAccountState.Waiting -> SignInWaiting(texts, actions.onCancelSignIn)
                 is AddAccountState.Approval -> ApprovalHelp(texts, state, actions)
                 is AddAccountState.Done -> Unit
@@ -104,6 +105,9 @@ private fun AddAccountForm(texts: Texts, state: AddAccountState.Form, actions: A
     }
     OutlinedButton(onClick = actions.onChooseImap, modifier = Modifier.fillMaxWidth()) {
         Text(texts.t("Add an IMAP account"))
+    }
+    OutlinedButton(onClick = actions.onChooseExchange, modifier = Modifier.fillMaxWidth()) {
+        Text(texts.t("Add an Exchange account"))
     }
 }
 

@@ -451,8 +451,8 @@ fn an_account_of_another_kind_is_said_so_in_words() {
                 "account.add",
                 &json!({
                     "email": "ada@example.org",
-                    "kind": "exchange",
-                    "ews": {"url": "https://mail.example.org/EWS/Exchange.asmx"},
+                    "kind": "jmap",
+                    "jmap": {"session": "https://jmap.example.org/session"},
                 }),
             )
             .unwrap();
@@ -557,8 +557,8 @@ fn mixed_session() -> Session {
         "account.add",
         &json!({
             "email": "ada@example.org",
-            "kind": "exchange",
-            "ews": {"url": "https://mail.example.org/EWS/Exchange.asmx"},
+            "kind": "jmap",
+            "jmap": {"session": "https://jmap.example.org/session"},
         }),
     )
     .unwrap();
@@ -686,12 +686,12 @@ fn an_account_that_went_is_no_longer_said_to_be_unsupported() {
     let deadline = Instant::now() + Duration::from_secs(10);
     core.enqueue_tick();
     while unsupported(&core).len() != 1 {
-        assert!(Instant::now() < deadline, "the Exchange account was never told of");
+        assert!(Instant::now() < deadline, "the JMAP account was never told of");
         std::thread::sleep(Duration::from_millis(20));
         core.enqueue_tick();
     }
-    let imap = unsupported(&core)[0].account;
-    block_on(core.execute("account.remove".into(), json!({"id": imap}).to_string())).unwrap();
+    let other = unsupported(&core)[0].account;
+    block_on(core.execute("account.remove".into(), json!({"id": other}).to_string())).unwrap();
     while !unsupported(&core).is_empty() {
         assert!(Instant::now() < deadline, "a removed account is still told of");
         std::thread::sleep(Duration::from_millis(20));
