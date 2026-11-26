@@ -1,0 +1,1 @@
+- **Pasting into a table cell keeps the formatting.** Formatted text pasted into a cell (from a page, a message or a signature) keeps its bold, italic, underline, colours, fonts, sizes and links, and its lines, instead of going in as plain text.

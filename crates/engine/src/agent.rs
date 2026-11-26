@@ -229,6 +229,7 @@ const SAFE: &[&str] = &[
     "table.cellBorders",
     "table.cellEdit",
     "table.cellType",
+    "table.cellPaste",
     "table.cellErase",
     "table.cellEnter",
     "table.cellLeave",

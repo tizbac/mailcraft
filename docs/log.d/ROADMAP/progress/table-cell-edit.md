@@ -3,3 +3,4 @@
 | 2026-11-26 | A signature pasted from the web keeps its grid and formatting in the rich editor, its cells are typed in like a message's, and its pictures on the web are downloaded once and stored in the signature |
 | 2026-11-28 | A table after a line break, a paragraph or a signature is entered at its first cell and its cells are typed in: the table's place is found with the line breaks counted, as the text counts them. An HTML signature brought back to rich text keeps its table |
 | 2026-11-28 | An Exchange server's answer to a message download without a response code is read as the answer it is, not taken for an answer to another request |
+| 2026-11-28 | A paste into a table cell keeps its HTML formatting (bold, italic, underline, colours, fonts, sizes, links and lines) through `table.cellPaste`, instead of going in as plain text |

@@ -1212,7 +1212,7 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
                 }
             }
             if app.ui.table_caret.is_some()
-                && let Some((command, params)) = cell_event(&event)
+                && let Some((command, params)) = cell_event(&event, paste_html(app, &ctx, id, &event))
             {
                 if command == "table.cellLeave" {
                     app.ui.table_caret = None;
@@ -1749,12 +1749,34 @@ mod wide_picture_tests;
 #[path = "spreadsheet_tests.rs"]
 mod spreadsheet_tests;
 
+/// The HTML a paste carries, for a table cell: what a text's menu read when its Paste was chosen
+/// stands for the clipboard, else the clipboard's own HTML. `None` when the event isn't a paste or
+/// there is no HTML.
+fn paste_html(app: &MailApp, ctx: &egui::Context, id: egui::Id, event: &Event) -> Option<String> {
+    if !matches!(event, Event::Paste(_)) {
+        return None;
+    }
+    match crate::text_menu::taken_paste(ctx, id) {
+        Some(found) => found.html,
+        None => app.services.clipboard.as_ref().and_then(|board| board.html()).filter(|html| !html.trim().is_empty()),
+    }
+}
+
 /// The command an event runs in the table cell the caret is in, if it is one for that cell.
-fn cell_event(event: &Event) -> Option<(&'static str, Value)> {
+fn cell_event(event: &Event, html: Option<String>) -> Option<(&'static str, Value)> {
     match event {
         Event::Text(text) if !text.is_empty() => Some(("table.cellType", json!({"text": text}))),
         Event::Ime(egui::ImeEvent::Commit(text)) if !text.is_empty() => Some(("table.cellType", json!({"text": text}))),
-        Event::Paste(text) if !text.is_empty() => Some(("table.cellType", json!({"text": text}))),
+        Event::Paste(text) => {
+            let html = html.filter(|html| !html.trim().is_empty());
+            (!text.is_empty() || html.is_some()).then(|| {
+                let params = match html {
+                    Some(html) => json!({"html": html, "text": text}),
+                    None => json!({"text": text}),
+                };
+                ("table.cellPaste", params)
+            })
+        }
         Event::Key { key: Key::Backspace, pressed: true, modifiers, .. } if !modifiers.command && !modifiers.alt => {
             Some(("table.cellErase", json!({})))
         }

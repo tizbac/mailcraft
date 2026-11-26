@@ -12232,6 +12232,11 @@ msgstr "Bild aus Zwischenablage einfügen"
 msgid "Paste Text Only"
 msgstr ""
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Paste in Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/signatures.rs
 msgid "Paste or write the signature's HTML"

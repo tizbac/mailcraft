@@ -108,6 +108,9 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("table.cellType", "Type in Cell", "Insert › Tables", cell_type)
             .params(r#"{"text": string} — put in at the caret in the cell being edited, a `\n` starting a new line"#)
             .when_writing(needs_html),
+        CommandSpec::new("table.cellPaste", "Paste in Cell", "Insert › Tables", cell_paste)
+            .params(r#"{"html"?: string, "text"?: string} — paste into the cell being edited: its HTML formatting (bold, italic, underline, colours, fonts, sizes, links) is kept, and its paragraphs are its lines; with no HTML, `text` is put in the cell's own style"#)
+            .when_writing(needs_html),
         CommandSpec::new("table.cellErase", "Erase in Cell", "Insert › Tables", cell_erase)
             .params(r#"{"forward"?: bool (the character after the caret; else the one before), "to"?: number (erase from the caret to there)}"#)
             .when_writing(needs_html),
@@ -590,6 +593,19 @@ fn cell_edit(s: &mut Session, v: &Value) -> CmdResult {
 fn cell_type(s: &mut Session, v: &Value) -> CmdResult {
     let text = p::str(v, "text").ok_or_else(|| bad("`text` (string) is required"))?.to_string();
     cell_write(s, |table, edit| table.cell_insert(edit.row, edit.cell, edit.at, &text), text.chars().count())
+}
+
+/// Paste into the cell being edited: the clipboard's HTML, with its formatting, or plain text in
+/// the style the cell has at the caret.
+fn cell_paste(s: &mut Session, v: &Value) -> CmdResult {
+    let text = p::str(v, "text").unwrap_or_default().to_string();
+    let Some(html) = p::str(v, "html").filter(|html| !html.trim().is_empty()) else {
+        return cell_write(s, |table, edit| table.cell_insert(edit.row, edit.cell, edit.at, &text), text.chars().count());
+    };
+    let rich = mailcraft_mime_model::rich::from_html_for_compose(html);
+    let rich = if rich.is_empty() { RichText::from_plain(&text) } else { rich };
+    let advance = rich.len();
+    cell_write(s, |table, edit| table.cell_insert_rich(edit.row, edit.cell, edit.at, &rich), advance)
 }
 
 fn cell_erase(s: &mut Session, v: &Value) -> CmdResult {

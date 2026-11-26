@@ -751,6 +751,43 @@ impl PastedTable {
         true
     }
 
+    /// Put a formatted fragment in a cell at character `at` (counted with its lines' `\n`); each
+    /// paragraph of it is a line of the cell and each run keeps its style. Whether there was such
+    /// a cell.
+    pub fn cell_insert_rich(&mut self, row: usize, cell: usize, at: usize, insert: &RichText) -> bool {
+        let Some(cell) = self.rows.get_mut(row).and_then(|row| row.get_mut(cell)) else { return false };
+        let mut chars = chars_of(&cell.lines);
+        let at = at.min(chars.len());
+        let mut added: Vec<(char, Style)> = Vec::new();
+        for (index, paragraph) in insert.paragraphs().iter().enumerate() {
+            if index > 0 {
+                added.push(('\n', Style::default()));
+            }
+            for run in &paragraph.runs {
+                if run.picture.is_some() {
+                    continue;
+                }
+                // (A table inside a pasted cell is the words of its cells: a cell holds no table
+                // of its own.)
+                for c in run.text.chars() {
+                    added.push((c, run.style.clone()));
+                }
+            }
+        }
+        if added.is_empty() {
+            return true;
+        }
+        // (A cell is not a place to keep a message: what is pasted into it is held to what a
+        // cell of a message may hold.)
+        let room = 64 * 1024usize.saturating_sub(chars.len());
+        added.truncate(room);
+        let tail = chars.split_off(at);
+        chars.extend(added);
+        chars.extend(tail);
+        cell.lines = lines_of(&chars);
+        true
+    }
+
     /// Take out the characters of a cell between `from` and `to` (`to` at least `from`), with
     /// their lines. Whether there was such a cell.
     pub fn cell_erase(&mut self, row: usize, cell: usize, from: usize, to: usize) -> bool {
