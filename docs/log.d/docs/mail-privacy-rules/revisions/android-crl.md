@@ -1,0 +1,1 @@
+| 2026-11-28 | patch | Encrypt or refuse: on Android the system's certificate check may fetch a certificate authority's revocation list over HTTP (the CA's CRL host only, nothing of the owner's), and the app's network security configuration allows exactly those hosts; every other connection stays TLS or loopback only |
