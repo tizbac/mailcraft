@@ -48,6 +48,7 @@ internal class MailCraftSyncAdapter(context: Context) : AbstractThreadedSyncAdap
 }
 
 /** One system sync service per kind of data: the Calendar app's and the Contacts app's. */
+@Suppress("UnnecessaryAbstractClass") // a base for the two services below, never a service of its own
 abstract class SyncService : Service() {
     private val adapter by lazy { MailCraftSyncAdapter(this) }
 

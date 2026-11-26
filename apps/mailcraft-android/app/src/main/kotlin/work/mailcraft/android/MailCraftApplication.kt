@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.util.Log
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -201,11 +202,11 @@ class MailCraftApplication : Application() {
      * Writes the calendars and contacts once more, soon: a change or a round has just finished, and
      * a burst of them is one writing. Called on the main thread.
      */
-    private fun systemSyncSoon(core: Core) {
+    private fun systemSyncSoon(core: Core, io: CoroutineDispatcher = Dispatchers.IO) {
         systemSync?.cancel()
         systemSync = scope.launch {
             delay(SYSTEM_SYNC_DELAY_MS)
-            withContext(Dispatchers.IO) { SystemSync.reconcile(this@MailCraftApplication, core) }
+            withContext(io) { SystemSync.reconcile(this@MailCraftApplication, core) }
             PhoneAccounts.requestSync(this@MailCraftApplication)
         }
     }

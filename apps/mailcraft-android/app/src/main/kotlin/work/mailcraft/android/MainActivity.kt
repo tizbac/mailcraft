@@ -45,6 +45,7 @@ import androidx.lifecycle.ViewModelProvider
 import java.time.ZoneId
 import java.util.Locale
 import java.util.TimeZone
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -243,6 +244,15 @@ private fun chosenFolder(outline: MailboxOutline?, picked: ULong): FolderItem? {
     return all.firstOrNull { it.id == wanted }
 }
 
+/**
+ * Writes the calendars and contacts into the phone's own apps, off the main thread, then asks the
+ * system to sync the account MailCraft keeps for them.
+ */
+private suspend fun writeSystemSync(context: Context, core: Core, io: CoroutineDispatcher = Dispatchers.IO) {
+    withContext(io) { SystemSync.reconcile(context, core) }
+    PhoneAccounts.requestSync(context)
+}
+
 @Suppress("LongMethod")
 @Composable
 private fun CoreShell(
@@ -294,15 +304,11 @@ private fun CoreShell(
     // owner is asked for those rights once such an account exists, and what MailCraft keeps is
     // written there when they are given.
     AskForSystemSyncOnce(hasDavAccount = accounts.any { it.kind == "dav" }) {
-        scope.launch {
-            withContext(Dispatchers.IO) { SystemSync.reconcile(appContext, core) }
-            PhoneAccounts.requestSync(appContext)
-        }
+        scope.launch { writeSystemSync(appContext, core) }
     }
     LaunchedEffect(accounts) {
         if (accounts.none { it.kind == "dav" }) return@LaunchedEffect
-        withContext(Dispatchers.IO) { SystemSync.reconcile(appContext, core) }
-        PhoneAccounts.requestSync(appContext)
+        writeSystemSync(appContext, core)
     }
     val pictured = rememberPictures(core, list, scope, appContext)
     val pictures = pictured.stack
