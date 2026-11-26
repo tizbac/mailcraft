@@ -449,7 +449,11 @@ fn an_account_of_another_kind_is_said_so_in_words() {
             let mut s = Session::empty();
             s.run(
                 "account.add",
-                &json!({"email": "ada@example.org", "auth": "oauth2", "provider": "microsoft", "incoming": {"host": "outlook.office365.com"}}),
+                &json!({
+                    "email": "ada@example.org",
+                    "kind": "exchange",
+                    "ews": {"url": "https://mail.example.org/EWS/Exchange.asmx"},
+                }),
             )
             .unwrap();
             s.prefs.sync_minutes = 0;
@@ -545,10 +549,19 @@ fn junk_budgets_and_calls_never_panic() {
     assert!(matches!(block_on(core.sync_now()), Err(CoreError::Cancelled)));
 }
 
-/// A session with a Microsoft account and an IMAP one, rounds by the clock.
+/// A session with a Microsoft account and an Exchange server one (which the phone doesn't run
+/// through the Graph round), rounds by the clock.
 fn mixed_session() -> Session {
     let mut s = session();
-    s.run("account.add", &json!({"email": "ada@example.org", "auth": "password", "incoming": {"host": "imap.example.org"}})).unwrap();
+    s.run(
+        "account.add",
+        &json!({
+            "email": "ada@example.org",
+            "kind": "exchange",
+            "ews": {"url": "https://mail.example.org/EWS/Exchange.asmx"},
+        }),
+    )
+    .unwrap();
     s.prefs.sync_minutes = 5;
     s
 }
@@ -673,7 +686,7 @@ fn an_account_that_went_is_no_longer_said_to_be_unsupported() {
     let deadline = Instant::now() + Duration::from_secs(10);
     core.enqueue_tick();
     while unsupported(&core).len() != 1 {
-        assert!(Instant::now() < deadline, "the IMAP account was never told of");
+        assert!(Instant::now() < deadline, "the Exchange account was never told of");
         std::thread::sleep(Duration::from_millis(20));
         core.enqueue_tick();
     }

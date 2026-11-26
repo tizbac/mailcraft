@@ -118,6 +118,30 @@ pub enum PermissionState {
     Unknown,
 }
 
+/// One server of an account that signs in with a password: where it is, and whether the
+/// connection is encrypted from the first byte (`tls`, usually port 993 or 465) or with `STARTTLS`
+/// (usually 143 or 587). A server without encryption is never offered by the phone.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct MailServer {
+    pub host: String,
+    pub port: u16,
+    /// `tls` or `starttls`.
+    pub security: String,
+}
+
+/// A mail account that signs in with a password: IMAP to read, SMTP to send.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct ImapAccountSettings {
+    pub email: String,
+    /// What the folder pane calls it; empty: the address.
+    pub display_name: String,
+    /// The name the servers know the owner by; empty: the address.
+    pub username: String,
+    pub password: String,
+    pub incoming: MailServer,
+    pub outgoing: MailServer,
+}
+
 /// What the sign-ins of a core hold: the host's (where the redirect lands, and the one that is
 /// under way), and for the tests a token server and a page of their own.
 #[derive(Default)]
@@ -480,24 +504,93 @@ impl Core {
     /// Remove an account: its mail and what is kept for it on this phone (`account.remove`), and
     /// its sign-in from the platform's credential store. Nothing on the server is touched. The
     /// sign-in is removed only once the account is.
+    /// Add a mail account that signs in with a password: IMAP to read, SMTP to send. The
+    /// account is checked by the engine (its address, its servers), and its password is kept in
+    /// memory for this session and, when the owner lets sign-ins be remembered, in the phone's
+    /// secure store. Nothing is fetched here: the caller's first Send/Receive does that.
+    pub async fn add_imap_account(&self, settings: ImapAccountSettings) -> Result<u64, CoreError> {
+        let sync = self.sync.clone();
+        let platform = self.platform.clone();
+        let remember = sync.remembers();
+        self.call(move |s| {
+            let email = settings.email.trim().chars().take(254).collect::<String>();
+            if email.is_empty() {
+                return Err(CoreError::BadRequest { reason: "the account's address is empty".to_string() });
+            }
+            if settings.password.is_empty() || settings.password.len() > 1024 {
+                return Err(CoreError::BadRequest { reason: "the account's password is empty or too long".to_string() });
+            }
+            let server = |server: &MailServer| {
+                json!({"host": server.host.trim().chars().take(255).collect::<String>(), "port": server.port, "security": server.security.trim()})
+            };
+            let username = if settings.username.trim().is_empty() { email.clone() } else { settings.username.trim().to_string() };
+            let mut params = json!({
+                "email": email,
+                "username": username,
+                "password": settings.password.clone(),
+                "incoming": server(&settings.incoming),
+                "outgoing": server(&settings.outgoing),
+                "auth": "password",
+                "kind": "imap",
+            });
+            if !settings.display_name.trim().is_empty() {
+                params["displayName"] = json!(settings.display_name.trim().chars().take(254).collect::<String>());
+            }
+            let id = s.run("account.add", &params)?.get("id").and_then(Value::as_u64).ok_or_else(|| CoreError::Failed {
+                reason: "the account was added but the core didn't say which".to_string(),
+            })?;
+            let account = s.mailbox.account(id).cloned().ok_or_else(|| CoreError::Failed {
+                reason: "the account was added but is not in the mailbox".to_string(),
+            })?;
+            sync.keep_password(id, settings.password.clone());
+            if remember
+                && let Ok(Some(store)) = platform.secrets()
+            {
+                // (A store that refuses doesn't undo the account: the password stays in memory
+                // for this session, and the owner is asked again at the next start.)
+                let _ = store.set(mailcraft_host::secrets::secret_key("password", &account), settings.password);
+            }
+            Ok(id)
+        })
+        .await
+    }
+
     pub async fn remove_account(&self, account: u64) -> Result<(), CoreError> {
-        let email = self.email_of(account).await?;
         // One job: the account goes and, when no other account has its address, so does its sign-in,
         // whatever becomes of the caller (a shutdown between two calls would leave the credential).
-        let platform = self.native.clone();
+        let native = self.native.clone();
+        let platform = self.platform.clone();
         let sync = self.sync.clone();
         self.call(move |s| {
+            let before = s.mailbox.account(account).cloned();
+            let email = before.as_ref().map(|a| a.email.clone()).unwrap_or_default();
             s.run("account.remove", &json!({"id": account})).map_err(CoreError::from)?;
             // What was being fetched for it is called off, and nothing it brings is taken in.
             sync.cancel_fetches(Some(account));
+            sync.forget_password(account);
             // (Nothing else of the account's is held under its address: a mailbox with another account
             // of the same address keeps it.)
             let still = s.mailbox.accounts.iter().any(|a| a.kind == AccountKind::Microsoft && a.email.trim().eq_ignore_ascii_case(&email));
+            let microsoft = before.as_ref().is_none_or(|a| a.kind == AccountKind::Microsoft);
             // (The account stays removed when the store refuses: the owner is told its sign-in is still kept.)
-            if !still && signin::forget(platform.as_ref(), &email).is_err() {
+            if microsoft && !still && signin::forget(native.as_ref(), &email).is_err() {
                 return Err(CoreError::Failed {
                     reason: "the account was removed, but its sign-in couldn't be removed from this phone's secure store".to_string(),
                 });
+            }
+            // An account that signed in with a password keeps it under a name of its own; another
+            // account with the same servers and address still needs it.
+            if let Some(before) = before.filter(|a| a.kind != AccountKind::Microsoft) {
+                let key = mailcraft_host::secrets::secret_key("password", &before);
+                let still = s.mailbox.accounts.iter().any(|a| mailcraft_host::secrets::secret_key("password", a) == key);
+                if !still
+                    && let Ok(Some(store)) = platform.secrets()
+                    && store.delete(key).is_err()
+                {
+                    return Err(CoreError::Failed {
+                        reason: "the account was removed, but its password couldn't be removed from this phone's secure store".to_string(),
+                    });
+                }
             }
             Ok(())
         })
