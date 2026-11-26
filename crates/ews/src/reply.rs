@@ -105,7 +105,11 @@ impl Reply {
 impl<'n> Message<'n> {
     fn read(node: &'n Node) -> Result<Self, Error> {
         let class = node.attribute("ResponseClass").and_then(ResponseClass::from_name).ok_or(Error::Unexpected)?;
-        let code = node.child_in(MESSAGES, "ResponseCode").map(|code| ResponseCode::from_name(&code.text)).ok_or(Error::Unexpected)?;
+        // (The schema has `ResponseCode` optional: a server that leaves it off has still said how
+        // the request went, and a success must not be taken for an answer to another request. A
+        // missing code on an error reads as an error without a name.)
+        let code =
+            node.child_in(MESSAGES, "ResponseCode").map(|code| ResponseCode::from_name(&code.text)).unwrap_or(ResponseCode::Other(String::new()));
         // (`MessageXml` and its values are told by their local names: a server puts them in the
         // messages' namespace or the types'.)
         let (busy, back_off_ms) = busy_of(&code, node.child("MessageXml"), node.child("BackOffMilliseconds").map(|wait| wait.text.as_str()));

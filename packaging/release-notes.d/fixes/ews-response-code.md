@@ -1,0 +1,1 @@
+- **An Exchange server's answer to a message download is read even when it leaves out the response code** (the schema allows that): a success is taken as the success it is, instead of the message failing with "the server's answer wasn't the answer to the request".
