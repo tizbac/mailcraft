@@ -18,11 +18,11 @@ mod account_tests;
 #[cfg(test)]
 mod address_book_tests;
 #[cfg(test)]
-mod folder_tests;
-#[cfg(test)]
 mod book_tests;
 #[cfg(test)]
 mod ews_contact_tests;
+#[cfg(test)]
+mod folder_tests;
 #[cfg(test)]
 mod share_tests;
 

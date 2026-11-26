@@ -1004,9 +1004,11 @@ fn card_kept_in(app: &MailApp, ui: &mut Ui, c: &Contact) {
         ));
     } else if read_only_here(app, c) {
         let why = if c.book_id.is_empty() {
-            tl!("This contacts folder can only be read, so this contact can't be edited or deleted here. Favorite is kept on this computer.").to_string()
+            tl!("This contacts folder can only be read, so this contact can't be edited or deleted here. Favorite is kept on this computer.")
+                .to_string()
         } else {
-            tl!("The address book this contact came from can only be read: the server hasn't given this account permission to change its contacts.").to_string()
+            tl!("The address book this contact came from can only be read: the server hasn't given this account permission to change its contacts.")
+                .to_string()
         };
         field(ui, "account", &line, tl!("(read only)"), false).on_hover_text(why);
     } else {
@@ -1043,9 +1045,6 @@ fn marked(label: &str, tip: &str, why: Option<&str>) -> (String, String) {
             let mark = tl!("On this computer only");
             let label = if label.is_empty() { mark.to_string() } else { format!("{label} · {mark}") };
             (label, if tip.is_empty() { why.to_string() } else { format!("{tip}\n{why}") })
-        }
-    }
-}
         }
     }
 }
