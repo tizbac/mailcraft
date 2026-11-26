@@ -95,7 +95,7 @@ fn people(list: &[mailcraft_model::Address]) -> String {
 /// when the owner let pictures be downloaded and the window already has them. Nothing is fetched
 /// here; a picture with no bytes at all prints what it says it is.
 fn picture(app: &MailApp, ctx: Option<&egui::Context>, m: &Message, src: &str) -> Option<PictureBytes> {
-    if let Some(a) = images::attachment(m, src)
+    if let Some(a) = mailcraft_model::shown::part_for(&m.attachments, src).map(|(_, a)| a)
         && !a.data.is_empty()
     {
         return Some((Arc::clone(&a.data), a.mime.clone()));

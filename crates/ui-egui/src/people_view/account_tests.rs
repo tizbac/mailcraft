@@ -244,6 +244,8 @@ fn what_the_server_has_no_place_for_is_marked_on_the_card() {
         w.state_mut().execute("people.select", json!({"id": shown})).unwrap();
         w.run();
     }
+}
+
 #[test]
 fn an_exchange_contact_in_a_writable_book_is_not_marked_read_only() {
     let mut w = testing::window("view.people");

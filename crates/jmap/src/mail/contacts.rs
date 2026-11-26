@@ -552,6 +552,7 @@ impl<H: HttpExchange> Run<'_, H> {
                     account: self.request.account,
                     email: self.request.email.clone(),
                     complete,
+                    books: Vec::new(),
                     contacts,
                     folder: Some(place.folder(book)),
                     // (Read whole, what isn't listed is gone anyway.)
