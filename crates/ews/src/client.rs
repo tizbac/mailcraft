@@ -158,7 +158,7 @@ impl Client {
             Err(error) => {
                 // (Only an answer that came and could not be used is kept: a code or a busy
                 // server says enough without a body.)
-                if matches!(error, Error::Malformed | Error::Unexpected | Error::Status(_)) {
+                if matches!(error, Error::Malformed | Error::Unexpected | Error::UnexpectedWhat(_) | Error::Status(_)) {
                     self.remember_bad(&response);
                 }
                 return Err(error);
