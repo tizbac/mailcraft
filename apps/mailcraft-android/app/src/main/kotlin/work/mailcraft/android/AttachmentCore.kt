@@ -45,7 +45,7 @@ internal class CoreAttachments(
             val check = file.check
             AttachmentBytes.Got(file.bytes, check.saveName, file.picture.isNotEmpty(), check.verdict, check.blocked)
         } catch (e: CoreException) {
-            AttachmentBytes.Failed(e.message.orEmpty())
+            AttachmentBytes.Failed(e.what())
         }
     }
 
@@ -54,7 +54,7 @@ internal class CoreAttachments(
             core.openAttachment(id, index, confirmed)
             AttachmentOutcome.Done
         } catch (e: CoreException) {
-            AttachmentOutcome.Refused(e.message.orEmpty())
+            AttachmentOutcome.Refused(e.what())
         }
     }
 
@@ -63,7 +63,7 @@ internal class CoreAttachments(
             val done = core.importCalendarAttachment(id, index)
             AttachmentOutcome.Imported(done.events.toInt(), done.tasks.toInt())
         } catch (e: CoreException) {
-            AttachmentOutcome.Refused(e.message.orEmpty())
+            AttachmentOutcome.Refused(e.what())
         }
     }
 }

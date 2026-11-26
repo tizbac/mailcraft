@@ -147,8 +147,10 @@ internal class AccountsHub(
             } catch (_: CoreException) {
                 SyncAnswer(started = false, message = texts.t("Send/Receive couldn't start. Try again."))
             }
+            // (A run that started can still have something to say: an account's server refused
+            // the sign-in, or could not be reached. It is shown as the reason a round gave.)
+            notice.value = answer.message.ifEmpty { null }
             if (!answer.started) {
-                notice.value = answer.message.ifEmpty { null }
                 syncingNow.value = false
                 startFollowUp()
             }

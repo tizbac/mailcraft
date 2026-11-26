@@ -157,6 +157,20 @@ pub struct ExchangeAccountSettings {
     pub url: String,
 }
 
+/// An account's settings as the phone's Edit form reads them out: its address and names, its
+/// mail servers (empty for an account kept in step by a provider's API), and an Exchange server
+/// account's Exchange Web Services address. The password is never here.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct AccountSettings {
+    pub email: String,
+    pub display_name: String,
+    pub username: String,
+    pub incoming: Option<MailServer>,
+    pub outgoing: Option<MailServer>,
+    /// An Exchange server account's Exchange Web Services address; empty for another.
+    pub url: String,
+}
+
 /// What the sign-ins of a core hold: the host's (where the redirect lands, and the one that is
 /// under way), and for the tests a token server and a page of their own.
 #[derive(Default)]
@@ -624,6 +638,149 @@ impl Core {
         .await
     }
 
+    /// An account's settings, for the Edit form: its address and names, its servers, and an
+    /// Exchange server account's Exchange Web Services address. Never its password.
+    pub async fn account_settings(&self, account: u64) -> Result<AccountSettings, CoreError> {
+        self.call(move |s| {
+            let a = s.mailbox.account(account).ok_or_else(|| CoreError::BadRequest { reason: "there is no such account".to_string() })?;
+            let server = |server: &Option<mailcraft_model::Server>| {
+                server.as_ref().map(|server| MailServer {
+                    host: server.host.clone(),
+                    port: server.port,
+                    security: match server.security {
+                        mailcraft_model::Security::Tls => "tls",
+                        mailcraft_model::Security::StartTls => "starttls",
+                        mailcraft_model::Security::None => "none",
+                    }
+                    .to_string(),
+                })
+            };
+            Ok(AccountSettings {
+                email: a.email.clone(),
+                display_name: a.display_name.clone(),
+                username: a.username.clone(),
+                incoming: server(&a.incoming),
+                outgoing: server(&a.outgoing),
+                url: a.ews.as_ref().map(|server| server.url.clone()).unwrap_or_default(),
+            })
+        })
+        .await
+    }
+
+    /// Try an IMAP account's servers and password before it is added or changed: the host opens
+    /// the connection and signs in, and answers what the server said (never the password). The
+    /// account is not touched.
+    pub async fn check_imap_account(&self, settings: ImapAccountSettings) -> Result<(), CoreError> {
+        let (email, username, password) = checked_password(&settings)?;
+        let incoming = model_server(&settings.incoming)?;
+        let outgoing = model_server(&settings.outgoing)?;
+        let account = mailcraft_model::Account {
+            email,
+            name: String::new(),
+            username,
+            kind: AccountKind::Imap,
+            incoming: Some(incoming),
+            outgoing: Some(outgoing),
+            ..Default::default()
+        };
+        let answer = Queue::<Result<(), String>>::new();
+        let sender = answer.clone();
+        let spawned = std::thread::Builder::new().name("mailcraft-check".to_string()).spawn(move || {
+            sender.push(mailcraft_net::test_account(&account, &password).map_err(|e| e.said().to_string()));
+        });
+        if spawned.is_err() {
+            return Err(CoreError::Failed { reason: "the check for the account couldn't be started".to_string() });
+        }
+        match answer.next().await {
+            Some(Ok(())) => Ok(()),
+            Some(Err(why)) => Err(CoreError::Failed { reason: why }),
+            None => Err(CoreError::Failed { reason: "the check for the account stopped unexpectedly".to_string() }),
+        }
+    }
+
+    /// Change an IMAP account's settings: its address, names and servers, and its password when
+    /// one is given (an empty one keeps the password it has). The password is kept in memory for
+    /// this session and, when the owner lets sign-ins be remembered, in the phone's secure store
+    /// under the account's new address. Nothing is read from the server here.
+    pub async fn edit_imap_account(&self, account: u64, settings: ImapAccountSettings) -> Result<(), CoreError> {
+        let sync = self.sync.clone();
+        let platform = self.platform.clone();
+        let remember = sync.remembers();
+        self.call(move |s| {
+            let before =
+                s.mailbox.account(account).cloned().ok_or_else(|| CoreError::BadRequest { reason: "there is no such account".to_string() })?;
+            if before.kind != AccountKind::Imap {
+                return Err(CoreError::BadRequest { reason: "this account isn't an IMAP account".to_string() });
+            }
+            let email = settings.email.trim().chars().take(254).collect::<String>();
+            if email.is_empty() {
+                return Err(CoreError::BadRequest { reason: "the account's address is empty".to_string() });
+            }
+            let params = json!({
+                "id": account,
+                "email": email,
+                "displayName": settings.display_name.trim().chars().take(254).collect::<String>(),
+                "username": if settings.username.trim().is_empty() { email } else { settings.username.trim().chars().take(254).collect::<String>() },
+                "incoming": server_json(&settings.incoming),
+                "outgoing": server_json(&settings.outgoing),
+            });
+            s.run("account.edit", &params).map_err(CoreError::from)?;
+            let after = s
+                .mailbox
+                .account(account)
+                .cloned()
+                .ok_or_else(|| CoreError::Failed { reason: "the account was changed but is not in the mailbox".to_string() })?;
+            keep_changed_password(sync.as_ref(), platform.as_ref(), &before, &after, &settings.password, remember);
+            Ok(())
+        })
+        .await
+    }
+
+    /// Change an Exchange server account's settings: its address, names and Exchange Web
+    /// Services address, and its password when one is given (an empty one keeps the one it has).
+    pub async fn edit_exchange_account(&self, account: u64, settings: ExchangeAccountSettings) -> Result<(), CoreError> {
+        let sync = self.sync.clone();
+        let platform = self.platform.clone();
+        let remember = sync.remembers();
+        self.call(move |s| {
+            let before =
+                s.mailbox.account(account).cloned().ok_or_else(|| CoreError::BadRequest { reason: "there is no such account".to_string() })?;
+            if before.kind != AccountKind::Exchange {
+                return Err(CoreError::BadRequest { reason: "this account isn't an Exchange server account".to_string() });
+            }
+            let email = settings.email.trim().chars().take(254).collect::<String>();
+            if email.is_empty() {
+                return Err(CoreError::BadRequest { reason: "the account's address is empty".to_string() });
+            }
+            let url = settings.url.trim().to_string();
+            if !(url.starts_with("https://") || url.starts_with("http://127.0.0.1:") || url.starts_with("http://[::1]:")) {
+                return Err(CoreError::BadRequest { reason: "the server's address is an https:// address".to_string() });
+            }
+            let username = if settings.username.trim().is_empty() { email.clone() } else { settings.username.trim().to_string() };
+            let mut ews = json!({"url": url, "username": username});
+            // (A certificate the owner already trusted for this account stays trusted.)
+            if let Some(trusted) = before.ews.as_ref().map(|server| server.trusted.clone()).filter(|trusted| !trusted.is_empty()) {
+                ews["trusted"] = json!(trusted);
+            }
+            let params = json!({
+                "id": account,
+                "email": email,
+                "displayName": settings.display_name.trim().chars().take(254).collect::<String>(),
+                "username": username,
+                "ews": ews,
+            });
+            s.run("account.edit", &params).map_err(CoreError::from)?;
+            let after = s
+                .mailbox
+                .account(account)
+                .cloned()
+                .ok_or_else(|| CoreError::Failed { reason: "the account was changed but is not in the mailbox".to_string() })?;
+            keep_changed_password(sync.as_ref(), platform.as_ref(), &before, &after, &settings.password, remember);
+            Ok(())
+        })
+        .await
+    }
+
     pub async fn remove_account(&self, account: u64) -> Result<(), CoreError> {
         // One job: the account goes and, when no other account has its address, so does its sign-in,
         // whatever becomes of the caller (a shutdown between two calls would leave the credential).
@@ -705,5 +862,70 @@ impl Core {
             Some(address) => Ok(Ok((address, tokens))),
             None => Ok(Err(failed("Microsoft didn't say which account signed in"))),
         }
+    }
+}
+
+/// What the add and check forms must say: the address, the name the servers know, and a password.
+fn checked_password(settings: &ImapAccountSettings) -> Result<(String, String, String), CoreError> {
+    let email = settings.email.trim().chars().take(254).collect::<String>();
+    if email.is_empty() {
+        return Err(CoreError::BadRequest { reason: "the account's address is empty".to_string() });
+    }
+    if settings.password.is_empty() || settings.password.len() > 1024 {
+        return Err(CoreError::BadRequest { reason: "the account's password is empty or too long".to_string() });
+    }
+    let username = if settings.username.trim().is_empty() { email.clone() } else { settings.username.trim().chars().take(254).collect::<String>() };
+    Ok((email, username, settings.password.clone()))
+}
+
+/// A server of the form as the model has it.
+fn model_server(server: &MailServer) -> Result<mailcraft_model::Server, CoreError> {
+    let host = server.host.trim().chars().take(255).collect::<String>();
+    if host.is_empty() {
+        return Err(CoreError::BadRequest { reason: "the server's address is empty".to_string() });
+    }
+    let security = mailcraft_model::Security::parse(&server.security)
+        .ok_or_else(|| CoreError::BadRequest { reason: "a server is encrypted from the first byte (tls) or with STARTTLS (starttls)".to_string() })?;
+    Ok(mailcraft_model::Server { host, port: server.port, security })
+}
+
+fn server_json(server: &MailServer) -> Value {
+    json!({
+        "host": server.host.trim().chars().take(255).collect::<String>(),
+        "port": server.port,
+        "security": server.security.trim(),
+    })
+}
+
+/// Keep the password an edit brought, under the account's new address: in memory for this
+/// session, and in the store when the owner lets sign-ins be remembered. A password the edit
+/// didn't give is the one the account has, kept as it was (the account's address may have
+/// changed, and the key with it). The old key is removed when the address changed.
+fn keep_changed_password(
+    sync: &crate::sync::SyncHost,
+    platform: &dyn crate::platform::Platform,
+    before: &mailcraft_model::Account,
+    after: &mailcraft_model::Account,
+    given: &str,
+    remember: bool,
+) {
+    let old_key = mailcraft_host::secrets::secret_key("password", before);
+    let new_key = mailcraft_host::secrets::secret_key("password", after);
+    let password = if given.is_empty() {
+        sync.password(after.id)
+            .or_else(|| if remember { platform.secrets().ok().flatten().and_then(|store| store.get(old_key.clone()).ok().flatten()) } else { None })
+    } else {
+        Some(given.to_string())
+    };
+    if let Some(password) = password.filter(|password| !password.is_empty()) {
+        sync.keep_password(after.id, password.clone());
+        if remember && let Ok(Some(store)) = platform.secrets() {
+            let _ = store.set(new_key.clone(), password);
+        }
+    }
+    if old_key != new_key
+        && let Ok(Some(store)) = platform.secrets()
+    {
+        let _ = store.delete(old_key);
     }
 }

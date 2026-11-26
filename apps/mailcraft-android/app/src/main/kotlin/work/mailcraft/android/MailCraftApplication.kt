@@ -241,9 +241,13 @@ private suspend fun syncAll(core: Core, owner: Boolean): SyncAnswer {
     } catch (_: CoreException) {
         null
     }
-    if (graph.started || imap?.ran == true || exchange?.ran == true) return SyncAnswer(started = true, message = "")
-    val why = graph.message.ifBlank {
-        imap?.errors?.firstOrNull() ?: exchange?.errors?.firstOrNull().orEmpty()
+    val failed = imap?.errors.orEmpty() + exchange?.errors.orEmpty()
+    if (graph.started || imap?.ran == true || exchange?.ran == true) {
+        // (What went wrong in a run that did start is said too: an IMAP or Exchange server that
+        // refused the sign-in, or could not be reached, would otherwise leave an empty list and
+        // no word of why.)
+        return SyncAnswer(started = true, message = failed.firstOrNull().orEmpty())
     }
+    val why = graph.message.ifBlank { failed.firstOrNull().orEmpty() }
     return SyncAnswer(started = false, message = why)
 }

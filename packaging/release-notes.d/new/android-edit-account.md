@@ -1,0 +1,1 @@
+- **An account on Android can be edited.** Settings › Accounts now has Edit account for an IMAP or Exchange server account: its address, name, user name and servers (or Exchange Web Services address), and its password — leave the password empty to keep the one it has. The account is changed in place and its next Send/Receive tries the new settings.

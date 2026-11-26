@@ -48,10 +48,11 @@ internal class AccountsController(
         onImapField = ::imapField,
         onImapIncomingTls = ::imapIncomingTls,
         onImapOutgoingTls = ::imapOutgoingTls,
-        onAddImap = ::addImap,
+        onAddImap = ::saveImap,
         onChooseExchange = ::chooseExchange,
         onExchangeField = ::exchangeField,
-        onAddExchange = ::addExchange,
+        onAddExchange = ::saveExchange,
+        onEditAccount = ::editAccount,
         onSignInAgain = ::signInAgain,
         onAsk = { account, permission -> askFor(account.id, permission) },
         onAllow = ::allow,
@@ -160,7 +161,8 @@ internal class AccountsController(
     }
 
     /** Adds the account the mail-server form describes; a password never leaves the core after this. */
-    private fun addImap() {
+    /** Add an IMAP account, or change one the form opened for: its servers are tried first. */
+    private fun saveImap() {
         val add = ui.value.add as? AddAccountState.Imap ?: return
         if (add.working) return
         val ready = imapReady(add) ?: return
@@ -170,16 +172,70 @@ internal class AccountsController(
             } ?: state
         }
         scope.launch {
+            val settings = imapSettings(ready.add, ready.incoming, ready.outgoing)
+            val editing = add.editing
+            // A new account's servers and password are tried before it is added, as the desktop
+            // checks them; an edit is tried when a password is given (an empty one keeps the old).
+            if (editing == null || add.password.isNotEmpty()) {
+                try {
+                    api.checkImap(settings)
+                } catch (e: CoreException) {
+                    failedImap(e.what())
+                    return@launch
+                }
+            }
             val id = try {
-                api.addImap(imapSettings(ready.add, ready.incoming, ready.outgoing))
+                if (editing == null) {
+                    api.addImap(settings)
+                } else {
+                    api.editImap(editing, settings)
+                    editing
+                }
             } catch (e: CoreException) {
-                failedImap(e.message.orEmpty())
+                failedImap(e.what())
                 return@launch
             }
             changed()
             ui.update { it.copy(add = AddAccountState.Done(id)) }
-            // The first Send/Receive goes through the app's account path, as a sign-in's does.
-            scope.launch { signedIn(id, KeepChoice(), true) }
+            // The first (or next) Send/Receive goes through the app's account path, as a sign-in's does.
+            scope.launch { signedIn(id, KeepChoice(), editing == null) }
+        }
+    }
+
+    /** The form for an account the owner has, filled with what the core says it has. */
+    private fun editAccount(account: AccountItem) {
+        scope.launch {
+            val settings = try {
+                api.settings(account.id)
+            } catch (_: CoreException) {
+                return@launch
+            }
+            ui.update { state ->
+                state.copy(
+                    add = when (account.kind) {
+                        "imap" -> AddAccountState.Imap(
+                            email = settings.email,
+                            displayName = settings.displayName,
+                            username = settings.username,
+                            incomingHost = settings.incoming?.host.orEmpty(),
+                            incomingPort = settings.incoming?.port?.toString() ?: "993",
+                            incomingTls = settings.incoming?.security != "starttls",
+                            outgoingHost = settings.outgoing?.host.orEmpty(),
+                            outgoingPort = settings.outgoing?.port?.toString() ?: "587",
+                            outgoingTls = settings.outgoing?.security != "starttls",
+                            editing = account.id,
+                        )
+                        "exchange" -> AddAccountState.Exchange(
+                            email = settings.email,
+                            displayName = settings.displayName,
+                            username = settings.username,
+                            url = settings.url,
+                            editing = account.id,
+                        )
+                        else -> return@update state
+                    },
+                )
+            }
         }
     }
 
@@ -197,7 +253,7 @@ internal class AccountsController(
     /** What the form still lacks, or null when it can be sent; the ports are checked apart. */
     private fun imapProblem(add: AddAccountState.Imap, incoming: UShort?, outgoing: UShort?): String? = when {
         add.email.trim().isEmpty() -> "Type the account's address."
-        add.password.isEmpty() -> "Type the account's password."
+        add.password.isEmpty() && add.editing == null -> "Type the account's password."
         add.incomingHost.isBlank() -> "Type the incoming server's address."
         add.outgoingHost.isBlank() -> "Type the outgoing server's address."
         incoming == null || incoming == 0u.toUShort() -> "Type the incoming server's port."
@@ -258,17 +314,11 @@ internal class AccountsController(
         )
     }
 
-    private fun addExchange() {
+    /** Add an Exchange server account, or change one the form opened for. */
+    private fun saveExchange() {
         val add = ui.value.add as? AddAccountState.Exchange ?: return
         if (add.working) return
-        val problem = when {
-            add.email.trim().isEmpty() -> "Type the account's address."
-            add.password.isEmpty() -> "Type the account's password."
-            add.url.trim().isEmpty() -> "Type the server's Exchange Web Services address."
-            !add.url.trim().startsWith("https://") && !add.url.trim().startsWith("http://127.0.0.1:") ->
-                "The server's address is an https:// address."
-            else -> null
-        }
+        val problem = exchangeProblem(add)
         if (problem != null) {
             refuseExchange(problem)
             return
@@ -279,16 +329,32 @@ internal class AccountsController(
             } ?: state
         }
         scope.launch {
+            val editing = add.editing
             val id = try {
-                api.addExchange(exchangeSettings(add))
+                if (editing == null) {
+                    api.addExchange(exchangeSettings(add))
+                } else {
+                    api.editExchange(editing, exchangeSettings(add))
+                    editing
+                }
             } catch (e: CoreException) {
-                failedExchange(e.message.orEmpty())
+                failedExchange(e.what())
                 return@launch
             }
             changed()
             ui.update { it.copy(add = AddAccountState.Done(id)) }
-            scope.launch { signedIn(id, KeepChoice(), true) }
+            scope.launch { signedIn(id, KeepChoice(), editing == null) }
         }
+    }
+
+    /** What the Exchange form still lacks, or null when it can be sent. */
+    private fun exchangeProblem(add: AddAccountState.Exchange): String? = when {
+        add.email.trim().isEmpty() -> "Type the account's address."
+        add.password.isEmpty() && add.editing == null -> "Type the account's password."
+        add.url.trim().isEmpty() -> "Type the server's Exchange Web Services address."
+        !add.url.trim().startsWith("https://") && !add.url.trim().startsWith("http://127.0.0.1:") ->
+            "The server's address is an https:// address."
+        else -> null
     }
 
     private fun exchangeSettings(add: AddAccountState.Exchange) = ExchangeAccountSettings(
@@ -530,3 +596,6 @@ internal class AccountsController(
         const val MAX_URL = 2_048
     }
 }
+
+/** What a core error says, in the owner's words (uniffi's `message` puts the field's name first). */
+internal fun CoreException.what(): String = (this as? CoreException.Failed)?.reason.orEmpty()

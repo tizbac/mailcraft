@@ -73,7 +73,7 @@ internal fun ImapAccountForm(texts: Texts, state: AddAccountState.Imap, actions:
         if (state.working) {
             CircularProgressIndicator(modifier = Modifier.size(SmallSpinner))
         } else {
-            Text(texts.t("Add account"))
+            Text(texts.t(if (state.editing == null) "Add account" else "Save"))
         }
     }
 }
@@ -96,6 +96,11 @@ private fun AddressFields(texts: Texts, state: AddAccountState.Imap, actions: Ac
             onValueChange = { actions.onImapField(ImapField.Password, it) },
             modifier = Modifier.fillMaxWidth(),
             label = { Text(texts.t("Password")) },
+            supportingText = if (state.editing != null) {
+                { Text(texts.t("Leave empty to keep the password you have.")) }
+            } else {
+                null
+            },
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),

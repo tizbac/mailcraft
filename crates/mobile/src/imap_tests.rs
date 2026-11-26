@@ -175,3 +175,46 @@ fn the_events_of_an_imap_run_say_the_mailbox_changed() {
     assert!(seen.iter().any(|e| matches!(e, Event::SyncFinished { .. })), "{seen:?}");
     core.shutdown();
 }
+
+/// An IMAP account's settings are read back for the Edit form, changed without a new password
+/// (the one it has is kept), and a new account's servers are tried before it is added — the
+/// server's words when they refuse, and never the password.
+#[test]
+fn an_imap_account_is_checked_and_edited_and_keeps_its_password() {
+    let imap = fake::Fake::imap(fake::ImapWorld {
+        user: "ada@example.org".into(),
+        password: PASSWORD.into(),
+        mailboxes: vec![mailbox("INBOX", "\\HasNoChildren", 11, vec![message(1, "\\Seen", "One")])],
+        ..Default::default()
+    });
+    let smtp = fake::Fake::smtp(fake::SmtpWorld { user: "ada@example.org".into(), password: PASSWORD.into(), auth: true, ..Default::default() });
+    let platform = FakePlatform::new();
+    let core = Core::start_with(platform.clone(), Session::empty, SendReceive::new()).expect("a core");
+    let settings = ImapAccountSettings {
+        email: "ada@example.org".into(),
+        display_name: "Ada".into(),
+        username: String::new(),
+        password: PASSWORD.into(),
+        incoming: MailServer { host: "127.0.0.1".into(), port: imap.port, security: "none".into() },
+        outgoing: MailServer { host: "127.0.0.1".into(), port: smtp.port, security: "none".into() },
+    };
+    block_on(core.check_imap_account(settings.clone())).expect("the servers answer the check");
+    let id = block_on(core.add_imap_account(settings.clone())).expect("the account is added");
+    let said = block_on(core.account_settings(id)).expect("its settings");
+    assert_eq!((said.email.as_str(), said.display_name.as_str()), ("ada@example.org", "Ada"));
+    assert_eq!(said.incoming.as_ref().map(|s| (s.host.as_str(), s.port)), Some(("127.0.0.1", imap.port)));
+    assert!(said.url.is_empty(), "an IMAP account has no Exchange Web Services address");
+    // The name and the user name change; an empty password keeps the one it has.
+    let edited =
+        ImapAccountSettings { display_name: "Ada L.".into(), username: "ada@example.org".into(), password: String::new(), ..settings.clone() };
+    block_on(core.edit_imap_account(id, edited)).expect("the account is edited");
+    let said = block_on(core.account_settings(id)).expect("its settings again");
+    assert_eq!((said.display_name.as_str(), said.username.as_str()), ("Ada L.", "ada@example.org"));
+    let summary = block_on(core.sync_imap_now(10_000)).expect("a sync");
+    assert!(summary.ran && summary.errors.is_empty(), "{summary:?}");
+    // A password the server refuses is the server's words, and never the password.
+    let wrong = ImapAccountSettings { password: "not-the-password".into(), ..settings };
+    let why = block_on(core.check_imap_account(wrong)).expect_err("a wrong password is refused").to_string();
+    assert!(!why.contains("not-the-password"), "{why}");
+    core.shutdown();
+}

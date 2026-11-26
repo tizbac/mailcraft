@@ -40,6 +40,17 @@ private class FakeApi : AccountsApi {
     }
 
     val imaps = mutableListOf<uniffi.mailcraft_mobile.ImapAccountSettings>()
+    val checks = mutableListOf<uniffi.mailcraft_mobile.ImapAccountSettings>()
+    val imapEdits = mutableListOf<Pair<ULong, uniffi.mailcraft_mobile.ImapAccountSettings>>()
+    val exchangeEdits = mutableListOf<Pair<ULong, uniffi.mailcraft_mobile.ExchangeAccountSettings>>()
+    var settingsAnswer = uniffi.mailcraft_mobile.AccountSettings(
+        email = "ada@example.org",
+        displayName = "Ada",
+        username = "",
+        incoming = uniffi.mailcraft_mobile.MailServer("imap.example.org", 993u, "tls"),
+        outgoing = uniffi.mailcraft_mobile.MailServer("smtp.example.org", 587u, "starttls"),
+        url = "",
+    )
 
     override suspend fun addImap(settings: uniffi.mailcraft_mobile.ImapAccountSettings): ULong {
         imaps.add(settings)
@@ -47,6 +58,23 @@ private class FakeApi : AccountsApi {
     }
 
     override suspend fun addExchange(settings: uniffi.mailcraft_mobile.ExchangeAccountSettings): ULong = 9u
+
+    override suspend fun settings(account: ULong) = settingsAnswer
+
+    var checkFails: String? = null
+
+    override suspend fun checkImap(settings: uniffi.mailcraft_mobile.ImapAccountSettings) {
+        checks.add(settings)
+        checkFails?.let { throw uniffi.mailcraft_mobile.CoreException.Failed(it) }
+    }
+
+    override suspend fun editImap(account: ULong, settings: uniffi.mailcraft_mobile.ImapAccountSettings) {
+        imapEdits.add(account to settings)
+    }
+
+    override suspend fun editExchange(account: ULong, settings: uniffi.mailcraft_mobile.ExchangeAccountSettings) {
+        exchangeEdits.add(account to settings)
+    }
 
     override suspend fun grant(account: ULong, permission: PermissionKind): GrantResult {
         grants.add(account to permission)
@@ -638,4 +666,42 @@ class AccountsTest {
         assertTrue(notice is Notice.Failed)
     }
 
+    @Test
+    fun anAccountIsEditedInItsFormWithoutBeingAddedAgain() {
+        val rig = Rig()
+        val account = AccountItem(5u, "Ada", "ada@example.org", emptyList(), kind = "imap")
+        rig.accounts = listOf(account)
+        rig.actions.onEditAccount(account)
+        val edit = rig.ui.add as AddAccountState.Imap
+        assertEquals(5uL, edit.editing)
+        assertEquals("imap.example.org", edit.incomingHost)
+        assertEquals("smtp.example.org", edit.outgoingHost)
+        assertEquals("the password is not read back", "", edit.password)
+        assertEquals("Ada", edit.displayName)
+        // Save without a password: the account is changed, not added again, and the password it
+        // has stays (the core keeps it).
+        rig.actions.onAddImap()
+        assertEquals("the account is not added again", 0, rig.api.imaps.size)
+        assertEquals(1, rig.api.imapEdits.size)
+        assertEquals(5uL, rig.api.imapEdits.single().first)
+        assertEquals("Ada", rig.api.imapEdits.single().second.displayName)
+        assertEquals(AddAccountState.Done(5uL), rig.ui.add)
+        assertEquals(1, rig.changes)
+    }
+
+    @Test
+    fun aNewImapAccountsServersAreTriedBeforeItIsAddedAndTheReasonIsShown() {
+        val api = FakeApi().apply { checkFails = "couldn't reach imap.example.org: no route" }
+        val rig = Rig(api)
+        rig.actions.onChooseImap()
+        rig.actions.onImapField(ImapField.Email, "ada@example.org")
+        rig.actions.onImapField(ImapField.Password, "hunter2")
+        rig.actions.onImapField(ImapField.IncomingHost, "imap.example.org")
+        rig.actions.onImapField(ImapField.OutgoingHost, "smtp.example.org")
+        rig.actions.onAddImap()
+        assertEquals("the servers are tried first", 1, api.checks.size)
+        assertEquals("nothing is added when the check fails", 0, api.imaps.size)
+        val notice = (rig.ui.add as AddAccountState.Imap).notice as Notice.Failed
+        assertEquals("couldn't reach imap.example.org: no route", notice.reason)
+    }
 }

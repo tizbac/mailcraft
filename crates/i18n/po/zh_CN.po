@@ -1167,7 +1167,7 @@ msgid "Add a task to {address} (it waits here until To Do is allowed)"
 msgstr "将任务添加到 {address}（授权使用 To Do 前，任务会保留在此计算机上）"
 
 #. android
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt
 #, fuzzy
 msgid "Add account"
 msgstr "添加账户"
@@ -5581,6 +5581,11 @@ msgid "Edit Task"
 msgstr "编辑任务"
 
 #. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Edit account"
+msgstr ""
+
+#. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Reply.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/RowActionsSheet.kt
 #, fuzzy
 msgid "Edit draft"
@@ -8756,6 +8761,11 @@ msgstr ""
 #, fuzzy
 msgid "Leave empty to keep the one in use"
 msgstr "留空则继续使用当前值"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+msgid "Leave empty to keep the password you have."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/account_setup/exchange.rs
