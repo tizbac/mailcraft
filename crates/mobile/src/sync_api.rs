@@ -11,14 +11,25 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use mailcraft_engine::Session;
+use mailcraft_engine::cmd::account::SyncTotals;
 use mailcraft_host::sync::Adopted;
 use mailcraft_i18n::Lang;
 use mailcraft_model::AccountKind;
 
 use crate::core::CancelOnDrop;
-use crate::queue::Queue;
+use crate::events::Event;
+use crate::queue::{Queue, Shed, Weight};
 use crate::sync::{SyncAnswer, SyncHost, SyncStatus, SyncSummary, Wake};
 use crate::{Core, CoreError, SignInOutcome, SignInsForgotten};
+
+/// One piece of an IMAP run on its way to the session's thread; `None` ends it.
+struct ImapPiece(Option<mailcraft_model::sync::SyncResult>);
+
+impl Shed for ImapPiece {
+    fn weight(&self) -> Weight {
+        Weight::Notice
+    }
+}
 
 /// The shortest and the longest time a background sync is given (the system gives a worker some
 /// minutes; a `0` or a day is a mistake).
@@ -66,6 +77,114 @@ impl Core {
         replies.next().await.unwrap_or(Err(CoreError::Cancelled))
     }
 
+    /// Read and send the mail of the accounts that sign in with a password (IMAP to read, SMTP to
+    /// send), to their end or until `budget_ms` runs out, and say what came. The pieces are applied
+    /// to the mailbox on the session's thread as they arrive, and are seen through the same events
+    /// as a Microsoft account's round ([`Event::RevChanged`], [`Event::SyncProgress`],
+    /// [`Event::SyncFinished`]). This is one pass over each such account; the app's Send/Receive
+    /// calls it after the Graph round.
+    pub async fn sync_imap_now(&self, budget_ms: u64) -> Result<SyncSummary, CoreError> {
+        let budget = Duration::from_millis(budget_ms.clamp(LEAST_BUDGET_MS, MOST_BUDGET_MS));
+        let sync = self.sync.clone();
+        let platform = self.platform.clone();
+        // What to ask each IMAP account's server, and the password for it: built on the session's
+        // thread, where the mailbox and the in-memory passwords are.
+        let requests = self
+            .call(move |session| {
+                let mut requests = Vec::new();
+                let mut errors = Vec::new();
+                let accounts: Vec<(u64, String)> = session
+                    .mailbox
+                    .accounts
+                    .iter()
+                    .filter(|a| a.kind == AccountKind::Imap && a.incoming.is_some())
+                    .map(|a| (a.id, mailcraft_host::secrets::secret_key("password", a)))
+                    .collect();
+                for (id, stored_key) in accounts {
+                    let password =
+                        sync.password(id).or_else(|| platform.secrets().ok().flatten().and_then(|store| store.get(stored_key).ok().flatten()));
+                    let Some(password) = password.filter(|password| !password.is_empty()) else {
+                        errors.push("An account's password is needed to send and receive its mail.".to_string());
+                        continue;
+                    };
+                    match session.run("sync.request", &serde_json::json!({"account": id})) {
+                        Ok(answer) => match serde_json::from_value::<mailcraft_model::sync::SyncRequest>(answer) {
+                            Ok(mut request) => {
+                                request.password = password;
+                                requests.push(request);
+                            }
+                            Err(e) => errors.push(e.to_string()),
+                        },
+                        Err(e) => errors.push(e.to_string()),
+                    }
+                }
+                Ok((requests, errors))
+            })
+            .await?;
+        let (requests, mut errors) = requests;
+        if requests.is_empty() {
+            return Ok(SyncSummary { ran: false, finished: true, errors, ..Default::default() });
+        }
+        let pieces = Queue::<ImapPiece>::new();
+        let sender = pieces.clone();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let worker_cancel = cancel.clone();
+        let worker = std::thread::Builder::new().name("mailcraft-imap".to_string()).spawn(move || {
+            for request in requests {
+                let sent = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    mailcraft_net::sync_with(&request, &worker_cancel, &mut |piece| sender.push(ImapPiece(Some(piece))));
+                }));
+                if sent.is_err() {
+                    // (The run stopped without a word: the mailbox keeps what it had, and the
+                    // summary says a run failed.)
+                    break;
+                }
+                if worker_cancel.load(Ordering::Relaxed) {
+                    break;
+                }
+            }
+            sender.push(ImapPiece(None));
+        });
+        if worker.is_err() {
+            return Err(CoreError::Failed { reason: "a Send/Receive for the phone couldn't be started".to_string() });
+        }
+        let mut totals = SyncTotals::default();
+        let started = std::time::Instant::now();
+        let mut cut = false;
+        loop {
+            let Some(piece) = pieces.next().await else { break };
+            let Some(piece) = piece.0 else { break };
+            let progress = piece.progress.clone();
+            let account = piece.account;
+            let before = totals.clone();
+            let applied = self
+                .call(move |session| {
+                    let mut totals = before;
+                    mailcraft_engine::cmd::account::apply_sync_part(session, &mut totals, piece).map_err(CoreError::from)?;
+                    Ok((totals, session.rev()))
+                })
+                .await;
+            match applied {
+                Ok((totals_now, rev)) => {
+                    totals = totals_now;
+                    self.events.push(Event::RevChanged { rev });
+                }
+                Err(e) => errors.push(e.to_string()),
+            }
+            if !progress.is_empty() {
+                self.events.push(Event::SyncProgress { account, phase: progress, done: 0, total: 0 });
+            }
+            if started.elapsed() >= budget {
+                cancel.store(true, Ordering::Relaxed);
+                cut = true;
+                break;
+            }
+        }
+        self.events.push(Event::SyncFinished { new_mail: totals.new as u64, finished: !cut });
+        errors.extend(totals.errors.iter().cloned());
+        Ok(SyncSummary { ran: true, finished: !cut, new_mail: totals.new as u64, errors, sign_in_needed: false })
+    }
+
     /// Send and receive now without letting go of the accounts held back
     /// ([`Core::hold_background_sync`]): for a round the app starts by itself and not on the
     /// owner's word, such as a new account's first one (which the owner's yes let go already).
@@ -110,7 +229,8 @@ impl Core {
         let answer = self.call(move |session| Ok(start_attached(&sync, session, waiter, &shared))).await?;
         if !answer.started {
             stop_on_drop.armed = false;
-            return Ok(SyncSummary { ran: false, finished: true, errors: vec![answer.message], ..Default::default() });
+            let summary = SyncSummary { ran: false, finished: true, errors: vec![answer.message], ..Default::default() };
+            return self.with_imap(summary).await;
         }
         // The timer: one short-lived thread, ended when this call is.
         let over = Arc::new(AtomicBool::new(false));
@@ -138,7 +258,29 @@ impl Core {
             None => Err(CoreError::Cancelled),
         };
         stop_on_drop.armed = false;
-        out
+        let out = out?;
+        self.with_imap(out).await
+    }
+
+    /// The same round, and then the accounts that sign in with a password: one pass each, when the
+    /// Graph round reached its end (a round cut off for its time leaves them for the next).
+    async fn with_imap(&self, mut summary: SyncSummary) -> Result<SyncSummary, CoreError> {
+        if !summary.finished {
+            return Ok(summary);
+        }
+        match self.sync_imap_now(120_000).await {
+            Ok(imap) => {
+                summary.ran |= imap.ran;
+                summary.new_mail = summary.new_mail.saturating_add(imap.new_mail);
+                summary.errors.extend(imap.errors);
+                summary.finished &= imap.finished;
+                Ok(summary)
+            }
+            Err(e) => {
+                summary.errors.push(e.to_string());
+                Ok(summary)
+            }
+        }
     }
 
     /// Where Send/Receive stands: whether a round is under way, what the last said went wrong,

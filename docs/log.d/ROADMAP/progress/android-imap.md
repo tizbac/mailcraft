@@ -1,0 +1,1 @@
+| 2026-11-28 | The phone adds a mail account that signs in with a password: IMAP to read and SMTP to send, with its servers filled in from the address, its password in the secure store, its mail read and sent on the owner's Send/Receive and by the background worker, and the account shown beside the Microsoft ones; Exchange and Linchange are still to come |
