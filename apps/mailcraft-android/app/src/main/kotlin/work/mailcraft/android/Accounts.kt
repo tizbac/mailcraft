@@ -7,7 +7,9 @@ package work.mailcraft.android
 import uniffi.mailcraft_mobile.Core
 import uniffi.mailcraft_mobile.CoreException
 import uniffi.mailcraft_mobile.DownloadSettings
+import uniffi.mailcraft_mobile.ImapAccountSettings
 import uniffi.mailcraft_mobile.KeepWindow
+import uniffi.mailcraft_mobile.MailServer
 import uniffi.mailcraft_mobile.Permission
 import uniffi.mailcraft_mobile.PermissionOutcome
 import uniffi.mailcraft_mobile.PermissionState
@@ -159,6 +161,9 @@ internal interface AccountsApi {
     /** Signs in to add an account; [keep] is what the phone keeps of a new account's mail. */
     suspend fun signIn(email: String, keep: KeepChoice): SignInResult
 
+    /** Adds an account that signs in with a password (IMAP to read, SMTP to send): its id. */
+    suspend fun addImap(settings: ImapAccountSettings): ULong
+
     suspend fun grant(account: ULong, permission: PermissionKind): GrantResult
 
     suspend fun status(account: ULong, permission: PermissionKind): PermissionStatus
@@ -195,6 +200,8 @@ internal class CoreAccounts(private val core: Core, private val handback: SignIn
             handback.end(ticket)
         }
     }
+
+    override suspend fun addImap(settings: ImapAccountSettings): ULong = core.addImapAccount(settings)
 
     override suspend fun grant(account: ULong, permission: PermissionKind): GrantResult {
         val ticket = handback.begin() ?: return GrantResult.Failed("")
@@ -276,6 +283,22 @@ internal sealed interface Notice {
 internal sealed interface AddAccountState {
     /** The form: the address typed (it is only a hint for Microsoft's page), and why the last try ended. */
     data class Form(val email: String = "", val notice: Notice? = null, val keep: KeepChoice = KeepChoice()) : AddAccountState
+
+    /** A mail server that signs in with a password (IMAP to read, SMTP to send): the form, and why the last try ended. */
+    data class Imap(
+        val email: String = "",
+        val displayName: String = "",
+        val username: String = "",
+        val password: String = "",
+        val incomingHost: String = "",
+        val incomingPort: String = "993",
+        val incomingTls: Boolean = true,
+        val outgoingHost: String = "",
+        val outgoingPort: String = "587",
+        val outgoingTls: Boolean = false,
+        val notice: Notice? = null,
+        val working: Boolean = false,
+    ) : AddAccountState
 
     /** Microsoft's page is open in the browser and the app waits for it. */
     data class Waiting(val email: String, val keep: KeepChoice = KeepChoice()) : AddAccountState
@@ -367,6 +390,30 @@ internal data class AccountsUi(
 )
 
 /** What the account screens ask of the app: one entry for each thing the owner can do there. */
+/** Which field of the mail-server form was changed. */
+internal enum class ImapField {
+    Email,
+    DisplayName,
+    Username,
+    Password,
+    IncomingHost,
+    IncomingPort,
+    OutgoingHost,
+    OutgoingPort,
+    ;
+
+    fun label(texts: Texts): String = when (this) {
+        Email -> texts.t("Email address")
+        DisplayName -> texts.t("Name (optional)")
+        Username -> texts.t("User name (optional)")
+        Password -> texts.t("Password")
+        IncomingHost -> texts.t("Incoming server")
+        IncomingPort -> texts.t("Port")
+        OutgoingHost -> texts.t("Outgoing server")
+        OutgoingPort -> texts.t("Port")
+    }
+}
+
 @Suppress("LongParameterList")
 internal class AccountActions(
     val onEmail: (String) -> Unit = {},
@@ -378,6 +425,12 @@ internal class AccountActions(
     val onCopyMessage: (String) -> Unit = {},
     /** Leaves Add Account: the form is as new the next time. */
     val onLeaveAdd: () -> Unit = {},
+    /** Opens the form for a mail server that signs in with a password (IMAP). */
+    val onChooseImap: () -> Unit = {},
+    val onImapField: (ImapField, String) -> Unit = { _, _ -> },
+    val onImapIncomingTls: (Boolean) -> Unit = {},
+    val onImapOutgoingTls: (Boolean) -> Unit = {},
+    val onAddImap: () -> Unit = {},
     /** A sign-in again for an account the owner has; the address is the form's hint. */
     val onSignInAgain: (AccountItem) -> Unit = {},
     val onAsk: (AccountItem, PermissionKind) -> Unit = { _, _ -> },

@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import uniffi.mailcraft_mobile.Core
 import uniffi.mailcraft_mobile.CoreException
 import uniffi.mailcraft_mobile.Event
+import uniffi.mailcraft_mobile.SyncAnswer
 
 /** The Rust core and what the app built on it, once both are ready. */
 internal class Opened(
@@ -152,8 +153,8 @@ class MailCraftApplication : Application() {
                 scope = scope,
                 save = { core.saveNow() },
                 copy = { text -> copyToClipboard(applicationContext, text) },
-                sync = { core.syncNow() },
-                firstRound = { core.syncKeepingHolds() },
+                sync = { syncAll(core, owner = true) },
+                firstRound = { syncAll(core, owner = false) },
                 roomFor = { account, storageMb -> settings?.roomForFirstSync(account, storageMb) ?: false },
                 holds = holds,
             )
@@ -222,3 +223,20 @@ internal suspend fun nextEvent(core: Core): uniffi.mailcraft_mobile.Event? =
     } catch (_: CoreException) {
         null
     }
+
+/**
+ * Send/Receive for every account: the Microsoft ones through their round, then the ones that sign
+ * in with a password (IMAP to read, SMTP to send). `owner` is the owner's ask (a pull to refresh),
+ * which lets go of the accounts held back. It says it started when either ran.
+ */
+private suspend fun syncAll(core: Core, owner: Boolean): SyncAnswer {
+    val graph = if (owner) core.syncNow() else core.syncKeepingHolds()
+    val imap = try {
+        core.syncImapNow(120_000uL)
+    } catch (_: CoreException) {
+        null
+    }
+    if (graph.started || imap?.ran == true) return SyncAnswer(started = true, message = "")
+    val why = graph.message.ifBlank { imap?.errors?.firstOrNull().orEmpty() }
+    return SyncAnswer(started = false, message = why)
+}

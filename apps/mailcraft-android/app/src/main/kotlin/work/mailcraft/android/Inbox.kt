@@ -19,7 +19,13 @@ internal data class FolderItem(
 )
 
 /** An account and its folders, top folders first and each folder's own just after it. */
-internal data class AccountItem(val id: ULong, val name: String, val email: String, val folders: List<FolderItem>)
+internal data class AccountItem(
+    val id: ULong,
+    val name: String,
+    val email: String,
+    val folders: List<FolderItem>,
+    val kind: String = "microsoft",
+)
 
 /** The accounts of the mailbox, and the folder the Mail tab opens on. */
 internal data class MailboxOutline(val accounts: List<AccountItem>, val inboxId: ULong?)
@@ -58,8 +64,9 @@ internal fun folderTree(folders: List<FolderItem>): List<FolderItem> {
 }
 
 /**
- * Lists the Microsoft accounts of the mailbox and their folders, read-only. The phone app has no
- * other kind of account in v1: the mailbox's empty local one, which the core always has, is not shown.
+ * Lists the accounts of the mailbox and their folders, read-only. Microsoft accounts are kept in
+ * step through Graph; an account that signs in with a password (IMAP) is kept in step by its own
+ * servers. The mailbox's empty local one, which the core always has, is not shown.
  */
 internal suspend fun loadOutline(
     core: Core,
@@ -67,12 +74,12 @@ internal suspend fun loadOutline(
 ): MailboxOutline? = withContext(dispatcher) {
     try {
         val list = core.folders(0uL)
-        val accounts = list.accounts.filter { it.kind == "microsoft" }.map { account ->
+        val accounts = list.accounts.filter { it.kind == "microsoft" || it.kind == "imap" }.map { account ->
             val own = list.folders.filter { it.account == account.id }.map {
                 FolderItem(it.id, it.parent, it.name, it.kind, it.unread)
             }
             val name = account.displayName.ifBlank { account.name }.ifBlank { account.email }
-            AccountItem(account.id, name, account.email, folderTree(own))
+            AccountItem(account.id, name, account.email, folderTree(own), account.kind)
         }
         val inbox = accounts.firstNotNullOfOrNull { account -> account.folders.firstOrNull { it.kind == "inbox" } }
         MailboxOutline(accounts, inbox?.id)

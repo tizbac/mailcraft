@@ -39,6 +39,13 @@ private class FakeApi : AccountsApi {
         return queued ?: signedIn
     }
 
+    val imaps = mutableListOf<uniffi.mailcraft_mobile.ImapAccountSettings>()
+
+    override suspend fun addImap(settings: uniffi.mailcraft_mobile.ImapAccountSettings): ULong {
+        imaps.add(settings)
+        return 8u
+    }
+
     override suspend fun grant(account: ULong, permission: PermissionKind): GrantResult {
         grants.add(account to permission)
         gate?.await()
@@ -596,4 +603,37 @@ class AccountsTest {
         assertEquals("2 GB", KeepChoice.storageLabel(EnglishTexts, 2048L))
         assertEquals(KeepSpan.entries.size, KeepSpan.entries.map { it.toCore() }.toSet().size)
     }
+    @Test
+    fun aMailServerAccountIsAddedFromItsFormAndItsFirstSyncAskedFor() {
+        val rig = Rig()
+        rig.actions.onChooseImap()
+        rig.actions.onImapField(ImapField.Email, "ada@example.org")
+        rig.actions.onImapField(ImapField.Password, "hunter2")
+        rig.actions.onImapField(ImapField.IncomingHost, "imap.example.org")
+        rig.actions.onImapField(ImapField.OutgoingHost, "smtp.example.org")
+        rig.actions.onAddImap()
+        assertEquals(AddAccountState.Done(8u), rig.ui.add)
+        assertEquals(1, rig.changes)
+        val settings = rig.api.imaps.single()
+        assertEquals("ada@example.org", settings.email)
+        assertEquals("hunter2", settings.password)
+        assertEquals(("imap.example.org" to 993.toUShort()), settings.incoming.host to settings.incoming.port)
+        assertEquals("tls", settings.incoming.security)
+        assertEquals(("smtp.example.org" to 587.toUShort()), settings.outgoing.host to settings.outgoing.port)
+        assertEquals("starttls", settings.outgoing.security)
+    }
+
+    @Test
+    fun aMailServerFormWithoutItsAddressSaysWhatIsMissingAndAddsNothing() {
+        val rig = Rig()
+        rig.actions.onChooseImap()
+        rig.actions.onImapField(ImapField.Password, "hunter2")
+        rig.actions.onImapField(ImapField.IncomingHost, "imap.example.org")
+        rig.actions.onImapField(ImapField.OutgoingHost, "smtp.example.org")
+        rig.actions.onAddImap()
+        assertTrue(rig.api.imaps.isEmpty())
+        val notice = (rig.ui.add as AddAccountState.Imap).notice
+        assertTrue(notice is Notice.Failed)
+    }
+
 }

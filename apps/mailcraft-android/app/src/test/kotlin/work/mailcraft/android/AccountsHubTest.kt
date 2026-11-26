@@ -27,6 +27,8 @@ private class HubApi(val gate: CompletableDeferred<Unit>) : AccountsApi {
         return SignInResult.SignedIn(7u, "ada@example.org", "Ada Example")
     }
 
+    override suspend fun addImap(settings: uniffi.mailcraft_mobile.ImapAccountSettings): ULong = 8u
+
     override suspend fun grant(account: ULong, permission: PermissionKind): GrantResult = GrantResult.Granted
 
     override suspend fun status(account: ULong, permission: PermissionKind) = PermissionStatus.Allowed
