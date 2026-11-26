@@ -111,6 +111,9 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("table.cellPaste", "Paste in Cell", "Insert › Tables", cell_paste)
             .params(r#"{"html"?: string, "text"?: string} — paste into the cell being edited: its HTML formatting (bold, italic, underline, colours, fonts, sizes, links) is kept, and its paragraphs are its lines; with no HTML, `text` is put in the cell's own style"#)
             .when_writing(needs_html),
+        CommandSpec::new("table.cellPicture", "Picture in Cell", "Insert › Tables", cell_picture)
+            .params(r#"{"data": base64, "file"?: string, "alt"?: string} — put a picture above the text of the cell being edited (the cell's text, when there is some, stands under it)"#)
+            .when_writing(needs_html),
         CommandSpec::new("table.cellErase", "Erase in Cell", "Insert › Tables", cell_erase)
             .params(r#"{"forward"?: bool (the character after the caret; else the one before), "to"?: number (erase from the caret to there)}"#)
             .when_writing(needs_html),
@@ -608,6 +611,47 @@ fn cell_paste(s: &mut Session, v: &Value) -> CmdResult {
     cell_write(s, |table, edit| table.cell_insert_rich(edit.row, edit.cell, edit.at, &rich), advance)
 }
 
+/// Put a picture above the text of the cell being edited: in the signature open or the message
+/// being written, its pictures are the ones its text shows.
+fn cell_picture(s: &mut Session, v: &Value) -> CmdResult {
+    let edit = s.table_edit_now().ok_or_else(|| fail("the owner isn't typing in a table cell"))?;
+    let path = p::str(v, "path").map(str::trim).unwrap_or_default();
+    if p::str(v, "data").is_none() && ["http:", "https:", "ftp:", "//"].iter().any(|scheme| path.to_ascii_lowercase().starts_with(scheme)) {
+        return Err(fail("pictures from the web are not downloaded: save the picture and add it from the file"));
+    }
+    let (_, bytes) = super::source(&json!({"data": v.get("data"), "path": v.get("path")}))?;
+    let file = p::str(v, "file").or_else(|| (!path.is_empty()).then(|| path.rsplit(['/', '\\']).next().unwrap_or(path))).unwrap_or("picture");
+    let alt = p::str(v, "alt");
+    let id = if let Some(e) = s.signature_edit.as_mut() {
+        let mut sig = e.signature.clone();
+        sig.set_body(e.body.text().clone()).map_err(model)?;
+        let id = sig.store_picture(file, bytes, alt).map_err(model)?;
+        e.signature = sig;
+        if let Some(table) = e.body.text_mut().table_at_mut(edit.from)
+            && table.set_cell_image(edit.row, edit.cell, Some(id))
+        {
+            e.dirty = true;
+            id
+        } else {
+            return Err(fail("there is no such cell in that table"));
+        }
+    } else if let Some(c) = s.compose.as_mut() {
+        let held: std::collections::HashSet<u32> = c.body.text().pictures().into_iter().collect();
+        let id = mailcraft_model::pictures::add(&mut c.pictures, &mut c.picture_seq, &held, file, bytes, alt, None).map_err(model)?;
+        if let Some(table) = c.body.text_mut().table_at_mut(edit.from)
+            && table.set_cell_image(edit.row, edit.cell, Some(id))
+        {
+            c.dirty = true;
+            id
+        } else {
+            return Err(fail("there is no such cell in that table"));
+        }
+    } else {
+        return Err(fail("no message is being written"));
+    };
+    Ok(json!({"id": id, "from": edit.from, "row": edit.row, "cell": edit.cell}))
+}
+
 fn cell_erase(s: &mut Session, v: &Value) -> CmdResult {
     let forward = p::bool(v, "forward").unwrap_or(false);
     let to = p::u64(v, "to").and_then(|n| usize::try_from(n).ok());
@@ -750,6 +794,7 @@ fn cells(v: &Value, key: &str) -> Result<usize, CmdError> {
 fn empty_cell() -> TableCell {
     TableCell {
         lines: vec![vec![CellText { text: String::new(), style: Style::default() }]],
+        image: None,
         header: false,
         colspan: 1,
         rowspan: 1,

@@ -13084,6 +13084,11 @@ msgstr "სურათი ტექსტის ზემოთ"
 msgid "Picture beside text"
 msgstr "სურათი ტექსტის გვერდით"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Picture in Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/compose/picture_size.rs
 #, fuzzy
@@ -24351,7 +24356,7 @@ msgid "personal"
 msgstr "პირადი"
 
 #. what a command says
-#: crates/engine/src/cmd/picture.rs crates/engine/src/cmd/signature.rs
+#: crates/engine/src/cmd/format.rs crates/engine/src/cmd/picture.rs crates/engine/src/cmd/signature.rs
 #, fuzzy
 msgid "pictures from the web are not downloaded: save the picture and add it from the file"
 msgstr "ინტერნეტიდან სურათები არ ჩამოიტვირთება: შეინახეთ სურათი და დაამატეთ ფაილიდან"

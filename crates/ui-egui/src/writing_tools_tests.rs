@@ -363,3 +363,46 @@ fn a_paste_into_a_table_cell_keeps_its_html_formatting_in_the_editor() {
     assert!(cell.lines.iter().flatten().any(|run| run.text == "Bold" && run.style.bold), "{:?}", cell.lines);
     assert!(cell.lines.iter().flatten().any(|run| run.text == "Red" && run.style.color.as_deref() == Some("#ff0000")), "{:?}", cell.lines);
 }
+
+/// An image on the clipboard, and nothing else.
+struct ImageBoard(Vec<u8>);
+
+impl RichClipboard for ImageBoard {
+    fn put(&self, _: &str, _: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn html(&self) -> Option<String> {
+        None
+    }
+
+    fn image(&self) -> Option<Vec<u8>> {
+        Some(self.0.clone())
+    }
+}
+
+/// Pasting a picture with the caret in a cell puts it above that cell's text.
+#[test]
+fn a_pasted_picture_goes_above_the_table_cell_text() {
+    let mut app = MailApp::new(Session::at(mailcraft_engine::sample::mailbox(NOW, 0), NOW, 0), Services::default());
+    app.autosave = false;
+    app.execute("mail.new", json!({})).unwrap();
+    app.execute("compose.set", json!({"body": ""})).unwrap();
+    app.execute("compose.select", json!({"from": 0})).unwrap();
+    app.execute("insert.table", json!({"rows": 2, "columns": 2})).unwrap();
+    let png = b"\x89PNG\r\n\x1a\nIHDR....".to_vec();
+    app.services.clipboard = Some(Box::new(ImageBoard(png)));
+    let from = {
+        let body = &app.session.compose.as_ref().unwrap().body;
+        (0..body.text().len()).find(|at| body.text().table_at(*at).is_some()).expect("the table")
+    };
+    let mut h = window(app);
+    h.run_steps(3);
+    let body = h.state().hit.rect("composeBody", 0).expect("the body is drawn");
+    click_at(&mut h, body.min + egui::vec2(20.0, 12.0));
+    h.event(egui::Event::Paste(String::new()));
+    h.run_steps(3);
+    let table = h.state().session.compose.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert!(table.cell_image(0, 0).is_some(), "the picture is above the first cell");
+    assert!(h.state().session.compose.as_ref().unwrap().pictures.iter().any(|p| p.id == table.cell_image(0, 0).unwrap_or(0)));
+}

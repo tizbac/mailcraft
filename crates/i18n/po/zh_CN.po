@@ -13112,6 +13112,11 @@ msgstr "图片在文字上方"
 msgid "Picture beside text"
 msgstr "图片在文字旁"
 
+#. command label
+#: crates/engine/src/cmd/format.rs
+msgid "Picture in Cell"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/compose/picture_size.rs
 #, fuzzy
@@ -24405,7 +24410,7 @@ msgid "personal"
 msgstr "个人"
 
 #. what a command says
-#: crates/engine/src/cmd/picture.rs crates/engine/src/cmd/signature.rs
+#: crates/engine/src/cmd/format.rs crates/engine/src/cmd/picture.rs crates/engine/src/cmd/signature.rs
 #, fuzzy
 msgid "pictures from the web are not downloaded: save the picture and add it from the file"
 msgstr "无法下载网络图片：请先保存图片，再从文件添加"

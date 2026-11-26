@@ -11,11 +11,14 @@ use egui::{
     vec2,
 };
 use mailcraft_model::rich::{CellAlignment, CellBorders, PastedTable, Style};
+use mailcraft_model::signature::Picture;
 
 use crate::theme::Tokens;
 
 const PADDING: f32 = 4.0;
 const MIN_ROW: f32 = 24.0;
+/// The room between a cell's picture and its text.
+const IMAGE_GAP: f32 = 4.0;
 
 struct Cell {
     rect: Rect,
@@ -27,6 +30,8 @@ struct Cell {
     column: usize,
     /// Where its text starts, measured from the table's own top left.
     text_at: Pos2,
+    /// The picture above its text, with the size it is drawn at.
+    image: Option<(u32, Vec2)>,
 }
 
 pub(super) struct TableLayout {
@@ -45,7 +50,7 @@ impl TableLayout {
         Self { size: text.size(), cells: Vec::new(), plain: Some(text) }
     }
 
-    pub fn new(ctx: &egui::Context, table: &PastedTable, tokens: &Tokens, room: f32) -> Self {
+    pub fn new(ctx: &egui::Context, table: &PastedTable, tokens: &Tokens, room: f32, pictures: &[Picture]) -> Self {
         let columns = usize::from(table.columns());
         let mut occupied = vec![0; columns];
         let mut widths = vec![24.0_f32; columns];
@@ -132,7 +137,15 @@ impl TableLayout {
             job.wrap.max_width = (right - left - 2.0 * PADDING).max(1.0);
             let text = ctx.fonts_mut(|f| f.layout_job(job));
             let Some(spanned) = heights.get_mut(row..end_row) else { continue };
-            let missing = (text.size().y + 2.0 * PADDING - spanned.iter().sum::<f32>()).max(0.0);
+            let image = table
+                .rows()
+                .get(row)
+                .and_then(|row| row.get(cell_index))
+                .and_then(|cell| cell.image)
+                .and_then(|id| pictures.iter().find(|p| p.id == id))
+                .map(|p| super::size_of(ctx, p, (right - left - 2.0 * PADDING).max(8.0)));
+            let extra = image.map_or(0.0, |size| size.y + IMAGE_GAP);
+            let missing = (text.size().y + extra + 2.0 * PADDING - spanned.iter().sum::<f32>()).max(0.0);
             if let Some(last) = spanned.last_mut() {
                 *last += missing;
             }
@@ -148,7 +161,15 @@ impl TableLayout {
                     egui::Align::Center => rect.center().x,
                     egui::Align::Max => rect.right() - PADDING,
                 };
-                Some(Cell { rect, text, background, borders, row, column: cell_index, text_at: pos2(x, rect.top() + PADDING) })
+                let image = table
+                    .rows()
+                    .get(row)
+                    .and_then(|row| row.get(cell_index))
+                    .and_then(|cell| cell.image)
+                    .and_then(|id| pictures.iter().find(|p| p.id == id))
+                    .map(|p| (p.id, super::size_of(ctx, p, (right - left - 2.0 * PADDING).max(8.0))));
+                let extra = image.map_or(0.0, |(_, size)| size.y + IMAGE_GAP);
+                Some(Cell { rect, text, background, borders, row, column: cell_index, text_at: pos2(x, rect.top() + PADDING + extra), image })
             })
             .collect();
         Self { size: vec2(total * scale, heights.iter().sum()), cells, plain: None }
@@ -157,6 +178,18 @@ impl TableLayout {
     /// The row and the cell's place in it under `at`, measured from the table's own top left.
     pub fn cell_at(&self, at: Vec2) -> Option<(usize, usize)> {
         self.cells.iter().find(|cell| cell.rect.contains(at.to_pos2())).map(|cell| (cell.row, cell.column))
+    }
+
+    /// The pictures above the cells' text, each with where it is drawn when the table is at `at`.
+    pub fn images(&self, at: Pos2) -> Vec<(Rect, u32)> {
+        self.cells
+            .iter()
+            .filter_map(|cell| {
+                let (id, size) = cell.image?;
+                let origin = pos2(cell.rect.left() + PADDING, cell.rect.top() + PADDING);
+                Some((Rect::from_min_size(origin + at.to_vec2(), size), id))
+            })
+            .collect()
     }
 
     /// The row, the cell and the character in it nearest to `at`, measured from the table's own
@@ -209,12 +242,7 @@ impl TableLayout {
                     painter.line_segment([rect.left_top(), rect.left_bottom()], line);
                 }
             }
-            let x = match cell.text.job.halign {
-                egui::Align::Min => rect.left() + PADDING,
-                egui::Align::Center => rect.center().x,
-                egui::Align::Max => rect.right() - PADDING,
-            };
-            painter.with_clip_rect(rect).galley(pos2(x, rect.top() + PADDING), cell.text.clone(), tokens.text);
+            painter.with_clip_rect(rect).galley(cell.text_at + at.to_vec2(), cell.text.clone(), tokens.text);
             if let Some((row, column, caret_at)) = caret
                 && (row, column) == (cell.row, cell.column)
                 && let Some(line) = self.caret_rect(row, column, caret_at)

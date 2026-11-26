@@ -164,6 +164,7 @@ fn undo_charges_shared_table_storage_once() {
 
     let cell = TableCell {
         lines: vec![vec![CellText { text: "x".repeat(MAX_CHARS / 2), style: Style::default() }]],
+        image: None,
         header: false,
         colspan: 1,
         rowspan: 1,

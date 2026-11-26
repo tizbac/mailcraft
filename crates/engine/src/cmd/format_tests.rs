@@ -869,3 +869,23 @@ fn a_paste_into_a_table_cell_keeps_its_formatting() {
     assert!(first.iter().any(|run| run.text == "Link" && run.style.link.as_deref() == Some("https://lumen.example/")), "{first:?}");
     assert_eq!(table.cell_text(0, 0).as_deref(), Some("Bold Red Link\n\nSecond"));
 }
+
+#[test]
+fn a_picture_above_the_text_of_a_table_cell_goes_with_the_signature() {
+    let mut s = session();
+    run(&mut s, "signature.set", json!({"name": "Logo", "text": ""}));
+    run(&mut s, "signature.open", json!({"name": "Logo"}));
+    run(&mut s, "insert.table", json!({"rows": 1, "columns": 1}));
+    let (from, ..) = s.table_edit().expect("the first cell");
+    let png = mailcraft_charset::base64::STANDARD.encode(b"\x89PNG\r\n\x1a\nIHDR....");
+    run(&mut s, "table.cellPicture", json!({"data": png, "file": "logo.png"}));
+    run(&mut s, "table.cellType", json!({"text": "under"}));
+    let table = s.signature_edit.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert!(table.cell_image(0, 0).is_some(), "the picture is above the cell");
+    assert_eq!(table.cell_text(0, 0).as_deref(), Some("under"));
+    run(&mut s, "signature.save", json!({}));
+    let sig = s.mailbox.signature("Logo").unwrap();
+    assert_eq!(sig.pictures().len(), 1);
+    let html = mailcraft_mime_model::rich::signature_html(sig, &|p| format!("p{}", p.id));
+    assert!(html.contains("<img src=\"cid:p") && html.contains("under"), "{html}");
+}

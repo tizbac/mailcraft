@@ -538,6 +538,10 @@ fn read_pasted_table<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Resul
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TableCell {
     pub lines: Vec<Vec<CellText>>,
+    /// One picture above the cell's text, its id in the signature's or the message's pictures
+    /// (the text, when there is some, stands under it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<u32>,
     pub header: bool,
     pub colspan: u16,
     pub rowspan: u16,
@@ -710,6 +714,7 @@ impl PastedTable {
                 row.iter()
                     .map(|cell| TableCell {
                         lines: vec![vec![CellText { text: cell.to_string(), style: Style::default() }]],
+                        image: None,
                         header: false,
                         colspan: 1,
                         rowspan: 1,
@@ -732,6 +737,18 @@ impl PastedTable {
     /// The number of characters a cell has, its lines' `\n` counted.
     pub fn cell_len(&self, row: usize, cell: usize) -> Option<usize> {
         self.rows.get(row)?.get(cell).map(|cell| chars_of(&cell.lines).len())
+    }
+
+    /// The picture above a cell's text, if it has one.
+    pub fn cell_image(&self, row: usize, cell: usize) -> Option<u32> {
+        self.rows.get(row)?.get(cell)?.image
+    }
+
+    /// Put a picture above a cell's text (`None` takes it away). Whether there was such a cell.
+    pub fn set_cell_image(&mut self, row: usize, cell: usize, image: Option<u32>) -> bool {
+        let Some(cell) = self.rows.get_mut(row).and_then(|row| row.get_mut(cell)) else { return false };
+        cell.image = image;
+        true
     }
 
     /// Put `text` in a cell at character `at` (counted with its lines' `\n`), in the style the
@@ -1262,7 +1279,20 @@ impl RichText {
 
     /// The pictures' ids, in the order they stand.
     pub fn pictures(&self) -> Vec<u32> {
-        self.paragraphs.iter().flat_map(|p| &p.runs).filter_map(|r| r.picture).collect()
+        self.paragraphs
+            .iter()
+            .flat_map(|p| &p.runs)
+            .filter_map(|r| r.picture)
+            .chain(
+                self.paragraphs
+                    .iter()
+                    .flat_map(|p| &p.runs)
+                    .filter_map(|r| r.table.as_deref())
+                    .flat_map(|table| table.rows())
+                    .flat_map(|row| row.iter())
+                    .filter_map(|cell| cell.image),
+            )
+            .collect()
     }
 
     /// The text as it goes in a plain-text part: bullets as `- `, numbers as `1. `, and a link's

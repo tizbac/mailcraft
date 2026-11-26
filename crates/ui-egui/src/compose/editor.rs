@@ -449,7 +449,8 @@ impl Layout {
                 let glued = last.is_some_and(|c| !c.is_whitespace() || c == '\u{A0}');
                 sized.push((r, local, Some(id), size, glued));
             } else if let Some(source) = &run.table {
-                let grid = if plain { table::TableLayout::plain(ctx, source, t, room) } else { table::TableLayout::new(ctx, source, t, room) };
+                let grid =
+                    if plain { table::TableLayout::plain(ctx, source, t, room) } else { table::TableLayout::new(ctx, source, t, room, pictures) };
                 sized.push((r, local, None, grid.size, true));
                 tables.insert(r, grid);
             }
@@ -755,7 +756,7 @@ fn class(c: char) -> u8 {
 
 /// The size a picture is shown at, in points (a CSS pixel each), within `room`: the width the
 /// owner gave it or its own, its height in proportion.
-fn size_of(ctx: &egui::Context, p: &Picture, room: f32) -> Vec2 {
+pub(super) fn size_of(ctx: &egui::Context, p: &Picture, room: f32) -> Vec2 {
     let [w, h] = own_size(ctx, p);
     let width = p.width.map_or(w, f32::from).min(room).max(8.0);
     vec2(width, (width * h / w).clamp(4.0, 2000.0))
@@ -1211,6 +1212,27 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
                     continue;
                 }
             }
+            // An image on the clipboard goes into the cell, above its text.
+            if app.ui.table_caret.is_some() {
+                let png = match &event {
+                    Event::PasteImage(picture) => {
+                        let [width, height] = picture.size;
+                        let fits = width <= crate::MAX_PICTURE_SIDE && height <= crate::MAX_PICTURE_SIDE;
+                        let rgba: Vec<u8> = if fits { picture.pixels.iter().flat_map(|c| c.to_srgba_unmultiplied()).collect() } else { Vec::new() };
+                        crate::clipboard_picture_png(width, height, &rgba)
+                    }
+                    Event::Paste(text) if text.is_empty() => app.services.clipboard.as_ref().and_then(|board| board.image()),
+                    _ => None,
+                };
+                if let Some(png) = png {
+                    let params = json!({"data": crate::files::base64_lite::encode(&png), "file": "picture.png"});
+                    if let Err(e) = run_in_cell(app, "table.cellPicture", params) {
+                        app.status(e);
+                    }
+                    resync(&mut layout, app);
+                    continue;
+                }
+            }
             if app.ui.table_caret.is_some()
                 && let Some((command, params)) = cell_event(&event, paste_html(app, &ctx, id, &event))
             {
@@ -1220,17 +1242,7 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
                 if matches!(&event, Event::Ime(egui::ImeEvent::Commit(_))) {
                     st.preedit.clear();
                 }
-                let answer = match app.execute(command, params.clone()) {
-                    // (The cell the window shows is entered again, once, when the engine no
-                    // longer has it: the message changed, or the click's was let go of.)
-                    Err(_) => match app.ui.table_caret {
-                        Some((from, row, cell, at)) => app
-                            .execute("table.cellEdit", json!({"from": from, "row": row, "cell": cell, "at": at}))
-                            .and_then(|_| app.execute(command, params)),
-                        None => Err(tl!("the caret is not in a table cell").to_string()),
-                    },
-                    ok => ok,
-                };
+                let answer = run_in_cell(app, command, params);
                 match answer {
                     Ok(answer) => {
                         if let Some(at) = answer.get("at").and_then(Value::as_u64)
@@ -1436,6 +1448,26 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
             let selected = app.ui.table_cell.filter(|(there, _, _)| *there == place).map(|(_, row, cell)| (row, cell));
             let caret = app.ui.table_caret.filter(|(there, _, _, _)| *there == place).map(|(_, row, cell, at)| (row, cell, at));
             table.grid.paint(painter, rect.min, &t, selected, caret);
+            // A cell's picture stands above its text, drawn as the body's pictures are.
+            for (r, id) in table.grid.images(rect.min) {
+                let picture = shown.iter().find(|x| x.id == id);
+                let cache = crate::reading::images::Pictures::of(&ctx);
+                let texture = picture.and_then(|x| cache.lock().ok().map(|mut c| c.texture(&ctx, &x.data, r.size())));
+                match texture {
+                    Some(crate::reading::images::Picture::Ready(tex)) => {
+                        painter.image(tex.id(), r, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), egui::Color32::WHITE);
+                    }
+                    Some(crate::reading::images::Picture::Pending) => {
+                        painter.rect_filled(r, 2.0, t.panel);
+                        ctx.request_repaint();
+                    }
+                    _ => {
+                        painter.rect_stroke(r, 2.0, Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
+                        let alt = picture.map(|x| x.alt.clone()).unwrap_or_default();
+                        painter.with_clip_rect(r).text(r.left_top() + vec2(4.0, 4.0), Align2::LEFT_TOP, alt, regular(11.0), t.text_dim);
+                    }
+                }
+            }
             let index = p.start + table.local;
             if sel.start() <= index && sel.end() > index {
                 painter.rect_stroke(rect, 0.0, Stroke::new(2.0, fill), egui::StrokeKind::Inside);
@@ -1759,6 +1791,21 @@ fn paste_html(app: &MailApp, ctx: &egui::Context, id: egui::Id, event: &Event) -
     match crate::text_menu::taken_paste(ctx, id) {
         Some(found) => found.html,
         None => app.services.clipboard.as_ref().and_then(|board| board.html()).filter(|html| !html.trim().is_empty()),
+    }
+}
+
+/// Run a command in the cell the window's caret is in; when the engine no longer has that cell
+/// (the message changed, or the click's was let go of), enter the cell the window shows once more
+/// and try again.
+fn run_in_cell(app: &mut MailApp, command: &str, params: Value) -> Result<Value, String> {
+    match app.execute(command, params.clone()) {
+        Err(_) => match app.ui.table_caret {
+            Some((from, row, cell, at)) => {
+                app.execute("table.cellEdit", json!({"from": from, "row": row, "cell": cell, "at": at})).and_then(|_| app.execute(command, params))
+            }
+            None => Err(tl!("the caret is not in a table cell").to_string()),
+        },
+        ok => ok,
     }
 }
 
