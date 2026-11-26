@@ -297,7 +297,14 @@ private suspend fun syncAll(core: Core, owner: Boolean, account: ULong? = null):
     } catch (_: CoreException) {
         null
     }
-    if (graph.started || imap?.ran == true) return SyncAnswer(started = true, message = "")
-    val why = graph.message.ifBlank { imap?.errors?.firstOrNull().orEmpty() }
+    val exchange = try {
+        core.syncExchangeNow(120_000uL)
+    } catch (_: CoreException) {
+        null
+    }
+    if (graph.started || imap?.ran == true || exchange?.ran == true) return SyncAnswer(started = true, message = "")
+    val why = graph.message.ifBlank {
+        imap?.errors?.firstOrNull() ?: exchange?.errors?.firstOrNull().orEmpty()
+    }
     return SyncAnswer(started = false, message = why)
 }

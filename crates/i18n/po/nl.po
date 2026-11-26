@@ -1151,7 +1151,7 @@ msgid "Add a task to {address} (it waits here until To Do is allowed)"
 msgstr "Een taak aan {address} toevoegen (deze wacht hier tot To Do is toegestaan)"
 
 #. android
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
 #, fuzzy
 msgid "Add account"
 msgstr "Account toevoegen"
@@ -1161,6 +1161,11 @@ msgstr "Account toevoegen"
 #, fuzzy
 msgid "Add address"
 msgstr "Adres toevoegen"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Add an Exchange account"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
@@ -1751,6 +1756,11 @@ msgstr "Een terugkerend item kan niet op deze manier naar een andere agenda word
 #, fuzzy
 msgid "An item would land where it already is; nothing was moved."
 msgstr "Een item zou terechtkomen waar het al staat; er is niets verplaatst."
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt
+msgid "An organisation's own Exchange Server, Grommunio or SmarterMail, through Exchange Web Services. Your password goes to that server only, and is kept on this phone when sign-ins are remembered."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/reading/unsubscribe.rs
@@ -5455,7 +5465,7 @@ msgid "Email Message"
 msgstr "E-mailbericht"
 
 #. android, interface
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Email address"
 msgstr "E-mailadres"
@@ -5779,6 +5789,11 @@ msgstr "Behalve als"
 msgid "Exchange Calendar, Contacts and To-dos to Read"
 msgstr ""
 
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt
+msgid "Exchange Web Services address"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup/exchange.rs
 #, fuzzy
@@ -5791,8 +5806,8 @@ msgstr "Exchange-server"
 msgid "Exchange server (your organisation's own)"
 msgstr "Exchange-server (van uw eigen organisatie)"
 
-#. interface
-#: crates/ui-egui/src/account_setup/exchange.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt crates/ui-egui/src/account_setup/exchange.rs
 #, fuzzy
 msgid "Exchange server account"
 msgstr "Exchange-serveraccount"
@@ -6292,6 +6307,11 @@ msgstr "Voor een relay die e-mail zonder wachtwoord aanneemt: uw wachtwoord word
 #, fuzzy
 msgid "For an account that signs in with Microsoft: the folders you keep under Favorites in Outlook, in the same order. They are read from the server and never changed there. Without this, the favourites you mark in MailCraft are shown."
 msgstr "Voor een account dat zich aanmeldt met Microsoft: de mappen die u onder favorieten in Outlook bewaart, in dezelfde volgorde. Ze worden van de server gelezen en daar nooit gewijzigd. Zonder dit worden de favorieten getoond die u in MailCraft markeert."
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt
+msgid "For example https://mail.example.org/EWS/Exchange.asmx"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/server_sync.rs
@@ -10224,7 +10244,7 @@ msgid "Name (A–Z)"
 msgstr "Naam (A–Z)"
 
 #. android, interface
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup/senders.rs crates/ui-egui/src/dialogs.rs
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup/senders.rs crates/ui-egui/src/dialogs.rs
 #, fuzzy
 msgid "Name (optional)"
 msgstr "Naam (optioneel)"
@@ -12601,7 +12621,7 @@ msgid "Part of your mailbox is damaged"
 msgstr "Een deel van uw postvak is beschadigd"
 
 #. android, interface
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Password"
 msgstr "Wachtwoord"
@@ -21113,7 +21133,7 @@ msgid "User name (optional)"
 msgstr ""
 
 #. android
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
 msgid "User name (optional, the address if empty)"
 msgstr ""
 

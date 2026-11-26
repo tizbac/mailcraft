@@ -46,6 +46,8 @@ private class FakeApi : AccountsApi {
         return 8u
     }
 
+    override suspend fun addExchange(settings: uniffi.mailcraft_mobile.ExchangeAccountSettings): ULong = 9u
+
     override suspend fun grant(account: ULong, permission: PermissionKind): GrantResult {
         grants.add(account to permission)
         gate?.await()

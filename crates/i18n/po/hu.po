@@ -1177,7 +1177,7 @@ msgid "Add a task to {address} (it waits here until To Do is allowed)"
 msgstr "Feladat hozzáadása ehhez a fiókhoz: {address}. A feladat helyben vár a To Do engedélyezéséig."
 
 #. android
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AppDrawer.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
 #, fuzzy
 msgid "Add account"
 msgstr "Fiók hozzáadása"
@@ -1187,6 +1187,11 @@ msgstr "Fiók hozzáadása"
 #, fuzzy
 msgid "Add address"
 msgstr "Cím hozzáadása"
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
+msgid "Add an Exchange account"
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
@@ -1793,6 +1798,11 @@ msgstr "Egy olyan elem, amely ismétli nem lehet más naptárba így. Tartsa Ctr
 #, fuzzy
 msgid "An item would land where it already is; nothing was moved."
 msgstr "Egy elem oda kerülne, ahol már van; semmi sem lett áthelyezve."
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt
+msgid "An organisation's own Exchange Server, Grommunio or SmarterMail, through Exchange Web Services. Your password goes to that server only, and is kept on this phone when sign-ins are remembered."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/reading/unsubscribe.rs
@@ -5647,7 +5657,7 @@ msgid "Email Message"
 msgstr "E-mail"
 
 #. android, interface
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Email address"
 msgstr "e-mail cím"
@@ -5975,6 +5985,11 @@ msgstr "Kivéve, ha"
 msgid "Exchange Calendar, Contacts and To-dos to Read"
 msgstr ""
 
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt
+msgid "Exchange Web Services address"
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/account_setup/exchange.rs
 #, fuzzy
@@ -5987,8 +6002,8 @@ msgstr "Csereszerver"
 msgid "Exchange server (your organisation's own)"
 msgstr "Exchange-kiszolgáló (a szervezet sajátja)"
 
-#. interface
-#: crates/ui-egui/src/account_setup/exchange.rs
+#. android, interface
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt crates/ui-egui/src/account_setup/exchange.rs
 #, fuzzy
 msgid "Exchange server account"
 msgstr "Kiszolgáló-fiók"
@@ -6520,6 +6535,11 @@ msgstr "Olyan továbbítószerverhez, amely jelszó nélkül fogadja a leveleket
 #, fuzzy
 msgid "For an account that signs in with Microsoft: the folders you keep under Favorites in Outlook, in the same order. They are read from the server and never changed there. Without this, the favourites you mark in MailCraft are shown."
 msgstr "Egy Microsoft-nál bejelentkező fiókhoz: az Outlook kedvencei alatt található mappák ugyanabból a sorrendben kerülnek bemutatásra. A szerverről olvasnak, és soha nem változtattak meg ott. Enélkül a MailCraft-ban található kedvencek jelennek meg."
+
+#. android
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt
+msgid "For example https://mail.example.org/EWS/Exchange.asmx"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/server_sync.rs
@@ -10574,7 +10594,7 @@ msgid "Name (A–Z)"
 msgstr "Név (A–Z)"
 
 #. android, interface
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup/senders.rs crates/ui-egui/src/dialogs.rs
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup/senders.rs crates/ui-egui/src/dialogs.rs
 #, fuzzy
 msgid "Name (optional)"
 msgstr "Név (nem kötelező)"
@@ -13004,7 +13024,7 @@ msgid "Part of your mailbox is damaged"
 msgstr "A postafiókád egy része megsérült."
 
 #. android, interface
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Accounts.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt crates/ui-egui/src/account_setup.rs
 #, fuzzy
 msgid "Password"
 msgstr "Jelszó"
@@ -21704,7 +21724,7 @@ msgid "User name (optional)"
 msgstr ""
 
 #. android
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ExchangeAccountScreen.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/ImapAccountScreen.kt
 msgid "User name (optional, the address if empty)"
 msgstr ""
 

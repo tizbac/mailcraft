@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uniffi.mailcraft_mobile.CoreException
+import uniffi.mailcraft_mobile.ExchangeAccountSettings
 import uniffi.mailcraft_mobile.ImapAccountSettings
 import uniffi.mailcraft_mobile.MailServer
 
@@ -48,6 +49,9 @@ internal class AccountsController(
         onImapIncomingTls = ::imapIncomingTls,
         onImapOutgoingTls = ::imapOutgoingTls,
         onAddImap = ::addImap,
+        onChooseExchange = ::chooseExchange,
+        onExchangeField = ::exchangeField,
+        onAddExchange = ::addExchange,
         onSignInAgain = ::signInAgain,
         onAsk = { account, permission -> askFor(account.id, permission) },
         onAllow = ::allow,
@@ -118,7 +122,7 @@ internal class AccountsController(
     }
 
     /** One field of the mail-server form, typed: held within what a server name or a password may be. */
-    private fun imapField(field: ImapField, value: String) = ui.update { state ->
+    private fun imapField(field: ImapField, typed: String) = ui.update { state ->
         val add = state.add as? AddAccountState.Imap ?: return@update state
         val room = when (field) {
             ImapField.Password -> MAX_PASSWORD
@@ -126,7 +130,7 @@ internal class AccountsController(
             ImapField.Email -> MAX_EMAIL
             else -> MAX_HOST
         }
-        val value = value.take(room)
+        val value = typed.take(room)
         state.copy(
             add = when (field) {
                 ImapField.Email -> add.copy(email = value, notice = null)
@@ -222,9 +226,95 @@ internal class AccountsController(
         } ?: state
     }
 
+    /** The form for an Exchange server account, its server guessed from the address. */
+    private fun chooseExchange() = ui.update { state ->
+        val email = (state.add as? AddAccountState.Form)?.email.orEmpty()
+        val domain = email.substringAfter('@', "").trim()
+        state.copy(
+            add = AddAccountState.Exchange(
+                email = email,
+                url = if (domain.isEmpty()) "" else "https://$domain/EWS/Exchange.asmx",
+            ),
+        )
+    }
+
+    private fun exchangeField(field: ExchangeField, typed: String) = ui.update { state ->
+        val add = state.add as? AddAccountState.Exchange ?: return@update state
+        val room = when (field) {
+            ExchangeField.Password -> MAX_PASSWORD
+            ExchangeField.Email -> MAX_EMAIL
+            ExchangeField.Url -> MAX_URL
+            else -> MAX_HOST
+        }
+        val value = typed.take(room)
+        state.copy(
+            add = when (field) {
+                ExchangeField.Email -> add.copy(email = value, notice = null)
+                ExchangeField.DisplayName -> add.copy(displayName = value, notice = null)
+                ExchangeField.Username -> add.copy(username = value, notice = null)
+                ExchangeField.Password -> add.copy(password = value, notice = null)
+                ExchangeField.Url -> add.copy(url = value, notice = null)
+            },
+        )
+    }
+
+    private fun addExchange() {
+        val add = ui.value.add as? AddAccountState.Exchange ?: return
+        if (add.working) return
+        val problem = when {
+            add.email.trim().isEmpty() -> "Type the account's address."
+            add.password.isEmpty() -> "Type the account's password."
+            add.url.trim().isEmpty() -> "Type the server's Exchange Web Services address."
+            !add.url.trim().startsWith("https://") && !add.url.trim().startsWith("http://127.0.0.1:") ->
+                "The server's address is an https:// address."
+            else -> null
+        }
+        if (problem != null) {
+            refuseExchange(problem)
+            return
+        }
+        ui.update { state ->
+            (state.add as? AddAccountState.Exchange)?.let {
+                state.copy(add = it.copy(working = true, notice = null))
+            } ?: state
+        }
+        scope.launch {
+            val id = try {
+                api.addExchange(exchangeSettings(add))
+            } catch (e: CoreException) {
+                failedExchange(e.message.orEmpty())
+                return@launch
+            }
+            changed()
+            ui.update { it.copy(add = AddAccountState.Done(id)) }
+            scope.launch { signedIn(id, KeepChoice(), true) }
+        }
+    }
+
+    private fun exchangeSettings(add: AddAccountState.Exchange) = ExchangeAccountSettings(
+        email = add.email.trim(),
+        displayName = add.displayName.trim(),
+        username = add.username.trim(),
+        password = add.password,
+        url = add.url.trim(),
+    )
+
+    private fun refuseExchange(problem: String) = ui.update { state ->
+        (state.add as? AddAccountState.Exchange)?.let {
+            state.copy(add = it.copy(notice = Notice.Failed(problem)))
+        } ?: state
+    }
+
+    private fun failedExchange(reason: String) = ui.update { state ->
+        (state.add as? AddAccountState.Exchange)?.let {
+            state.copy(add = it.copy(working = false, notice = Notice.Failed(reason)))
+        } ?: state
+    }
+
     private fun keepOf(add: AddAccountState): KeepChoice = when (add) {
         is AddAccountState.Form -> add.keep
         is AddAccountState.Imap -> KeepChoice()
+        is AddAccountState.Exchange -> KeepChoice()
         is AddAccountState.Approval -> add.keep
         is AddAccountState.Waiting -> add.keep
         is AddAccountState.Done -> KeepChoice()
@@ -233,6 +323,7 @@ internal class AccountsController(
     private fun emailOf(add: AddAccountState): String? = when (add) {
         is AddAccountState.Form -> add.email
         is AddAccountState.Imap -> add.email
+        is AddAccountState.Exchange -> add.email
         is AddAccountState.Approval -> add.email
         is AddAccountState.Waiting, is AddAccountState.Done -> null
     }
@@ -265,6 +356,7 @@ internal class AccountsController(
 
     /** Opens Microsoft's page and waits for the owner. Only from the form or the approval help. */
     fun signIn() {
+        if (ui.value.add is AddAccountState.Exchange) return
         val email = emailOf(ui.value.add) ?: return
         val keep = keepOf(ui.value.add)
         val operation = ++signInOperation
@@ -433,5 +525,8 @@ internal class AccountsController(
 
         /** The most digits a port may be typed in (65535 is five). */
         const val MAX_PORT_DIGITS = 5
+
+        /** The longest a server's Exchange Web Services address may be. */
+        const val MAX_URL = 2_048
     }
 }

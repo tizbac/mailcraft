@@ -31,6 +31,15 @@ impl Shed for ImapPiece {
     }
 }
 
+/// One piece of an Exchange run on its way to the session's thread; `None` ends it.
+struct ExchangePiece(Option<mailcraft_model::sync::EwsMailResult>);
+
+impl Shed for ExchangePiece {
+    fn weight(&self) -> Weight {
+        Weight::Notice
+    }
+}
+
 /// The shortest and the longest time a background sync is given (the system gives a worker some
 /// minutes; a `0` or a day is a mistake).
 const LEAST_BUDGET_MS: u64 = 500;
@@ -213,6 +222,109 @@ impl Core {
         .await
     }
 
+    /// Read and send the mail of the Exchange server accounts (Exchange Web Services), to their
+    /// end or until `budget_ms` runs out. The pieces are applied as `sync.applyEws` would, on the
+    /// session's thread, and are seen through the same events as a Microsoft account's round.
+    pub async fn sync_exchange_now(&self, budget_ms: u64) -> Result<SyncSummary, CoreError> {
+        let budget = Duration::from_millis(budget_ms.clamp(LEAST_BUDGET_MS, MOST_BUDGET_MS));
+        let sync = self.sync.clone();
+        let platform = self.platform.clone();
+        let (requests, mut errors) = self
+            .call(move |session| {
+                let mut requests = Vec::new();
+                let mut errors = Vec::new();
+                let accounts: Vec<(u64, String)> = session
+                    .mailbox
+                    .accounts
+                    .iter()
+                    .filter(|a| a.kind == AccountKind::Exchange)
+                    .map(|a| (a.id, mailcraft_host::secrets::secret_key("password", a)))
+                    .collect();
+                for (id, stored_key) in accounts {
+                    let password =
+                        sync.password(id).or_else(|| platform.secrets().ok().flatten().and_then(|store| store.get(stored_key).ok().flatten()));
+                    let Some(password) = password.filter(|password| !password.is_empty()) else {
+                        errors.push("An account's password is needed to send and receive its mail.".to_string());
+                        continue;
+                    };
+                    match session.run("sync.ewsRequest", &serde_json::json!({"account": id})) {
+                        Ok(answer) => match serde_json::from_value::<mailcraft_model::sync::EwsMailRequest>(answer) {
+                            Ok(request) => requests.push((request, password)),
+                            Err(e) => errors.push(e.to_string()),
+                        },
+                        Err(e) => errors.push(e.to_string()),
+                    }
+                }
+                Ok((requests, errors))
+            })
+            .await?;
+        if requests.is_empty() {
+            return Ok(SyncSummary { ran: false, finished: true, errors, ..Default::default() });
+        }
+        let pieces = Queue::<ExchangePiece>::new();
+        let sender = pieces.clone();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let worker_cancel = cancel.clone();
+        let worker = std::thread::Builder::new().name("mailcraft-exchange".to_string()).spawn(move || {
+            for (request, password) in requests {
+                let sent = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    mailcraft_host::ews::run_mail_with(&request, &password, &worker_cancel, &mut |piece| {
+                        sender.push(ExchangePiece(Some(piece)));
+                    });
+                }));
+                if sent.is_err() || worker_cancel.load(Ordering::Relaxed) {
+                    break;
+                }
+            }
+            sender.push(ExchangePiece(None));
+        });
+        if worker.is_err() {
+            return Err(CoreError::Failed { reason: "a Send/Receive for the phone couldn't be started".to_string() });
+        }
+        let started = std::time::Instant::now();
+        let mut cut = false;
+        let mut new_mail = 0u64;
+        loop {
+            let Some(piece) = pieces.next().await else { break };
+            let Some(piece) = piece.0 else { break };
+            if !piece.errors.is_empty() {
+                errors.extend(piece.errors.iter().cloned());
+            }
+            // (The engine counts what is really new, and says what it couldn't take in.)
+            let applied = self
+                .call(move |session| {
+                    let answer = session.run("sync.applyEws", &serde_json::json!({"result": piece})).map_err(CoreError::from)?;
+                    Ok((answer, session.rev()))
+                })
+                .await;
+            match applied {
+                Ok((answer, rev)) => {
+                    new_mail = new_mail.saturating_add(answer.get("new").and_then(serde_json::Value::as_u64).unwrap_or(0));
+                    if let Some(list) = answer.get("errors").and_then(serde_json::Value::as_array) {
+                        errors.extend(list.iter().filter_map(serde_json::Value::as_str).map(str::to_string));
+                    }
+                    self.events.push(Event::RevChanged { rev });
+                }
+                Err(e) => errors.push(e.to_string()),
+            }
+            if started.elapsed() >= budget {
+                cancel.store(true, Ordering::Relaxed);
+                cut = true;
+                break;
+            }
+        }
+        // What went wrong, as much of it as the app can say: a few lines, each held to a length
+        // (a server's answer is nobody's to grow without end).
+        errors.truncate(8);
+        for line in &mut errors {
+            if line.chars().count() > 200 {
+                *line = line.chars().take(200).collect();
+            }
+        }
+        self.events.push(Event::SyncFinished { new_mail, finished: !cut });
+        Ok(SyncSummary { ran: true, finished: !cut, new_mail, errors, sign_in_needed: false })
+    }
+
     /// One round to its end, or until `budget_ms` runs out (a worker's time: it is held between
     /// half a second and ten minutes): the round is then called off, and the run under way stops
     /// at its next safe place. For the system's scheduler, which calls it with a network. What it
@@ -268,19 +380,18 @@ impl Core {
         if !summary.finished {
             return Ok(summary);
         }
-        match self.sync_imap_now(120_000).await {
-            Ok(imap) => {
-                summary.ran |= imap.ran;
-                summary.new_mail = summary.new_mail.saturating_add(imap.new_mail);
-                summary.errors.extend(imap.errors);
-                summary.finished &= imap.finished;
-                Ok(summary)
-            }
-            Err(e) => {
-                summary.errors.push(e.to_string());
-                Ok(summary)
+        for other in [self.sync_imap_now(120_000).await, self.sync_exchange_now(120_000).await] {
+            match other {
+                Ok(imap) => {
+                    summary.ran |= imap.ran;
+                    summary.new_mail = summary.new_mail.saturating_add(imap.new_mail);
+                    summary.errors.extend(imap.errors);
+                    summary.finished &= imap.finished;
+                }
+                Err(e) => summary.errors.push(e.to_string()),
             }
         }
+        Ok(summary)
     }
 
     /// Where Send/Receive stands: whether a round is under way, what the last said went wrong,

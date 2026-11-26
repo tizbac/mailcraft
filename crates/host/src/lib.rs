@@ -29,6 +29,9 @@ pub mod platform;
 pub mod secrets;
 #[cfg(test)]
 mod secrets_tests;
+// The Exchange server runner needs sockets, which the browser build has none of.
+#[cfg(not(target_arch = "wasm32"))]
+pub mod ews;
 // Signing in on the provider's page needs the OAuth client, which the browser build has no sockets for.
 #[cfg(not(target_arch = "wasm32"))]
 pub mod signin;

@@ -4171,6 +4171,7 @@ version = "0.15.59"
 dependencies = [
  "log",
  "mailcraft-engine",
+ "mailcraft-ews",
  "mailcraft-i18n",
  "mailcraft-model",
  "mailcraft-net",
