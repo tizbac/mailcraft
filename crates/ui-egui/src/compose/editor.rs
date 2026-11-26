@@ -57,6 +57,117 @@ fn indent_of(p: &Paragraph) -> f32 {
 /// Longest text an input method is shown composing.
 const MAX_PREEDIT: usize = 256;
 
+/// Most pictures one pasted signature asks the window to download.
+const MAX_PASTE_PICTURES: usize = 30;
+
+/// How long a pasted signature waits for its pictures before it goes without the ones still
+/// missing.
+const PASTE_PATIENCE: f32 = 20.0;
+
+/// A paste into a signature whose pictures on the web are still being downloaded: the HTML and
+/// the selection wait until they arrive, and then the paste is made with them. `images` holds a
+/// channel per address.
+pub(crate) struct PendingSignaturePaste {
+    pub signature: String,
+    pub html: String,
+    pub text: String,
+    pub from: usize,
+    pub to: usize,
+    pub images: Vec<(String, std::sync::mpsc::Receiver<Result<Vec<u8>, String>>)>,
+    pub since: f64,
+}
+
+/// The addresses of the pictures an HTML paste names on the web, each once, bounded.
+fn remote_image_urls(html: &str) -> Vec<String> {
+    const MAX_URL: usize = 2_000;
+    const MAX_TAG: usize = 64 * 1024;
+    let lower = html.to_ascii_lowercase();
+    let bytes = html.as_bytes();
+    let mut out: Vec<String> = Vec::new();
+    let mut at = 0usize;
+    while let Some(start) = lower.get(at..).and_then(|rest| rest.find("<img")).map(|i| at + i) {
+        let after = start.saturating_add(4);
+        let end = bytes
+            .get(after..bytes.len().min(after.saturating_add(MAX_TAG)))
+            .and_then(|window| window.iter().position(|b| *b == b'>'))
+            .map_or(bytes.len(), |i| after.saturating_add(i));
+        let tag = html.get(after..end).unwrap_or_default();
+        // The tag's `src`, in quotes or bare.
+        let lower_tag = tag.to_ascii_lowercase();
+        if let Some(s) = lower_tag.find("src") {
+            let rest = tag.get(s.saturating_add(3)..).unwrap_or_default();
+            let rest = rest.trim_start().strip_prefix('=').map(str::trim_start).unwrap_or_default();
+            let value = match rest.as_bytes().first() {
+                Some(q @ (b'"' | b'\'')) => {
+                    let q = *q;
+                    let body = rest.get(1..).unwrap_or_default();
+                    body.split(|c| c == char::from(q)).next().unwrap_or_default()
+                }
+                _ => rest.split_whitespace().next().unwrap_or_default(),
+            };
+            let value = value.trim();
+            let url = value.get(..MAX_URL).unwrap_or(value);
+            let secure = url.get(..8).is_some_and(|p| p.eq_ignore_ascii_case("https://"));
+            let plain = url.get(..7).is_some_and(|p| p.eq_ignore_ascii_case("http://"));
+            if (secure || plain) && !out.iter().any(|seen| seen == url) && out.len() < MAX_PASTE_PICTURES {
+                out.push(url.to_string());
+            }
+        }
+        at = end.saturating_add(1);
+        if at >= html.len() {
+            break;
+        }
+    }
+    out
+}
+
+/// Finish a signature paste whose pictures were being downloaded: put the selection back and
+/// paste the HTML with the ones that came. The ones still missing after [`PASTE_PATIENCE`] are
+/// left out, and said.
+fn finish_signature_paste(app: &mut MailApp, ctx: &egui::Context) {
+    let Some(mut pending) = app.signature_paste.take() else { return };
+    let open = app.session.signature_edit.as_ref().map(|e| e.signature.name.clone());
+    if open.as_deref() != Some(pending.signature.as_str()) {
+        return;
+    }
+    let waited = ((crate::now_ms() - pending.since).max(0.0) / 1000.0) as f32;
+    let mut ready = Vec::new();
+    let mut failed = 0usize;
+    let mut still = Vec::new();
+    for (url, answer) in pending.images.drain(..) {
+        match answer.try_recv() {
+            Ok(Ok(bytes)) if !bytes.is_empty() => ready.push((url, bytes)),
+            Ok(Ok(_)) | Ok(Err(_)) | Err(std::sync::mpsc::TryRecvError::Disconnected) => failed += 1,
+            Err(std::sync::mpsc::TryRecvError::Empty) if waited < PASTE_PATIENCE => still.push((url, answer)),
+            Err(std::sync::mpsc::TryRecvError::Empty) => failed += 1,
+        }
+    }
+    pending.images = still;
+    if !pending.images.is_empty() {
+        app.signature_paste = Some(pending);
+        ctx.request_repaint_after(std::time::Duration::from_millis(250));
+        return;
+    }
+    if app.execute("compose.select", json!({"from": pending.from, "to": pending.to})).is_err() {
+        return;
+    }
+    let pictures: Vec<Value> =
+        ready.iter().map(|(url, bytes)| json!({"url": url, "data": crate::files::base64_lite::encode(bytes), "file": "picture.png"})).collect();
+    let mut params = json!({"html": pending.html, "text": pending.text});
+    if !pictures.is_empty() {
+        params["pictures"] = json!(pictures);
+    }
+    match app.execute("edit.paste", params) {
+        Ok(_) if failed > 0 => app.status(tln!(
+            failed as u64,
+            "A picture couldn't be downloaded and was left out",
+            "{n} pictures couldn't be downloaded and were left out"
+        )),
+        Ok(_) => {}
+        Err(e) => app.status(e),
+    }
+}
+
 /// What a picture is laid out as when egui must be able to break the line before it: a kana
 /// letter, never shown (a picture is laid out as [`OBJECT`] otherwise).
 const BREAKS_BEFORE: char = '\u{30A2}';
@@ -795,6 +906,10 @@ pub(crate) fn show(app: &mut MailApp, ui: &mut Ui, min_height: f32, take_focus: 
 /// the editing commands are the signature's then.
 pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height: f32, take_focus: bool) {
     let ctx = ui.ctx().clone();
+    // A paste whose pictures were still coming is made as they are here.
+    if which == Which::Signature {
+        finish_signature_paste(app, &ctx);
+    }
     // Once a frame, as the reading pane does: what the threads brought in is taken in and given
     // to egui, so a font chosen here is drawn in a frame or two.
     crate::fonts::tick(&ctx);
@@ -1187,6 +1302,31 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
                             (html, spreadsheet, image)
                         }
                     };
+                    // A signature's HTML pictures on the web are downloaded before it is pasted,
+                    // so they are the signature's own and nobody's program fetches them later.
+                    // Until they arrive the paste waits (a frame or two, or
+                    // [`PASTE_PATIENCE`]).
+                    if which == Which::Signature
+                        && image.is_none()
+                        && let Some(html) = html.as_deref()
+                        && let Some(download) = &app.services.pictures
+                    {
+                        let urls = remote_image_urls(html);
+                        if !urls.is_empty() {
+                            let signature = app.session.signature_edit.as_ref().map_or_else(Default::default, |e| e.signature.name.clone());
+                            app.signature_paste = Some(PendingSignaturePaste {
+                                signature,
+                                html: html.to_string(),
+                                text: text.clone(),
+                                from: sel.start(),
+                                to: sel.end(),
+                                images: urls.into_iter().map(|url| (url.clone(), download(url))).collect(),
+                                since: crate::now_ms(),
+                            });
+                            ctx.request_repaint_after(std::time::Duration::from_millis(250));
+                            continue;
+                        }
+                    }
                     match (image, html, spreadsheet) {
                         (Some(png), _, _) => {
                             let command = if which == Which::Signature { "signature.picture.add" } else { "insert.picture" };

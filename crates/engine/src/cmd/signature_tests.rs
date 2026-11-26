@@ -598,3 +598,71 @@ fn a_table_can_be_put_in_an_open_signature() {
     let sig = s.mailbox.signature("Standard").unwrap();
     assert!(sig.body().paragraphs().iter().flat_map(|p| &p.runs).any(|r| r.table.is_some()), "{:?}", sig.plain());
 }
+
+#[test]
+fn an_html_table_pasted_into_a_signature_is_a_table_to_type_in() {
+    let mut s = session();
+    run(&mut s, "signature.set", json!({"name": "Pasted", "text": ""}));
+    run(&mut s, "signature.open", json!({"name": "Pasted"}));
+    run(
+        &mut s,
+        "edit.paste",
+        json!({
+            "html": "<table><tr><td><b>One</b></td><td>Two</td></tr><tr><td>Three</td><td>Four</td></tr></table>",
+            "text": "One\tTwo\nThree\tFour",
+        }),
+    );
+    let from = {
+        let text = &s.signature_edit.as_ref().unwrap().body.text();
+        (0..text.len()).find(|at| text.table_at(*at).is_some()).expect("a table in the signature")
+    };
+    let table = s.signature_edit.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert_eq!((table.rows().len(), table.columns()), (2, 2));
+    assert_eq!(table.cell_text(0, 0).as_deref(), Some("One"));
+    // The cells are the owner's to type in, as in a message.
+    run(&mut s, "table.cellEdit", json!({"from": from, "row": 0, "cell": 0, "at": 0}));
+    run(&mut s, "table.cellType", json!({"text": "x"}));
+    let table = s.signature_edit.as_ref().unwrap().body.text().table_at(from).expect("the table");
+    assert_eq!(table.cell_text(0, 0).as_deref(), Some("xOne"));
+    run(&mut s, "signature.save", json!({}));
+    let sig = s.mailbox.signature("Pasted").unwrap();
+    assert!(sig.body().paragraphs().iter().flat_map(|p| &p.runs).any(|r| r.table.is_some()), "{:?}", sig.plain());
+}
+
+#[test]
+fn a_pasted_signature_embeds_the_pictures_its_html_names_on_the_web() {
+    let mut s = session();
+    run(&mut s, "signature.set", json!({"name": "Pasted", "text": ""}));
+    run(&mut s, "signature.open", json!({"name": "Pasted"}));
+    let html = r#"<p>Logo <img src="https://lumen.example/logo.png" alt="logo"></p><table><tr><td>One</td><td>Two</td></tr></table>"#;
+    let pasted = run(
+        &mut s,
+        "edit.paste",
+        json!({
+            "html": html,
+            "text": "Logo \nOne\tTwo",
+            "pictures": [{"url": "https://lumen.example/logo.png", "data": png(), "file": "logo.png"}],
+        }),
+    );
+    assert!(pasted.get("note").is_none(), "the picture was embedded, not left out: {pasted}");
+    let e = s.signature_edit.as_ref().unwrap();
+    let pictures = e.signature.pictures();
+    assert_eq!(pictures.len(), 1);
+    let id = pictures[0].id;
+    assert_eq!(e.body.text().pictures(), [id]);
+    // The table beside it is a table to type in.
+    let from = {
+        let text = &e.body.text();
+        (0..text.len()).find(|at| text.table_at(*at).is_some()).unwrap_or_else(|| panic!("no table in {text:?}"))
+    };
+    run(&mut s, "table.cellEdit", json!({"from": from, "row": 0, "cell": 0, "at": 0}));
+    run(&mut s, "table.cellType", json!({"text": "x"}));
+    assert_eq!(s.signature_edit.as_ref().unwrap().body.text().table_at(from).and_then(|t| t.cell_text(0, 0)).as_deref(), Some("xOne"));
+    // Kept on Save, and sent as the signature's own picture.
+    run(&mut s, "signature.save", json!({}));
+    let sig = s.mailbox.signature("Pasted").unwrap();
+    assert_eq!(sig.pictures().len(), 1);
+    assert!(sig.body().pictures() == [id]);
+    let sent = mailcraft_mime_model::rich::signature_html(sig, &|p| format!("p{}", p.id));
+    assert!(sent.contains("cid:p1"), "{sent}");
+}

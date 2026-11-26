@@ -726,6 +726,14 @@ msgid "A part of this key is RSA (a subkey for encryption, perhaps), which MailC
 msgstr "Część tego klucza to RSA (być może podklucz szyfrujący), którego MailCraft sam nie używa: zachowaj klucz w GnuPG, którego agentem MailCraft podpisuje, i nie dodawaj go tutaj."
 
 #. interface
+#: crates/ui-egui/src/compose/editor.rs
+msgid "A picture couldn't be downloaded and was left out"
+msgid_plural "{n} pictures couldn't be downloaded and were left out"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+#. interface
 #: crates/ui-egui/src/reading/remote.rs
 #, fuzzy
 msgid "A picture couldn't be downloaded."

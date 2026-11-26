@@ -1,0 +1,1 @@
+- **A signature pasted from the web keeps its tables and pictures.** HTML pasted into File › Signatures keeps its grid (and its cells can be typed in, as in a message), its formatting and its pictures: a picture at a web address is downloaded once and becomes the signature's own, so recipients never fetch it.
