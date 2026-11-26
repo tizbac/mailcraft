@@ -35,6 +35,21 @@ private class SigningIn(
 
     override suspend fun addExchange(settings: uniffi.mailcraft_mobile.ExchangeAccountSettings): ULong = 9u
 
+    override suspend fun settings(account: ULong) = uniffi.mailcraft_mobile.AccountSettings(
+        email = "ada@example.org",
+        displayName = "",
+        username = "",
+        incoming = null,
+        outgoing = null,
+        url = "",
+    )
+
+    override suspend fun checkImap(settings: uniffi.mailcraft_mobile.ImapAccountSettings) = Unit
+
+    override suspend fun editImap(account: ULong, settings: uniffi.mailcraft_mobile.ImapAccountSettings) = Unit
+
+    override suspend fun editExchange(account: ULong, settings: uniffi.mailcraft_mobile.ExchangeAccountSettings) = Unit
+
     override suspend fun grant(account: ULong, permission: PermissionKind): GrantResult = GrantResult.Granted
 
     override suspend fun status(account: ULong, permission: PermissionKind) = PermissionStatus.Allowed

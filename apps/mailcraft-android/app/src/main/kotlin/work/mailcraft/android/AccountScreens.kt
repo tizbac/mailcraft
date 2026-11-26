@@ -58,7 +58,10 @@ internal fun AddAccountScreen(texts: Texts, state: AddAccountState, actions: Acc
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(texts.t("Add account"), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = {
+                    val editing = (state as? AddAccountState.Imap)?.editing != null || (state as? AddAccountState.Exchange)?.editing != null
+                    Text(texts.t(if (editing) "Edit account" else "Add account"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(AppIcons.Back, contentDescription = texts.t("Back")) }
                 },
@@ -234,7 +237,15 @@ internal fun AccountsPage(texts: Texts, accounts: List<AccountItem>, ui: Account
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            TextButton(onClick = { actions.onRemoveAsk(account) }) { Text(texts.t("Remove account")) }
+            Row(horizontalArrangement = Arrangement.spacedBy(ChipGap)) {
+                if (account.kind == "imap" || account.kind == "exchange") {
+                    TextButton(onClick = {
+                        actions.onEditAccount(account)
+                        onAdd()
+                    }) { Text(texts.t("Edit account")) }
+                }
+                TextButton(onClick = { actions.onRemoveAsk(account) }) { Text(texts.t("Remove account")) }
+            }
         }
         HorizontalDivider()
     }

@@ -4,6 +4,7 @@
 
 package work.mailcraft.android
 
+import uniffi.mailcraft_mobile.AccountSettings
 import uniffi.mailcraft_mobile.Core
 import uniffi.mailcraft_mobile.CoreException
 import uniffi.mailcraft_mobile.DownloadSettings
@@ -157,8 +158,23 @@ internal sealed interface GrantResult {
     class Failed(val reason: String) : GrantResult
 }
 
+/** An account the owner has: its settings, and how they are tried and changed. */
+internal interface AccountSettingsApi {
+    /** An account's settings, for the Edit form (never its password). */
+    suspend fun settings(account: ULong): AccountSettings
+
+    /** Tries an IMAP account's servers and password before it is added or changed. */
+    suspend fun checkImap(settings: ImapAccountSettings)
+
+    /** Changes an IMAP account's settings; an empty password keeps the one it has. */
+    suspend fun editImap(account: ULong, settings: ImapAccountSettings)
+
+    /** Changes an Exchange server account's settings; an empty password keeps the one it has. */
+    suspend fun editExchange(account: ULong, settings: ExchangeAccountSettings)
+}
+
 /** What the screens ask of the core about accounts: one seam, so that they run without the library. */
-internal interface AccountsApi {
+internal interface AccountsApi : AccountSettingsApi {
     /** Signs in to add an account; [keep] is what the phone keeps of a new account's mail. */
     suspend fun signIn(email: String, keep: KeepChoice): SignInResult
 
@@ -208,6 +224,14 @@ internal class CoreAccounts(private val core: Core, private val handback: SignIn
     override suspend fun addImap(settings: ImapAccountSettings): ULong = core.addImapAccount(settings)
 
     override suspend fun addExchange(settings: ExchangeAccountSettings): ULong = core.addExchangeAccount(settings)
+
+    override suspend fun settings(account: ULong): AccountSettings = core.accountSettings(account)
+
+    override suspend fun checkImap(settings: ImapAccountSettings) = core.checkImapAccount(settings)
+
+    override suspend fun editImap(account: ULong, settings: ImapAccountSettings) = core.editImapAccount(account, settings)
+
+    override suspend fun editExchange(account: ULong, settings: ExchangeAccountSettings) = core.editExchangeAccount(account, settings)
 
     override suspend fun grant(account: ULong, permission: PermissionKind): GrantResult {
         val ticket = handback.begin() ?: return GrantResult.Failed("")
@@ -304,6 +328,8 @@ internal sealed interface AddAccountState {
         val outgoingTls: Boolean = false,
         val notice: Notice? = null,
         val working: Boolean = false,
+        /** The account this form edits; null when it adds one. */
+        val editing: ULong? = null,
     ) : AddAccountState
 
     /** An Exchange server account (Exchange Web Services): the form, and why the last try ended. */
@@ -315,6 +341,8 @@ internal sealed interface AddAccountState {
         val url: String = "",
         val notice: Notice? = null,
         val working: Boolean = false,
+        /** The account this form edits; null when it adds one. */
+        val editing: ULong? = null,
     ) : AddAccountState
 
     /** Microsoft's page is open in the browser and the app waits for it. */
@@ -459,6 +487,8 @@ internal class AccountActions(
     val onAddImap: () -> Unit = {},
     /** Opens the form for an Exchange server account. */
     val onChooseExchange: () -> Unit = {},
+    /** Opens the form for an account the owner has, to change its settings. */
+    val onEditAccount: (AccountItem) -> Unit = {},
     val onExchangeField: (ExchangeField, String) -> Unit = { _, _ -> },
     val onAddExchange: () -> Unit = {},
     /** A sign-in again for an account the owner has; the address is the form's hint. */

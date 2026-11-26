@@ -38,7 +38,7 @@ internal fun ExchangeAccountForm(texts: Texts, state: AddAccountState.Exchange, 
         if (state.working) {
             CircularProgressIndicator(modifier = Modifier.size(ExchangeSpinner))
         } else {
-            Text(texts.t("Add account"))
+            Text(texts.t(if (state.editing == null) "Add account" else "Save"))
         }
     }
 }
@@ -61,6 +61,11 @@ private fun ExchangeFields(texts: Texts, state: AddAccountState.Exchange, action
             onValueChange = { actions.onExchangeField(ExchangeField.Password, it) },
             modifier = Modifier.fillMaxWidth(),
             label = { Text(texts.t("Password")) },
+            supportingText = if (state.editing != null) {
+                { Text(texts.t("Leave empty to keep the password you have.")) }
+            } else {
+                null
+            },
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),

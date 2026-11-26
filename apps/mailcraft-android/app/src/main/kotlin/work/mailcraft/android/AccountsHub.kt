@@ -160,6 +160,8 @@ internal class AccountsHub(
             } catch (_: CoreException) {
                 SyncAnswer(started = false, message = texts.t("Send/Receive couldn't start. Try again."))
             }
+            // (A run that started can still have something to say: an account's server refused
+            // the sign-in, or could not be reached. It is shown as the reason a round gave.)
             // The owner's pull is over once the mail it asked for is in (the holds' lock is not held
             // meanwhile). A core that closes meanwhile ends it too.
             if (owner && answer.started) {
@@ -169,13 +171,12 @@ internal class AccountsHub(
                     Unit
                 }
             }
+            notice.value = answer.message.ifEmpty { null }
             if (owner) {
                 pulling.set(false)
-                if (!answer.started) notice.value = answer.message.ifEmpty { null }
                 syncingNow.value = false
                 startFollowUp()
             } else if (!answer.started) {
-                notice.value = answer.message.ifEmpty { null }
                 syncingNow.value = false
                 startFollowUp()
             }
