@@ -985,9 +985,8 @@ pub(crate) fn show_doc(app: &mut MailApp, ui: &mut Ui, which: Which, min_height:
             Some((from, row, cell, at)) => {
                 app.ui.table_caret = Some((from, row, cell, at));
                 app.ui.table_cell = Some((from, row, cell));
-                if app.session.table_selection().is_none() {
-                    app.ui.table_anchor = None;
-                }
+                // The selection too, whoever made it: the pointer, a key, or a script.
+                app.ui.table_anchor = app.session.table_anchor();
             }
             // (A caret whose message was closed, or whose signature is no longer open, goes with
             // it. One whose click the engine didn't take stays: typing enters the cell again.)

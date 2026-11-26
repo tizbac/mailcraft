@@ -2041,6 +2041,17 @@ impl Session {
         Some((edit.from, edit.row, edit.cell, edit.at.min(length)))
     }
 
+    /// The other end of the selection in the cell being typed in, as (the table's place in the
+    /// text, the row, the cell, the character), when something is selected.
+    pub fn table_anchor(&self) -> Option<(usize, usize, usize, usize)> {
+        let edit = self.table_edit?;
+        if edit.doc != self.table_doc() || edit.anchor == edit.at {
+            return None;
+        }
+        let length = self.doc()?.0.text().table_at(edit.from)?.cell_len(edit.row, edit.cell)?;
+        Some((edit.from, edit.row, edit.cell, edit.anchor.min(length)))
+    }
+
     /// Whether a table cell was being typed in before the text being edited changed (another
     /// message, or a signature): its caret is not this text's.
     pub fn table_edit_stale(&self) -> bool {
