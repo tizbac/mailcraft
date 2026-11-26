@@ -64,7 +64,7 @@ impl Reply {
         match Self::parse(response.body()) {
             // (A 500 that is no fault is no answer of the service.)
             Ok(_) if response.status() == 500 => Err(Error::Status(500)),
-            Err(Error::Malformed | Error::Unexpected) if response.status() == 500 => Err(Error::Status(500)),
+            Err(Error::Malformed | Error::Unexpected | Error::UnexpectedWhat(_)) if response.status() == 500 => Err(Error::Status(500)),
             other => other,
         }
     }
@@ -95,8 +95,13 @@ impl Reply {
     /// The response messages of the answer to `operation` (`GetFolder`: the
     /// `GetFolderResponseMessage`s inside `GetFolderResponse`), in order.
     pub fn messages(&self, operation: &str) -> Result<Vec<Message<'_>>, Error> {
-        let response = self.body.child_in(MESSAGES, &format!("{operation}Response")).ok_or(Error::Unexpected)?;
-        let all = response.child_in(MESSAGES, "ResponseMessages").ok_or(Error::Unexpected)?;
+        let response = self
+            .body
+            .child_in(MESSAGES, &format!("{operation}Response"))
+            .ok_or_else(|| Error::UnexpectedWhat(format!("it has no {operation}Response")))?;
+        let all = response
+            .child_in(MESSAGES, "ResponseMessages")
+            .ok_or_else(|| Error::UnexpectedWhat(format!("its {operation}Response has no ResponseMessages")))?;
         let name = format!("{operation}ResponseMessage");
         all.children.iter().filter(|child| child.is(MESSAGES, &name)).map(Message::read).collect()
     }

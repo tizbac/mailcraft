@@ -486,18 +486,27 @@ impl GetItemMime {
     /// can be read (over [`MAX_MIME_TEXT`] of base64) is [`Error::TooLarge`].
     pub fn answer(&self, reply: &Reply) -> Result<Vec<u8>, Error> {
         let messages = reply.messages("GetItem")?;
-        let [message] = messages.as_slice() else { return Err(Error::Unexpected) };
+        let message = match messages.as_slice() {
+            [message] => message,
+            [] => return Err(Error::UnexpectedWhat("it answers for no message".to_string())),
+            _ => return Err(Error::UnexpectedWhat("it answers for more than one message".to_string())),
+        };
         let node = message.ok()?;
-        let items = node.child_in(MESSAGES, "Items").ok_or(Error::Unexpected)?;
-        let item = items.children.iter().find(|c| *c.namespace == *TYPES).ok_or(Error::Unexpected)?;
+        let items = node.child_in(MESSAGES, "Items").ok_or_else(|| Error::UnexpectedWhat("its answer has no Items".to_string()))?;
+        let item =
+            items.children.iter().find(|c| *c.namespace == *TYPES).ok_or_else(|| Error::UnexpectedWhat("its Items hold no message".to_string()))?;
         // (In the types' namespace as the schema has it; a server that writes it elsewhere is
         // read by its name, as `MessageXml` is.)
-        let content = item.child_in(TYPES, "MimeContent").or_else(|| item.child("MimeContent")).ok_or(Error::Unexpected)?;
+        let content = item
+            .child_in(TYPES, "MimeContent")
+            .or_else(|| item.child("MimeContent"))
+            .ok_or_else(|| Error::UnexpectedWhat("the message has no MimeContent".to_string()))?;
         if content.text.is_empty() {
             // (Either nothing, or more than the reader keeps.)
             return Err(Error::TooLarge);
         }
-        let bytes = b64::decode(&content.text, MAX_MIME_TEXT).ok_or(Error::Unexpected)?;
-        if bytes.is_empty() { Err(Error::Unexpected) } else { Ok(bytes) }
+        let bytes =
+            b64::decode(&content.text, MAX_MIME_TEXT).ok_or_else(|| Error::UnexpectedWhat("the message's MimeContent is not base64".to_string()))?;
+        if bytes.is_empty() { Err(Error::UnexpectedWhat("the message's MimeContent is empty".to_string())) } else { Ok(bytes) }
     }
 }

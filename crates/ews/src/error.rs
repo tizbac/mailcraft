@@ -210,6 +210,9 @@ pub enum Error {
     /// The answer is a document but not the answer to this request (wrong namespace, a missing
     /// element, fewer answers than questions, a value that is not one).
     Unexpected,
+    /// [`Error::Unexpected`] with a word about what the answer lacked (an operation, an element),
+    /// for the owner and the saved answer. Never anything the server wrote.
+    UnexpectedWhat(String),
     /// A change in the answer can't be taken in (it has no usable id, or no item): the page holding
     /// it is no page, since its state would say the change was taken in.
     Unreadable(Unreadable),
@@ -232,6 +235,7 @@ impl fmt::Display for Error {
             Self::Server(code) => write!(f, "the server answered with {code}"),
             Self::Malformed => f.write_str("the server's answer could not be read"),
             Self::Unexpected => f.write_str("the server's answer is not the answer to the request"),
+            Self::UnexpectedWhat(what) => write!(f, "the server's answer is not the answer to the request: {what}"),
             Self::Unreadable(_) => f.write_str("a change in the server's answer could not be taken in"),
             Self::TooLarge => f.write_str("the server's answer is larger than any this program reads"),
             Self::Status(code) => write!(f, "the server answered with HTTP status {code}"),

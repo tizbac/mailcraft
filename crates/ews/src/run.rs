@@ -83,13 +83,14 @@ const MAX_RECIPIENT_ASKS: usize = 20;
 /// Why the server's answer couldn't be used: a kind, never any text the server wrote
 /// (docs/mail-privacy-rules.md). It says enough to tell a malformed answer from an unexpected
 /// one, and from an HTTP status the service does not use.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Fault {
     /// Not a document that can be read: not XML, cut short, nested without end.
     Malformed,
     /// A document, but not the answer to this request (wrong namespace, a missing element,
-    /// fewer answers than questions, a value that is not one).
-    Unexpected,
+    /// fewer answers than questions, a value that is not one); the word, when one is known,
+    /// says what the answer lacked.
+    Unexpected(String),
     /// An HTTP status the Exchange service does not use.
     Status(u16),
 }
@@ -99,7 +100,8 @@ impl Fault {
     pub(crate) fn words(&self) -> String {
         match self {
             Self::Malformed => "the server's answer wasn't a document that could be read".to_owned(),
-            Self::Unexpected => "the server's answer wasn't the answer to the request".to_owned(),
+            Self::Unexpected(what) if what.is_empty() => "the server's answer wasn't the answer to the request".to_owned(),
+            Self::Unexpected(what) => format!("the server's answer wasn't the answer to the request: {what}"),
             Self::Status(code) => format!("the server answered with HTTP status {code}"),
         }
     }
@@ -358,7 +360,8 @@ impl<E: HttpExchange> Run<'_, E> {
                 // The answer came, but it is not one this program can use: say which way, so the
                 // owner can tell a broken document from one to the wrong request or a stray status.
                 Error::Malformed => return Err(Asked::Unusable(self.bad(operation, Fault::Malformed))),
-                Error::Unexpected => return Err(Asked::Unusable(self.bad(operation, Fault::Unexpected))),
+                Error::Unexpected => return Err(Asked::Unusable(self.bad(operation, Fault::Unexpected(String::new())))),
+                Error::UnexpectedWhat(what) => return Err(Asked::Unusable(self.bad(operation, Fault::Unexpected(what)))),
                 Error::Status(code) => return Err(Asked::Unusable(self.bad(operation, Fault::Status(code)))),
             }
         }
@@ -842,7 +845,7 @@ impl<E: HttpExchange> Run<'_, E> {
                             (named, UnreadWhy::Code)
                         }
                         Asked::Unusable(Fault::Malformed) => (String::new(), UnreadWhy::Malformed),
-                        Asked::Unusable(Fault::Unexpected) => (String::new(), UnreadWhy::Unexpected),
+                        Asked::Unusable(Fault::Unexpected(_)) => (String::new(), UnreadWhy::Unexpected),
                         Asked::Unusable(Fault::Status(status)) => (String::new(), UnreadWhy::Status(status)),
                         Asked::Lost => (String::new(), UnreadWhy::Lost),
                         Asked::TooLarge => (String::new(), UnreadWhy::TooLarge),

@@ -181,7 +181,10 @@ fn prefixes_are_the_documents_own_choice() {
 fn an_element_in_the_wrong_namespace_is_not_the_one_asked_for() {
     let body = reply_with("NoError", "").replace("services/2006/messages", "services/2006/elsewhere");
     let reply = Reply::parse(body.as_bytes()).unwrap();
-    assert_eq!(GetFolder::new(&[DistinguishedFolder::Inbox]).answer(&reply).unwrap_err(), Error::Unexpected);
+    assert!(matches!(
+        GetFolder::new(&[DistinguishedFolder::Inbox]).answer(&reply).unwrap_err(),
+        Error::UnexpectedWhat(what) if what.contains("GetFolderResponse")
+    ));
 }
 
 #[test]
@@ -845,4 +848,27 @@ fn a_response_message_without_a_class_is_read() {
     );
     let reply = Reply::parse(success.as_bytes()).unwrap();
     assert_eq!(crate::items::GetItemMime::new("item").answer(&reply).unwrap(), b"Hello");
+}
+
+/// A download answer that isn't the one expected says what it lacked, so that the owner (and the
+/// saved answer) can tell a server answering oddly from a message that isn't there.
+#[test]
+fn a_download_answer_says_what_it_lacked() {
+    let body = format!(
+        "{ENVELOPE_OPEN}<m:GetItemResponse xmlns:m=\"http://schemas.microsoft.com/exchange/services/2006/messages\" xmlns:t=\"http://schemas.microsoft.com/exchange/services/2006/types\">\
+         <m:ResponseMessages><m:GetItemResponseMessage ResponseClass=\"Success\"><m:ResponseCode>NoError</m:ResponseCode>\
+         </m:GetItemResponseMessage></m:ResponseMessages></m:GetItemResponse>{ENVELOPE_CLOSE}"
+    );
+    let reply = Reply::parse(body.as_bytes()).unwrap();
+    let error = crate::items::GetItemMime::new("item").answer(&reply).unwrap_err();
+    assert_eq!(error.to_string(), "the server's answer is not the answer to the request: its answer has no Items");
+    let body = format!(
+        "{ENVELOPE_OPEN}<m:GetItemResponse xmlns:m=\"http://schemas.microsoft.com/exchange/services/2006/messages\" xmlns:t=\"http://schemas.microsoft.com/exchange/services/2006/types\">\
+         <m:ResponseMessages><m:GetItemResponseMessage ResponseClass=\"Success\"><m:ResponseCode>NoError</m:ResponseCode>\
+         <m:Items><t:Message><t:ItemId Id=\"item\"/></t:Message></m:Items>\
+         </m:GetItemResponseMessage></m:ResponseMessages></m:GetItemResponse>{ENVELOPE_CLOSE}"
+    );
+    let reply = Reply::parse(body.as_bytes()).unwrap();
+    let error = crate::items::GetItemMime::new("item").answer(&reply).unwrap_err();
+    assert_eq!(error.to_string(), "the server's answer is not the answer to the request: the message has no MimeContent");
 }
