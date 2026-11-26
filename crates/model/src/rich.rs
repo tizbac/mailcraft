@@ -1159,10 +1159,14 @@ impl RichText {
     /// The table at character `at` (the object's place in the text), if there is one.
     pub fn table_at(&self, at: usize) -> Option<&PastedTable> {
         let mut seen = 0usize;
-        for p in &self.paragraphs {
+        for (index, p) in self.paragraphs.iter().enumerate() {
+            // (A paragraph after the first is one character in: its line break, as `text` counts.)
+            if index > 0 {
+                seen = seen.saturating_add(1);
+            }
             for run in &p.runs {
                 let len = run.text.chars().count().max(1);
-                if let Some(table) = run.table.as_deref().filter(|_| at >= seen && at < seen + len) {
+                if let Some(table) = run.table.as_deref().filter(|_| at >= seen && at < seen.saturating_add(len)) {
                     return Some(table);
                 }
                 seen = seen.saturating_add(len);
@@ -1175,7 +1179,10 @@ impl RichText {
     /// is shared by no undo step).
     pub fn table_at_mut(&mut self, at: usize) -> Option<&mut PastedTable> {
         let mut seen = 0usize;
-        for p in &mut self.paragraphs {
+        for (index, p) in self.paragraphs.iter_mut().enumerate() {
+            if index > 0 {
+                seen = seen.saturating_add(1);
+            }
             for run in &mut p.runs {
                 let len = run.text.chars().count().max(1);
                 if at >= seen && at < seen.saturating_add(len) {
