@@ -490,7 +490,9 @@ impl GetItemMime {
         let node = message.ok()?;
         let items = node.child_in(MESSAGES, "Items").ok_or(Error::Unexpected)?;
         let item = items.children.iter().find(|c| *c.namespace == *TYPES).ok_or(Error::Unexpected)?;
-        let content = item.child_in(TYPES, "MimeContent").ok_or(Error::Unexpected)?;
+        // (In the types' namespace as the schema has it; a server that writes it elsewhere is
+        // read by its name, as `MessageXml` is.)
+        let content = item.child_in(TYPES, "MimeContent").or_else(|| item.child("MimeContent")).ok_or(Error::Unexpected)?;
         if content.text.is_empty() {
             // (Either nothing, or more than the reader keeps.)
             return Err(Error::TooLarge);
