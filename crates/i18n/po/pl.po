@@ -201,7 +201,7 @@ msgid "(no subject)"
 msgstr "(brak tematu)"
 
 #. interface
-#: crates/ui-egui/src/alerts.rs crates/ui-egui/src/reading/invitation.rs crates/ui-egui/src/reminders.rs crates/ui-egui/src/tasks_view.rs
+#: crates/ui-egui/src/alerts.rs crates/ui-egui/src/dav_settings.rs crates/ui-egui/src/reading/invitation.rs crates/ui-egui/src/reminders.rs crates/ui-egui/src/tasks_view.rs
 #, fuzzy
 msgid "(no title)"
 msgstr "(bez tytułu)"
@@ -3014,6 +3014,11 @@ msgid "Calendar"
 msgstr "Kalendarz"
 
 #. command label
+#: crates/engine/src/cmd/dav_sync.rs
+msgid "Calendar Changes Waiting on You"
+msgstr ""
+
+#. command label
 #: crates/engine/src/cmd/remote.rs
 #, fuzzy
 msgid "Calendar Changes to Send"
@@ -3507,6 +3512,11 @@ msgstr "Zmień nazwę konta, logowanie i pocztę przechowywaną offline"
 #, fuzzy
 msgid "Changed after it was signed"
 msgstr "Zmieniono po podpisaniu"
+
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Changed here and on the server too"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/signatures.rs
@@ -8689,6 +8699,11 @@ msgstr "Utrzymuj pocztę w granicach tego urządzenia"
 msgid "Keep MailCraft running for mail and reminders when you close its window. Click its icon beside the clock to show it again, or choose Quit from the icon's menu. If no system tray is available, closing exits MailCraft."
 msgstr "Pozostaw MailCraft uruchomiony dla poczty i przypomnień po zamknięciu jego okna. Kliknij jego ikonę obok zegara, aby pokazać okno ponownie, lub wybierz Zakończ z menu ikony. Jeśli nie ma zasobnika systemowego, zamknięcie okna kończy działanie programu MailCraft."
 
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Keep Mine"
+msgstr ""
+
 #. command label
 #: crates/engine/src/cmd/rules.rs
 #, fuzzy
@@ -8747,6 +8762,11 @@ msgstr "Przechowuj pocztę z ostatnich"
 #, fuzzy
 msgid "Keep on the server of {address}"
 msgstr "Zachowaj na serwerze: {address}"
+
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Keep the Server's"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/backstage.rs
@@ -12219,6 +12239,11 @@ msgid "Nothing was done: what you were asked about has changed since. Ask again.
 msgstr "Nic nie zostało zrobione: to, o co pytano, zmieniło się od tego czasu. Spróbuj ponownie."
 
 #. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Nothing was sent over the server's copy. Keep one of the two for each change."
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/account_setup/exchange.rs
 #, fuzzy
 msgid "Nothing was sent to Microsoft, and your password isn't kept."
@@ -12306,6 +12331,11 @@ msgstr "października"
 #, fuzzy
 msgid "Off"
 msgstr "Wyłączone"
+
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Off: MailCraft asks which copy to keep. On: the server's is read, and what changed here is kept as a copy of its own."
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Freshness.kt
@@ -16330,6 +16360,11 @@ msgstr "Ustawienia"
 #, fuzzy
 msgid "Settings…"
 msgstr "Ustawienia…"
+
+#. command label
+#: crates/engine/src/cmd/dav_sync.rs
+msgid "Settle a Calendar Change"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs
@@ -22627,6 +22662,11 @@ msgid "When opened"
 msgstr ""
 
 #. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "When the server's copy changed too, keep both"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/graph_switch.rs
 #, fuzzy
 msgid "When you switch:"
@@ -24715,6 +24755,11 @@ msgstr "żaden kalendarz nie został otwarty według adresu"
 #, fuzzy
 msgid "no calendar with id {id}"
 msgstr "brak kalendarza o identyfikatorze {id}"
+
+#. what a command says
+#: crates/engine/src/cmd/dav_sync.rs
+msgid "no change of event {id} is waiting for you"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/attach_item.rs crates/engine/src/cmd/contacts_move.rs crates/engine/src/cmd/people.rs crates/engine/src/cmd/people_merge.rs

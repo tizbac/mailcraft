@@ -1062,6 +1062,24 @@ pub struct Prefs {
     /// What File › Save As writes by default, an `.eml` or an Outlook `.msg` (`file.options`).
     #[serde(default)]
     pub save_message_format: SaveMessageFormat,
+    /// A change made here whose server's copy changed too (a calendar or contacts server told
+    /// the change was made on a version it no longer has): ask the owner which copy to keep (the
+    /// default, `ask`), or keep both (`keepBoth`: the server's, and what was changed here as a
+    /// copy). Never the server's silently, and never over it.
+    pub dav_conflicts: DavConflicts,
+}
+
+/// What a change made here does when its server's copy changed too ([`Prefs::dav_conflicts`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DavConflicts {
+    /// Hold the change, and ask the owner which copy to keep (`sync.davConflicts`,
+    /// `sync.davResolve`).
+    #[default]
+    Ask,
+    /// Keep both: the server's copy is read, and what was changed here is kept as a copy of its
+    /// own, made on the server as a new item.
+    KeepBoth,
 }
 
 fn yes() -> bool {
@@ -1112,6 +1130,7 @@ impl Default for Prefs {
             import_tree_max_mb: Prefs::IMPORT_TREE_MB_DEFAULT,
             import_tree_max_messages: Prefs::IMPORT_TREE_MESSAGES_DEFAULT,
             save_message_format: SaveMessageFormat::Eml,
+            dav_conflicts: DavConflicts::Ask,
         }
     }
 }
@@ -1544,6 +1563,10 @@ pub struct Session {
     /// one changed again while the request was out goes up again once the answer comes. Never
     /// saved: a request out when the program ends brings no answer.
     pub dav_sent: std::collections::HashMap<Id, mailcraft_model::Event>,
+    /// Changes made here whose server's copy changed too: never sent over the server's, and kept
+    /// until the owner says which copy to keep (`sync.davConflicts`, `sync.davResolve`). Never
+    /// saved: after a restart the change is asked again and held again.
+    pub dav_conflicts: BTreeMap<Id, crate::cmd::dav_sync::HeldConflict>,
     /// The width and theme each message was last read at in each place (the reading pane, a window
     /// of its own), whether its text part was shown instead of its HTML, and when it was last said
     /// ([`Session::read_at`]): a reply or forward quotes it as it was read where it was asked for,
@@ -1774,6 +1797,7 @@ impl Session {
             dav_seen: Default::default(),
             dav_generation: Default::default(),
             dav_sent: Default::default(),
+            dav_conflicts: BTreeMap::new(),
             read_at: HashMap::new(),
             drawn_checked: HashSet::new(),
             read_count: 0,

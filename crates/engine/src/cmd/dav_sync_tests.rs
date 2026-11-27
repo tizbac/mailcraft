@@ -1275,18 +1275,60 @@ fn what_the_server_kept_of_a_change_or_a_deletion_is_read_whole_again_even_when_
 }
 
 #[test]
-fn a_change_the_server_refused_is_put_back_and_one_changed_there_waits_for_the_read() {
-    let (mut s, id, e, dir) = theirs_kept("back");
-    s.run("calendar.edit", &json!({"id": e, "title": "Geändert"})).unwrap();
-    let r = update_answer(&mut s, id, mailcraft_model::DavPutOver::Refused);
-    assert_eq!(r["kept"], json!(["Vom Server"]));
-    assert_eq!(s.mailbox.event(e).unwrap().title, "Vom Server", "the server kept what it had");
-    s.run("calendar.edit", &json!({"id": e, "title": "Nochmal"})).unwrap();
+fn a_change_the_server_had_changed_too_is_held_and_the_owner_asked() {
+    let (mut s, id, e, dir) = theirs_kept("held");
+    s.run("calendar.edit", &json!({"id": e, "title": "Meins"})).unwrap();
     update_answer(&mut s, id, mailcraft_model::DavPutOver::Conflict);
-    assert!(updates(&mut s, id).is_empty());
-    // The read that follows brings the server's version over it.
+    // Held: it is never put over the server's copy, and the owner is asked which one to keep.
+    assert!(updates(&mut s, id).is_empty(), "nothing more goes up until the owner says");
+    let asked = s.run("sync.davConflicts", &json!({})).unwrap();
+    let asked = asked["conflicts"].as_array().unwrap();
+    assert_eq!(asked.len(), 1);
+    assert_eq!(asked[0]["event"], json!(e));
+    // The read brings the server's copy, and the ETag it has now: what was changed here stays
+    // until the owner says, and keeping it goes over the copy the server has now.
+    let theirs = event("a", 22, "Von dort");
+    apply(&mut s, id, None, vec![read(vec![change("a.ics", "\"9\"", &theirs)], false, true, "t2")]);
+    assert_eq!(s.mailbox.event(e).unwrap().title, "Meins", "not put over it");
+    // Refused, then kept: the server's copy is put back, and the change waits again.
+    s.run("sync.davResolve", &json!({"event": e, "keep": "mine"})).unwrap();
+    let up = updates(&mut s, id);
+    assert_eq!(up.len(), 1, "kept, it goes up");
+    assert_eq!(up[0].etag, "\"9\"", "over the copy the server has now");
+    assert!(up[0].body.contains("SUMMARY:Meins"), "{}", up[0].body);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn a_change_given_up_for_the_servers_copy_goes_when_the_read_comes() {
+    let (mut s, id, e, dir) = theirs_kept("theirs");
+    s.run("calendar.edit", &json!({"id": e, "title": "Meins"})).unwrap();
+    update_answer(&mut s, id, mailcraft_model::DavPutOver::Conflict);
+    s.run("sync.davResolve", &json!({"event": e, "keep": "theirs"})).unwrap();
+    assert!(s.run("sync.davConflicts", &json!({})).unwrap()["conflicts"].as_array().unwrap().is_empty());
+    // The read brings the server's copy, and nothing of the change is left.
     apply(&mut s, id, None, vec![read(vec![change("a.ics", "\"9\"", &event("a", 22, "Von dort"))], false, true, "t2")]);
     assert_eq!(s.mailbox.event(e).unwrap().title, "Von dort");
+    assert!(updates(&mut s, id).is_empty());
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn a_conflict_with_both_kept_makes_a_copy_of_what_changed_here() {
+    let (mut s, id, e, dir) = theirs_kept("both");
+    s.run("file.options", &json!({"davConflicts": "keepBoth"})).unwrap();
+    s.run("calendar.edit", &json!({"id": e, "title": "Meins"})).unwrap();
+    update_answer(&mut s, id, mailcraft_model::DavPutOver::Conflict);
+    // Nothing is held: what was changed here is a copy of its own, waiting to be made there, and
+    // the read brings the server's copy of the original.
+    assert!(s.dav_conflicts.is_empty());
+    let calendar = s.mailbox.event(e).unwrap().calendar;
+    let copies: Vec<_> = s.mailbox.events.values().filter(|x| x.id != e && x.calendar == calendar).collect();
+    assert_eq!(copies.len(), 1, "one copy of what was changed here");
+    assert_eq!(copies[0].title, "Meins");
+    let made = creates(&mut s, id);
+    assert_eq!(made.len(), 1);
+    assert!(made[0].body.contains("SUMMARY:Meins"), "{}", made[0].body);
     let _ = std::fs::remove_dir_all(dir);
 }
 

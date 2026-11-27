@@ -204,7 +204,7 @@ msgid "(no subject)"
 msgstr "(nincs tárgy)"
 
 #. interface
-#: crates/ui-egui/src/alerts.rs crates/ui-egui/src/reading/invitation.rs crates/ui-egui/src/reminders.rs crates/ui-egui/src/tasks_view.rs
+#: crates/ui-egui/src/alerts.rs crates/ui-egui/src/dav_settings.rs crates/ui-egui/src/reading/invitation.rs crates/ui-egui/src/reminders.rs crates/ui-egui/src/tasks_view.rs
 #, fuzzy
 msgid "(no title)"
 msgstr "(nincs cím)"
@@ -3009,6 +3009,11 @@ msgid "Calendar"
 msgstr "Naptár"
 
 #. command label
+#: crates/engine/src/cmd/dav_sync.rs
+msgid "Calendar Changes Waiting on You"
+msgstr ""
+
+#. command label
 #: crates/engine/src/cmd/remote.rs
 #, fuzzy
 msgid "Calendar Changes to Send"
@@ -3500,6 +3505,11 @@ msgstr "A fiók nevének, bejelentkezési módjának és a kapcsolat nélkül el
 #, fuzzy
 msgid "Changed after it was signed"
 msgstr "Megváltozott, miután aláírták."
+
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Changed here and on the server too"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/signatures.rs
@@ -8651,6 +8661,11 @@ msgstr "Levelek megtartása az eszköz korlátain belül"
 msgid "Keep MailCraft running for mail and reminders when you close its window. Click its icon beside the clock to show it again, or choose Quit from the icon's menu. If no system tray is available, closing exits MailCraft."
 msgstr "A MailCraft fut a levelek és emlékeztetők, amikor bezárja az ablakot. Kattintson az ikonra az óra mellett, hogy megmutassa újra, vagy válassza ki a Kilépés az ikon menüből. Ha nincs rendszertálca, zárja ki a MailCraft."
 
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Keep Mine"
+msgstr ""
+
 #. command label
 #: crates/engine/src/cmd/rules.rs
 #, fuzzy
@@ -8709,6 +8724,11 @@ msgstr "Levelek megtartása az utolsó"
 #, fuzzy
 msgid "Keep on the server of {address}"
 msgstr "Tárolás a fiók kiszolgálóján: {address}"
+
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Keep the Server's"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/backstage.rs
@@ -12174,6 +12194,11 @@ msgid "Nothing was done: what you were asked about has changed since. Ask again.
 msgstr "Semmi sem történt: amire rákérdeztünk, azóta megváltozott. Próbálja újra."
 
 #. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Nothing was sent over the server's copy. Keep one of the two for each change."
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/account_setup/exchange.rs
 #, fuzzy
 msgid "Nothing was sent to Microsoft, and your password isn't kept."
@@ -12261,6 +12286,11 @@ msgstr "október"
 #, fuzzy
 msgid "Off"
 msgstr "Ki"
+
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Off: MailCraft asks which copy to keep. On: the server's is read, and what changed here is kept as a copy of its own."
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/Freshness.kt
@@ -16273,6 +16303,11 @@ msgstr "Beállítások"
 #, fuzzy
 msgid "Settings…"
 msgstr "Beállítások…"
+
+#. command label
+#: crates/engine/src/cmd/dav_sync.rs
+msgid "Settle a Calendar Change"
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs
@@ -22539,6 +22574,11 @@ msgid "When opened"
 msgstr ""
 
 #. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "When the server's copy changed too, keep both"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/graph_switch.rs
 #, fuzzy
 msgid "When you switch:"
@@ -24620,6 +24660,11 @@ msgstr "cím szerint nem nyitottak meg naptárt"
 #, fuzzy
 msgid "no calendar with id {id}"
 msgstr "nincs ilyen azonosítójú naptár: {id}"
+
+#. what a command says
+#: crates/engine/src/cmd/dav_sync.rs
+msgid "no change of event {id} is waiting for you"
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/attach_item.rs crates/engine/src/cmd/contacts_move.rs crates/engine/src/cmd/people.rs crates/engine/src/cmd/people_merge.rs

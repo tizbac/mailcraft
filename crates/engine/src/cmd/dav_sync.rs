@@ -38,7 +38,7 @@ use std::collections::{HashMap, HashSet};
 
 use mailcraft_model::dav_down::{MAX_ACCOUNT_RESOURCES, MAX_ACCOUNT_TEXT, MAX_CHANGES, MAX_KNOWN, MAX_READ, MAX_RESOURCES};
 use mailcraft_model::remote::MAX_KEY;
-use mailcraft_model::remote::{EventChangeKind, MAX_EVENT_OPS};
+use mailcraft_model::remote::{EventChange, EventChangeKind, MAX_EVENT_OPS};
 use mailcraft_model::{
     Calendar, DavAsk, DavAskCollection, DavChange, DavCollectionState, DavCreate, DavCreated, DavDelete, DavDeleted, DavDownload, DavGone, DavKnown,
     DavListing, DavProblem, DavPut, DavPutOver, DavRead, DavReadState, DavServer, DavUpdate, DavUpdated, Event, Id, Origin, Rights, origin_of,
@@ -46,7 +46,7 @@ use mailcraft_model::{
 use serde_json::{Value, json};
 
 use super::{bad, fail};
-use crate::{CmdError, CmdResult, CommandSpec, Session};
+use crate::{CmdError, CmdResult, CommandSpec, Session, p};
 
 /// What the commands that send changes up say while they have nothing to do yet.
 const NOT_YET: &str = "Changes to calendars and contacts on a server are not sent yet in this version.";
@@ -71,6 +71,16 @@ pub struct Seen {
     /// It gave no event here (a to-do, or a document that isn't a calendar).
     pub bare: bool,
 }
+
+/// A change made here whose server's copy changed too, waiting for the owner to say which copy
+/// to keep (`sync.davConflicts`, `sync.davResolve`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HeldConflict {
+    pub account: Id,
+    pub title: String,
+    /// When the conflict was found (Unix seconds).
+    pub since: i64,
+}
 /// Most events one resource is taken to hold (a series with its changed occurrences).
 const MAX_PER_RESOURCE: usize = 1_000;
 /// Most calendars a mailbox has (as for those made elsewhere).
@@ -93,12 +103,18 @@ pub fn specs() -> Vec<CommandSpec> {
             .pure()
             .params(r#"{"result": DavDownload} — takes in what a host read from a calendar server: the calendars its homes list, and each collection's changed or gone resources. Refused, and nothing taken in, when the download was read under settings that have changed since. Answers {"added", "updated", "removed", "calendars", "skipped", "problem", "wait"}."#)
             .when(super::dav_account::switched_on),
+        CommandSpec::new("sync.davConflicts", "Calendar Changes Waiting on You", "Send / Receive", conflicts)
+            .pure()
+            .params("{} — the changes made here whose server's copy changed too, so that sending them would put over it: each with its event, account, title and when it was found. Keep one with `sync.davResolve`.")
+            .when(available),
+        CommandSpec::new("sync.davResolve", "Settle a Calendar Change", "Send / Receive", resolve)
+            .params(r#"{"event": number, "keep": "mine"|"theirs"} — a change whose server's copy changed too (`sync.davConflicts`): keep what was changed here (it goes up over the server's copy at the next Send/Receive) or the server's (the change is given up, and its copy is read). Never over the server's without this."#)
+            .when(available),
         CommandSpec::new("sync.davChanges", "Calendar and Contacts Changes to Send", "Send / Receive", changes)
             .pure()
             .params(r#"{"account"?: number} — answers what was changed here that a host should send to an account's calendar and contacts server. Not built yet: it refuses."#)
             .when(available),
-        CommandSpec::new("sync.applyDavUploaded", "Apply Uploaded Calendar and Contacts Changes", "Send / Receive", uploaded)
-            .pure()
+        CommandSpec::new("sync.applyDavUploaded", "Apply Uploaded Calendar and Contacts Changes", "Send / Receive", uploaded)            .pure()
             .params(r#"{"result": DavUploaded} — takes in what a calendar and contacts server made of changes sent to it. Not built yet: it refuses."#)
             .when(super::dav_account::switched_on),
     ]
@@ -192,6 +208,11 @@ fn updates(s: &Session, account: Id, collections: &[DavAskCollection]) -> Vec<Da
         if out.len() >= MAX_EVENT_OPS {
             break;
         }
+        // (A change the server's copy changed under is not sent again until the owner says which
+        // copy to keep: `sync.davConflicts`.)
+        if s.dav_conflicts.contains_key(&change.event) {
+            continue;
+        }
         let Some(event) = s.mailbox.event(change.event).filter(|e| e.origin.id == change.remote) else { continue };
         let Some(collection) = collections.iter().find(|c| within(&c.href, &change.remote)) else { continue };
         let etag = change.base.as_deref().map(|b| b.origin.change_key.clone()).unwrap_or_else(|| event.origin.change_key.clone());
@@ -224,17 +245,63 @@ fn also_changed(base: &Event, now: &Event) -> Vec<&'static str> {
     out
 }
 
+/// The owner keeps both (`Prefs::dav_conflicts` is `KeepBoth`): what was changed here is kept as
+/// a copy of its own, made on the server as a new event, and the server's copy of the original is
+/// read as it is.
+fn keep_both(s: &mut Session, account: Id, at: usize, took: &mut Took) -> bool {
+    let Some(change) = s.mailbox.event_changes.get(at) else { return false };
+    let Some(event) = s.mailbox.event(change.event).cloned() else {
+        s.mailbox.event_changes.remove(at);
+        return false;
+    };
+    s.mailbox.event_changes.remove(at);
+    let title = event.title.clone();
+    let mut copy = event;
+    copy.id = 0;
+    copy.origin = Origin::default();
+    copy.uid = String::new();
+    let Ok(id) = s.mailbox.add_event(copy) else { return false };
+    let token = super::remote::new_token(id, s.rev() ^ s.now().unsigned_abs().rotate_left(32));
+    if let Ok(e) = s.mailbox.event_mut(id) {
+        e.origin = Origin { account, ..Default::default() };
+    }
+    s.mailbox.event_changes.push(EventChange { account, kind: EventChangeKind::Create, event: id, token, ..Default::default() });
+    took.kept.push(title);
+    true
+}
+
 /// What the server made of the changes the request gave it. Taken: nothing more waits; the
 /// event keeps the ETag it was read with, so the next read, seeing the server's new one, brings
-/// the document as the server keeps it now. Changed there since: given up, the owner is told,
-/// and the next read brings the server's version the same way. Refused: the server keeps what
-/// it had, which is the event as it was before the change: put back here, and the owner is told.
+/// the document as the server keeps it now. Changed there since: never put over it; the change is
+/// held and the owner is asked which copy to keep, or both are kept ([`Prefs::dav_conflicts`]
+/// through `sync.davConflicts`). Refused: the server keeps what it had, which is the event as it
+/// was before the change: put back here, and the owner is told.
 fn take_updated(s: &mut Session, account: Id, updated: &[DavUpdated], offset_at: &dyn Fn(i64) -> i32, took: &mut Took) -> bool {
     let mut changed = false;
     for answer in updated.iter().take(MAX_EVENT_OPS) {
         let at = s.mailbox.event_changes.iter().position(|c| c.account == account && c.kind == EventChangeKind::Update && c.remote == answer.href);
         let Some(at) = at else { continue };
         if answer.outcome == DavPutOver::NotNow {
+            continue;
+        }
+        // The server's copy changed too (412: the ETag it was changed on is no longer the
+        // server's): it is never put over. What was changed here is held, and the owner is asked
+        // which copy to keep (`sync.davConflicts`), or both are kept, as the settings say
+        // (`Prefs::dav_conflicts`).
+        if answer.outcome == DavPutOver::Conflict {
+            let event = s.mailbox.event_changes.get(at).map(|c| c.event);
+            let Some(event) = event else { continue };
+            if s.prefs.dav_conflicts == crate::session::DavConflicts::KeepBoth {
+                changed |= keep_both(s, account, at, took);
+            } else {
+                let title = s.mailbox.event_changes.get(at).and_then(|c| c.base.as_ref()).map(|b| b.title.clone()).unwrap_or_default();
+                took.kept.push(title.clone());
+                s.dav_conflicts.insert(event, HeldConflict { account, title, since: s.now() });
+                changed = true;
+            }
+            // (Read whole again, so that the owner is asked about the copy the server has now.)
+            took.reread.push(answer.href.clone());
+            s.dav_sent.remove(&event);
             continue;
         }
         let change = s.mailbox.event_changes.remove(at);
@@ -299,8 +366,15 @@ fn changed_while_out(s: &mut Session, account: Id, id: Id, origin: Origin, offse
 /// says whether it changed (412).
 fn settle_update(s: &mut Session, account: Id, id: Id, theirs: &Event, offset_at: &dyn Fn(i64) -> i32, took: &mut Took) -> bool {
     let waiting = |c: &mailcraft_model::remote::EventChange| c.account == account && c.kind == EventChangeKind::Update && c.event == id;
+    // (A change held for the owner: the server's copy came, and its ETag is what keeping this
+    // one would go over. The event itself stays as it was here until the owner says.)
+    let held = s.dav_conflicts.contains_key(&id);
     let Some(at) = s.mailbox.event_changes.iter().position(waiting) else { return false };
     let Some(base) = s.mailbox.event_changes.get_mut(at).and_then(|c| c.base.as_deref_mut()) else { return false };
+    if held {
+        base.origin.change_key = theirs.origin.change_key.clone();
+        return false;
+    }
     if base.origin.change_key == theirs.origin.change_key {
         return false;
     }
@@ -405,6 +479,42 @@ fn changes(_: &mut Session, _: &Value) -> CmdResult {
 
 fn uploaded(_: &mut Session, _: &Value) -> CmdResult {
     Err(fail(NOT_YET))
+}
+
+/// What waits for the owner: changes made here that the server's copy changed under (`take_updated`
+/// holds them; [`Prefs::dav_conflicts`](crate::session::Prefs)).
+fn conflicts(s: &mut Session, _: &Value) -> CmdResult {
+    let list: Vec<Value> = s
+        .dav_conflicts
+        .iter()
+        .take(200)
+        .map(|(event, held)| json!({"event": event, "account": held.account, "title": held.title, "since": held.since}))
+        .collect();
+    Ok(json!({"conflicts": list}))
+}
+
+/// Which copy the owner keeps for one held change: `mine` (it goes up over the server's copy at the
+/// next Send/Receive, with the ETag the server had when the conflict was found) or `theirs` (the
+/// change is given up, and the server's copy is read).
+fn resolve(s: &mut Session, v: &Value) -> CmdResult {
+    let event = p::req_id(v, "event")?;
+    let keep = p::req_str(v, "keep")?;
+    let Some(held) = s.dav_conflicts.remove(&event) else {
+        return Err(failed!("no change of event {id} is waiting for you", id = event));
+    };
+    match keep.trim() {
+        "mine" => {}
+        "theirs" => {
+            s.mailbox.event_changes.retain(|c| !(c.account == held.account && c.event == event && c.kind == EventChangeKind::Update));
+            // (Its ETag here is the one the change was made on, not the server's: the next read
+            // brings the copy as the server has it now.)
+            if let Ok(e) = s.mailbox.event_mut(event) {
+                e.origin.change_key.clear();
+            }
+        }
+        _ => return Err(bad("`keep` is \"mine\" or \"theirs\"")),
+    }
+    Ok(json!({"event": event, "kept": keep.trim()}))
 }
 
 /// The account has no calendar server any more, or another one: what the old one gave goes (its

@@ -18,6 +18,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 
 use egui::Ui;
+use mailcraft_engine::DavConflicts;
 use mailcraft_engine::cmd::dav_account::may_have;
 use mailcraft_model::{Account, DavFindFailure, DavFindQuestion, DavFound, DavProblem, Id, origin_of};
 use serde_json::json;
@@ -265,7 +266,11 @@ pub fn show(ctx: &egui::Context, d: &mut DavSettings, app: &mut MailApp, t: &Tok
     let remember = app.ui.remember_sign_in;
     d.poll();
     let can_find = app.services.dav_find.is_some() && d.finding.is_none() && d.find_password(app).is_some();
+    // Changes made here that the server's copy changed under: none of them is sent over it.
+    let held: Vec<(Id, String)> =
+        app.session.dav_conflicts.iter().filter(|(_, h)| h.account == d.account).map(|(id, h)| (*id, h.title.clone())).take(50).collect();
     let (mut submit, mut close, mut stop, mut find, mut answer) = (false, false, false, false, None);
+    let mut resolved: Option<(Id, &'static str)> = None;
     let open = window(ctx, tl!("Calendars and Contacts"), 480.0, |ui| {
         ui.label(crate::i18n::fmt(tl!("Where the calendars and contacts of {account} are kept"), &[("account", &who)]));
         ui.label(tl!("Calendars"));
@@ -359,6 +364,37 @@ pub fn show(ctx: &egui::Context, d: &mut DavSettings, app: &mut MailApp, t: &Tok
         if let Some(line) = status(app, &account) {
             hint(ui, t, &line);
         }
+        // A change made here and on the server too: never sent over the server's copy, and kept
+        // until the owner says which one (File › Options › When the server's copy changed too).
+        if !held.is_empty() {
+            ui.separator();
+            ui.label(tl!("Changed here and on the server too"));
+            hint(ui, t, tl!("Nothing was sent over the server's copy. Keep one of the two for each change."));
+            for (event, title) in &held {
+                ui.horizontal(|ui| {
+                    let name = crate::forms::kit::shown(title, 60);
+                    if name.is_empty() {
+                        ui.label(tl!("(no title)"));
+                    } else {
+                        ui.label(name);
+                    }
+                    if ui.button(tl!("Keep Mine")).clicked() {
+                        resolved = Some((*event, "mine"));
+                    }
+                    if ui.button(tl!("Keep the Server's")).clicked() {
+                        resolved = Some((*event, "theirs"));
+                    }
+                });
+            }
+        }
+        // What a change does when the server's copy changed too: ask (off), or keep both (on).
+        ui.separator();
+        let mut keep_both = app.session.prefs.dav_conflicts == DavConflicts::KeepBoth;
+        if ui.checkbox(&mut keep_both, tl!("When the server's copy changed too, keep both")).changed() {
+            let choice = if keep_both { "keepBoth" } else { "ask" };
+            let _ = app.execute("file.options", json!({"davConflicts": choice}));
+        }
+        hint(ui, t, tl!("Off: MailCraft asks which copy to keep. On: the server's is read, and what changed here is kept as a copy of its own."));
         if !d.error.is_empty() {
             ui.label(egui::RichText::new(d.error.as_str()).color(t.red));
         }
@@ -382,6 +418,11 @@ pub fn show(ctx: &egui::Context, d: &mut DavSettings, app: &mut MailApp, t: &Tok
     }
     if find {
         d.find(app);
+    }
+    if let Some((event, keep)) = resolved {
+        if let Err(e) = app.execute("sync.davResolve", json!({"event": event, "keep": keep})) {
+            d.error = e;
+        }
     }
     if stop {
         return match app.execute("account.davOff", json!({"id": d.account})) {

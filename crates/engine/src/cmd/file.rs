@@ -39,7 +39,7 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("file.exportContacts", "Export Contacts", "File › Open & Export", export_contacts).pure().params(r#"{"ids"?: [number], "path"?: string} — .vcf"#),
         CommandSpec::new("file.info", "Info", "File › Info", info).pure(),
         CommandSpec::new("file.options", "Options", "File", options).pure().params(
-            r#"{"clock"?: "auto" (the interface language's) | "12" | "24" (independent of the language), "twelveHour"?: bool, "weekStart"?: "sun"|"mon"|…, "workDays"?: ["mon",…], "workStart"?: 0-23, "workEnd"?: 1-24, "markReadOnOpen"?: bool, "sentCopy"?: bool (keep a copy of a message that is sent in Sent Items; on unless turned off), "sentUnread"?: bool (keep that copy unread), "sentFolders"?: [{"address": string, "folder": number | null (the folder that keeps what is sent from that address; null: the account's own Sent Items)}], "defaultReminder"?: minutes | null, "quoteOnReply"?: bool, "autoLists"?: bool, "previewLines"?: 0-3, "syncLimit"?: number, "syncMinutes"?: 0-1440 (0: only when asked), "importMaxFileMb"?: 1-16384 (the most one imported file may be), "importMaxMessages"?: 1-10000000 (the most one imported mbox file brings in), "importTreeMaxMb"?: 1-65536 (the most one folder import may be), "importTreeMaxMessages"?: 1-10000000 (the most one folder import brings in), "saveMessageFormat"?: "eml"|"msg" (what File › Save As writes by default)}"#,
+            r#"{"clock"?: "auto" (the interface language's) | "12" | "24" (independent of the language), "twelveHour"?: bool, "weekStart"?: "sun"|"mon"|…, "workDays"?: ["mon",…], "workStart"?: 0-23, "workEnd"?: 1-24, "markReadOnOpen"?: bool, "sentCopy"?: bool (keep a copy of a message that is sent in Sent Items; on unless turned off), "sentUnread"?: bool (keep that copy unread), "sentFolders"?: [{"address": string, "folder": number | null (the folder that keeps what is sent from that address; null: the account's own Sent Items)}], "defaultReminder"?: minutes | null, "quoteOnReply"?: bool, "autoLists"?: bool, "previewLines"?: 0-3, "syncLimit"?: number, "syncMinutes"?: 0-1440 (0: only when asked), "importMaxFileMb"?: 1-16384 (the most one imported file may be), "importMaxMessages"?: 1-10000000 (the most one imported mbox file brings in), "importTreeMaxMb"?: 1-65536 (the most one folder import may be), "importTreeMaxMessages"?: 1-10000000 (the most one folder import brings in), "saveMessageFormat"?: "eml"|"msg" (what File › Save As writes by default), "davConflicts"?: "ask"|"keepBoth" (a change whose server's copy changed too: ask which to keep, or keep both)}"#,
         ),
     ]
 }
@@ -655,6 +655,13 @@ fn options(s: &mut Session, v: &Value) -> CmdResult {
     }
     if let Some(word) = p::str(v, "saveMessageFormat") {
         prefs.save_message_format = crate::SaveMessageFormat::parse(word).ok_or_else(|| bad("`saveMessageFormat` is eml or msg"))?;
+    }
+    if let Some(choice) = p::str(v, "davConflicts") {
+        prefs.dav_conflicts = match choice.trim() {
+            "ask" => crate::session::DavConflicts::Ask,
+            "keepBoth" => crate::session::DavConflicts::KeepBoth,
+            _ => return Err(bad("`davConflicts` is \"ask\" or \"keepBoth\"")),
+        };
     }
     s.prefs = prefs;
     serde_json::to_value(&s.prefs).map_err(|e| fail(e.to_string()))

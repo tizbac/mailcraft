@@ -689,6 +689,9 @@ const NEVER: &[&str] = &[
     "sync.applyDav",
     "sync.davChanges",
     "sync.applyDavUploaded",
+    // Settling which copy to keep when a calendar server's changed too is the owner's own word.
+    "sync.davConflicts",
+    "sync.davResolve",
     // A search of the server goes only on the owner's own click (R6.2).
     "sync.graphSearchRequest",
     "sync.applyGraphSearch",

@@ -169,7 +169,7 @@ msgid "(no subject)"
 msgstr ""
 
 #. interface
-#: crates/ui-egui/src/alerts.rs crates/ui-egui/src/reading/invitation.rs crates/ui-egui/src/reminders.rs crates/ui-egui/src/tasks_view.rs
+#: crates/ui-egui/src/alerts.rs crates/ui-egui/src/dav_settings.rs crates/ui-egui/src/reading/invitation.rs crates/ui-egui/src/reminders.rs crates/ui-egui/src/tasks_view.rs
 msgid "(no title)"
 msgstr ""
 
@@ -2531,6 +2531,11 @@ msgid "Calendar"
 msgstr ""
 
 #. command label
+#: crates/engine/src/cmd/dav_sync.rs
+msgid "Calendar Changes Waiting on You"
+msgstr ""
+
+#. command label
 #: crates/engine/src/cmd/remote.rs
 msgid "Calendar Changes to Send"
 msgstr ""
@@ -2947,6 +2952,11 @@ msgstr ""
 #. interface
 #: crates/ui-egui/src/reading/signature.rs
 msgid "Changed after it was signed"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Changed here and on the server too"
 msgstr ""
 
 #. interface
@@ -7263,6 +7273,11 @@ msgstr ""
 msgid "Keep MailCraft running for mail and reminders when you close its window. Click its icon beside the clock to show it again, or choose Quit from the icon's menu. If no system tray is available, closing exits MailCraft."
 msgstr ""
 
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Keep Mine"
+msgstr ""
+
 #. command label
 #: crates/engine/src/cmd/rules.rs
 msgid "Keep Rule on Server"
@@ -7311,6 +7326,11 @@ msgstr ""
 #. interface
 #: crates/ui-egui/src/forms.rs
 msgid "Keep on the server of {address}"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Keep the Server's"
 msgstr ""
 
 #. interface
@@ -10218,6 +10238,11 @@ msgid "Nothing was done: what you were asked about has changed since. Ask again.
 msgstr ""
 
 #. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Nothing was sent over the server's copy. Keep one of the two for each change."
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/account_setup/exchange.rs
 msgid "Nothing was sent to Microsoft, and your password isn't kept."
 msgstr ""
@@ -10290,6 +10315,11 @@ msgstr ""
 #. android, interface
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/PicturesSettings.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/SettingsScreen.kt crates/ui-egui/src/backstage.rs crates/ui-egui/src/ribbon.rs crates/ui-egui/src/spelling.rs
 msgid "Off"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Off: MailCraft asks which copy to keep. On: the server's is read, and what changed here is kept as a copy of its own."
 msgstr ""
 
 #. android
@@ -13641,6 +13671,11 @@ msgstr ""
 #. name
 #: crates/ui-egui/src/menubar.rs
 msgid "Settings…"
+msgstr ""
+
+#. command label
+#: crates/engine/src/cmd/dav_sync.rs
+msgid "Settle a Calendar Change"
 msgstr ""
 
 #. interface
@@ -18913,6 +18948,11 @@ msgid "When opened"
 msgstr ""
 
 #. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "When the server's copy changed too, keep both"
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/graph_switch.rs
 msgid "When you switch:"
 msgstr ""
@@ -20661,6 +20701,11 @@ msgstr ""
 #. what a command says
 #: crates/engine/src/cmd/calendar.rs crates/engine/src/cmd/calendar/selection.rs crates/engine/src/cmd/calendar/share.rs crates/engine/src/cmd/calendar_extra.rs crates/engine/src/cmd/calendar_opened.rs crates/engine/src/cmd/calendar_settings.rs crates/engine/src/cmd/calendar_subscribed.rs crates/engine/src/cmd/file.rs crates/engine/src/import_pst.rs
 msgid "no calendar with id {id}"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/dav_sync.rs
+msgid "no change of event {id} is waiting for you"
 msgstr ""
 
 #. what a command says
