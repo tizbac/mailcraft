@@ -24513,6 +24513,11 @@ msgid "the Linchange approval stopped unexpectedly"
 msgstr ""
 
 #. what a command says
+#: crates/mobile/src/accounts.rs
+msgid "the Linchange server couldn't be found for this address"
+msgstr ""
+
+#. what a command says
 #: crates/engine/src/cmd/keys.rs
 #, fuzzy
 msgid "the OpenPGP key is larger than a Public key is kept"
