@@ -1,0 +1,83 @@
+# Maintainer: Tiziano Bacocco <tiziano@tizbac.ovh>
+# MailCraft source package for Arch Linux (and the AUR).
+#
+# The source is the repository at this version, as one tarball with the `mailcraft-$pkgver/`
+# prefix:
+#
+#   git archive --format=tar.gz --prefix=mailcraft-$pkgver/ -o mailcraft-$pkgver.tar.gz HEAD
+#
+# `packaging/arch/package.sh` does that and builds the package (also from a checkout that is
+# ahead of the tag). By hand: put the tarball beside a copy of this PKGBUILD and its two
+# companions, then `makepkg -si` there.
+#
+# A machine whose Rust comes from rustup rather than the `rust` package (as this fork's owner's
+# does) builds with `makepkg --nodeps`, since pacman doesn't see rustup's cargo as the `rust`
+# package; every other dependency below is a runtime library the binary loads.
+
+pkgname=mailcraft
+pkgver=0.15.70
+pkgrel=1
+pkgdesc='Open-source mail, calendar, contacts and tasks program that works the way Outlook users expect'
+arch=('x86_64' 'aarch64')
+url='https://github.com/tizbac/mailcraft'
+license=('MIT' 'Apache-2.0')
+# Windowing (X11, Wayland, xkbcommon) and the GPU (Vulkan, EGL/GL) are loaded at run time, so
+# they are dependencies rather than ELF NEEDED entries. libxkbcommon-x11 is not optional: on an
+# X11 session the window can't start without it.
+depends=('glibc' 'gcc-libs' 'libxkbcommon' 'libxkbcommon-x11'
+         'libx11' 'libxcursor' 'libxi' 'libxrandr' 'libxcb' 'wayland'
+         'vulkan-icd-loader' 'libglvnd')
+optdepends=('xdg-desktop-portal: the system’s own open and save dialogs'
+            'xdg-utils: opening an attachment or a link in another program'
+            'gnome-keyring: remembering sign-ins in the system’s credential store'
+            'vulkan-swrast: software Vulkan on a machine with no GPU driver')
+# Arch’s rust (>= 1.95, the workspace minimum); git for the five git dependencies in Cargo.lock.
+makedepends=('rust' 'git')
+install=mailcraft.install
+# (The tarball is made from this checkout, so it has no published checksum: package.sh builds it
+# and the tarball and this PKGBUILD travel together.)
+source=("$pkgname-$pkgver.tar.gz" 'mailcraft.install')
+sha256sums=('SKIP' 'SKIP')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  cargo fetch --locked
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  local stamp="${SOURCE_DATE_EPOCH:-$(date +%s)}"
+  export MAILCRAFT_BUILD_DATE="$(date -u -d "@$stamp" +%Y-%m-%d)"
+  # (The archive carries no .git; package.sh passes the commit in.)
+  export MAILCRAFT_BUILD_SHA="${MAILCRAFT_BUILD_SHA:-}"
+  cargo build --frozen --release -p mailcraft -p mailcraft-cli
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  # (A smoke test of the engine: every command with hostile parameters never panics. The whole
+  # suite runs in CI; this keeps the package build reasonable.)
+  cargo test --frozen --release -p mailcraft-engine --lib hostile_params_never_panic
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm755 target/release/mailcraft "$pkgdir/usr/bin/mailcraft"
+  install -Dm755 target/release/mailcraft-cli "$pkgdir/usr/bin/mailcraft-cli"
+
+  local app_id='io.github.billsecond.mailcraft' today
+  today="$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y-%m-%d)"
+  install -Dm644 "packaging/linux/$app_id.desktop" "$pkgdir/usr/share/applications/$app_id.desktop"
+  install -Dm644 "packaging/linux/$app_id.mime.xml" "$pkgdir/usr/share/mime/packages/$app_id.xml"
+  mkdir -p "$pkgdir/usr/share/metainfo"
+  sed -e "s/@VERSION@/$pkgver/g" -e "s/@DATE@/$today/g" \
+    "packaging/linux/$app_id.metainfo.xml.in" >"$pkgdir/usr/share/metainfo/$app_id.metainfo.xml"
+
+  install -dm755 "$pkgdir/usr/share/icons"
+  cp -R assets/app-icon/hicolor "$pkgdir/usr/share/icons/"
+
+  install -dm755 "$pkgdir/usr/share/doc/mailcraft"
+  for f in README.md LICENSE LICENSE-MIT LICENSE-APACHE COPYRIGHT; do
+    if [ -f "$f" ]; then install -m644 "$f" "$pkgdir/usr/share/doc/mailcraft/$f"; fi
+  done
+}

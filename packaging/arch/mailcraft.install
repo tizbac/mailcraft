@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: MailCraft contributors
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# pacman hooks for MailCraft: refresh the desktop, MIME and icon caches. Every tool is optional;
+# a machine without one skips it (pacman also runs its own hooks for these when it has them).
+post_install() {
+  update-desktop-database -q /usr/share/applications 2>/dev/null || true
+  update-mime-database /usr/share/mime 2>/dev/null || true
+  gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || true
+}
+
+post_upgrade() {
+  post_install
+}
+
+post_remove() {
+  post_install
+}

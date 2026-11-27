@@ -57,7 +57,7 @@ WordCraft does.
 |---|---|---|
 | macOS | universal `MailCraft.app` in a `.dmg`, universal CLI zip | Developer ID + notarization (`APPLE_*` secrets) |
 | Windows | x64, x86 and arm64 `.msi` + portable `.zip` | Azure Artifact Signing (`AZURE_*` secrets, OIDC sign-in) or a certificate (`WINDOWS_CERTIFICATE*`) |
-| Linux | x86_64 and aarch64 `.AppImage` (+ `.zsync` for AppImageUpdate), `.flatpak` bundle, `.deb`, `.rpm`, `.tar.gz` | checksums |
+| Linux | x86_64 and aarch64 `.AppImage` (+ `.zsync` for AppImageUpdate), `.flatpak` bundle, `.deb`, `.rpm`, `.tar.gz`; an Arch Linux source package is built from the tag with `packaging/arch/package.sh` rather than by the workflow | checksums |
 | FreeBSD | x86_64 `.tar.gz` (built in a FreeBSD VM; on a tag always, on a dry run only when asked for) | checksums |
 | Web | `mailcraft-web-<version>.zip` (static site: `index.html`, wasm, glue) | none |
 
@@ -398,6 +398,18 @@ packaging/linux/package.sh
 
 Both write to `dist/release/`. Also: `packaging/macos/package.sh --arch universal`,
 `packaging/linux/flatpak-bundle.sh` (after `package.sh`) and `packaging/web/package.sh`.
+
+Arch Linux (a source package, built with the system's Rust; `base-devel`, Rust 1.95 or later and
+git are needed, and with `rustup` rather than the `rust` package add `--nodeps`):
+
+```
+packaging/arch/package.sh            # dist/release/mailcraft-<version>-1-<arch>.pkg.tar.zst
+packaging/arch/package.sh --install  # and pacman -U it
+```
+
+It installs the same desktop entry, MIME types, AppStream metadata and icons as the other Linux
+packages, and `mailcraft` and `mailcraft-cli` under `/usr/bin` (see
+[`packaging/arch/README.md`](../packaging/arch/README.md)).
 
 ## The Rust toolchain
 
