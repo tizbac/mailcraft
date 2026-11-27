@@ -713,6 +713,11 @@ msgstr "A más által szervezett értekezlet csak az Ön naptárából kerül ki
 msgid "A meeting that repeats and skips some days can't be put on the server's calendar from here: everyone invited would get a cancellation for each skipped day. Keep it in a calendar on this computer, or make it again without the skipped days."
 msgstr "Egy találkozó, amely megismétli és kihagy néhány napot nem lehet feltenni a szerver naptár innen: mindenki meghívott kap egy lemondás minden egyes kihagyt nap. Tartsa egy naptár ezen a számítógépen, vagy újra nélkül a kihagyott napok."
 
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "A meeting, or one day of a series, on a calendar server can't be changed from here yet: change it on the server."
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/reading/unsubscribe.rs
 #, fuzzy
@@ -843,12 +848,6 @@ msgstr "A kiszolgálóhoz nem sikerült biztonságos kapcsolatot létrehozni. Í
 #, fuzzy
 msgid "A series and one of its days are both named; nothing was changed."
 msgstr "Egy sorozat és annak egyik napja is meg van adva; semmi sem változott."
-
-#. what a command says
-#: crates/engine/src/cmd/remote.rs
-#, fuzzy
-msgid "A series or a meeting on a calendar server can't be changed from here yet: change it on the server."
-msgstr "A naptárkiszolgálón lévő sorozat vagy megbeszélés innen még nem módosítható: módosítsa a kiszolgálón."
 
 #. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
@@ -12439,6 +12438,11 @@ msgstr "Ha már működött, a rendszer hiteles boltja legközelebb megtartja."
 #. interface
 #: crates/ui-egui/src/dav_password_ask.rs crates/ui-egui/src/dav_settings.rs
 msgid "Once the server has taken it, MailCraft keeps it in your system's credential store, as File › Options lets it."
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/calendar.rs
+msgid "One day of a series on a calendar server can't be changed from here yet: change the whole series, or that day on the server."
 msgstr ""
 
 #. what a command says
@@ -29200,6 +29204,10 @@ msgstr "−Bin"
 #, fuzzy
 msgid "−Lines"
 msgstr "−Sorok"
+
+#, fuzzy
+#~ msgid "A series or a meeting on a calendar server can't be changed from here yet: change it on the server."
+#~ msgstr "A naptárkiszolgálón lévő sorozat vagy megbeszélés innen még nem módosítható: módosítsa a kiszolgálón."
 
 #, fuzzy
 #~ msgid "Messages (.eml, .mbox), calendars (.ics) and contacts (.vcf)"

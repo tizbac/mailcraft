@@ -97,8 +97,9 @@ screen changed), and a signed APK into `dist/release/` as [android.md](android.m
 
 ## What this fork does not have yet
 
-- Repeating appointments (series) cannot be made or changed on a calendar server yet (upstream's D6
-  first part: single appointments).
+- One day of a series on a calendar server cannot be changed from here: the whole series can
+  (made, changed, deleted), and that one day has to be changed on the server. A series' rule is
+  kept as it came, so how it repeats is changed on the server too.
 
 ## Revision history
 

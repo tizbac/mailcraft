@@ -257,6 +257,7 @@ pub(crate) const NAMING_PARAMS: &[&str] = &[
     "gone",
     "id",
     "ids",
+    "href",
     "value",
     "zone",
     "group",

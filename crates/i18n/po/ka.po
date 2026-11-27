@@ -707,6 +707,11 @@ msgstr "სხვის მიერ ორგანიზებული შე
 msgid "A meeting that repeats and skips some days can't be put on the server's calendar from here: everyone invited would get a cancellation for each skipped day. Keep it in a calendar on this computer, or make it again without the skipped days."
 msgstr "განმეორებადი შეხვედრა გამოტოვებული დღეებით სერვერის კალენდარში აქედან ვერ განთავსდება: ყველა მოწვეული ყოველ გამოტოვებულ დღეზე გაუქმებას მიიღებდა. შეინახეთ ის ამ კომპიუტერის კალენდარში ან ხელახლა შექმენით გამოტოვებული დღეების გარეშე."
 
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "A meeting, or one day of a series, on a calendar server can't be changed from here yet: change it on the server."
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/reading/unsubscribe.rs
 #, fuzzy
@@ -836,12 +841,6 @@ msgstr "სერვერთან დაცული კავშირი ვ
 #, fuzzy
 msgid "A series and one of its days are both named; nothing was changed."
 msgstr "მითითებულია როგორც სერია, ისე მისი ერთ-ერთი დღე; არაფერი შეცვლილა."
-
-#. what a command says
-#: crates/engine/src/cmd/remote.rs
-#, fuzzy
-msgid "A series or a meeting on a calendar server can't be changed from here yet: change it on the server."
-msgstr "კალენდრის სერვერზე არსებული სერიის ან თათბირის შეცვლა აქედან ჯერ შეუძლებელია: შეცვალეთ სერვერზე."
 
 #. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
@@ -12411,6 +12410,11 @@ msgstr "როგორც კი იმუშავებს, თქვენ�
 #. interface
 #: crates/ui-egui/src/dav_password_ask.rs crates/ui-egui/src/dav_settings.rs
 msgid "Once the server has taken it, MailCraft keeps it in your system's credential store, as File › Options lets it."
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/calendar.rs
+msgid "One day of a series on a calendar server can't be changed from here yet: change the whole series, or that day on the server."
 msgstr ""
 
 #. what a command says
@@ -29111,6 +29115,10 @@ msgstr ""
 #: crates/ui-egui/src/credits.rs
 msgid "−Lines"
 msgstr ""
+
+#, fuzzy
+#~ msgid "A series or a meeting on a calendar server can't be changed from here yet: change it on the server."
+#~ msgstr "კალენდრის სერვერზე არსებული სერიის ან თათბირის შეცვლა აქედან ჯერ შეუძლებელია: შეცვალეთ სერვერზე."
 
 #, fuzzy
 #~ msgid "Messages (.eml, .mbox), calendars (.ics) and contacts (.vcf)"

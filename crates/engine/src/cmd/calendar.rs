@@ -606,6 +606,13 @@ fn may_change(s: &Session, v: &Value, before: &Event, e: &Event) -> Result<bool,
 /// the change would leave it; the occurrence is changed by as much (an hour later, another
 /// title), on its own day.
 fn change_one(s: &mut Session, v: &Value, series: &Event, day: Date, changed: Event) -> CmdResult {
+    // (One day of a calendar server's series is another resource, which this version doesn't
+    // write: refused before anything is made.)
+    if remote::dav_addable(&s.mailbox, series.calendar) {
+        return Err(fail(
+            "One day of a series on a calendar server can't be changed from here yet: change the whole series, or that day on the server.",
+        ));
+    }
     if !happens_on(s, series, day) {
         return Err(failed!("the series doesn't happen on {date}", date = day.iso()));
     }

@@ -934,11 +934,12 @@ pub fn dav_addable(mailbox: &Mailbox, calendar: Id) -> bool {
 
 /// Whether a calendar server's event may become `after` from here (#209 D6): what MailCraft
 /// knows of it (title, time, place, description, reminder, categories, private), written into the
-/// document the server sent, which keeps everything else as it was; not a series, nor a meeting
-/// (the server could send updates by itself), nor a move to another calendar.
+/// document the server sent, which keeps everything else as it was, a series' rule included; not a
+/// meeting, nor one day of a series (the server could send updates by itself, and a day of a series
+/// is another resource), nor a move to another calendar.
 pub(crate) fn dav_changeable(before: &Event, after: &Event) -> Result<(), CmdError> {
-    if before.recurrence.is_some() || !before.origin.series.is_empty() || !before.attendees.is_empty() || before.origin.guest {
-        return Err(fail("A series or a meeting on a calendar server can't be changed from here yet: change it on the server."));
+    if !before.origin.series.is_empty() || !before.attendees.is_empty() || before.origin.guest {
+        return Err(fail("A meeting, or one day of a series, on a calendar server can't be changed from here yet: change it on the server."));
     }
     let mut same = after.clone();
     (same.title, same.location, same.description) = (before.title.clone(), before.location.clone(), before.description.clone());

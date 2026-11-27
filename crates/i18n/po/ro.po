@@ -710,6 +710,11 @@ msgstr "O întâlnire organizată de altcineva este scoasă doar din calendarul 
 msgid "A meeting that repeats and skips some days can't be put on the server's calendar from here: everyone invited would get a cancellation for each skipped day. Keep it in a calendar on this computer, or make it again without the skipped days."
 msgstr "O întâlnire care se repetă și sare peste unele zile nu poate fi pusă de aici în calendarul serverului: fiecare invitat ar primi câte o anulare pentru fiecare zi sărită. Păstrați-o într-un calendar de pe acest computer sau creați-o din nou fără zilele sărite."
 
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "A meeting, or one day of a series, on a calendar server can't be changed from here yet: change it on the server."
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/reading/unsubscribe.rs
 #, fuzzy
@@ -841,12 +846,6 @@ msgstr "Nu s-a putut stabili o conexiune securizată cu serverul. Scrieți adres
 #, fuzzy
 msgid "A series and one of its days are both named; nothing was changed."
 msgstr "Sunt numite atât o serie, cât și una dintre zilele ei; nu s-a schimbat nimic."
-
-#. what a command says
-#: crates/engine/src/cmd/remote.rs
-#, fuzzy
-msgid "A series or a meeting on a calendar server can't be changed from here yet: change it on the server."
-msgstr "O serie sau o ședință de pe un server de calendare nu poate fi încă modificată de aici: modificați-o pe server."
 
 #. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
@@ -12480,6 +12479,11 @@ msgstr "După ce a funcționat, depozitul de acreditări al sistemului o păstre
 #. interface
 #: crates/ui-egui/src/dav_password_ask.rs crates/ui-egui/src/dav_settings.rs
 msgid "Once the server has taken it, MailCraft keeps it in your system's credential store, as File › Options lets it."
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/calendar.rs
+msgid "One day of a series on a calendar server can't be changed from here yet: change the whole series, or that day on the server."
 msgstr ""
 
 #. what a command says
@@ -29425,6 +29429,10 @@ msgstr "−Bin"
 #, fuzzy
 msgid "−Lines"
 msgstr "−Linii"
+
+#, fuzzy
+#~ msgid "A series or a meeting on a calendar server can't be changed from here yet: change it on the server."
+#~ msgstr "O serie sau o ședință de pe un server de calendare nu poate fi încă modificată de aici: modificați-o pe server."
 
 #, fuzzy
 #~ msgid "Messages (.eml, .mbox), calendars (.ics) and contacts (.vcf)"

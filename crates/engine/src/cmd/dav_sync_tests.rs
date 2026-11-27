@@ -1143,15 +1143,16 @@ fn a_deletion_the_server_kept_is_given_up_and_the_calendar_is_read_whole_again()
 }
 
 #[test]
-fn one_day_of_a_series_or_a_meeting_on_the_server_is_not_deleted_from_here() {
+fn one_day_of_a_series_or_a_meeting_on_the_server_is_not_changed_from_here() {
     let (mut s, id, _) = theirs();
     let series = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:s\r\nDTSTART:20261123T100000Z\r\nDTEND:20261123T110000Z\r\nRRULE:FREQ=DAILY;COUNT=5\r\nSUMMARY:Serie\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
     apply(&mut s, id, None, vec![read(vec![change("s.ics", "\"8\"", series)], false, true, "t3")]);
     let serie = s.mailbox.events.values().find(|e| e.title == "Serie").unwrap().id;
     assert!(s.run("calendar.delete", &json!({"id": serie, "occurrence": "2026-11-24"})).is_err());
     assert!(deletes(&mut s, id).is_empty());
-    // Nor is the series changed from here yet.
-    assert!(s.run("calendar.edit", &json!({"id": serie, "title": "Anders"})).is_err());
+    // The series as a whole is changed from here; one of its days is not.
+    assert!(s.run("calendar.edit", &json!({"id": serie, "title": "Anders"})).is_ok());
+    assert!(s.run("calendar.edit", &json!({"id": serie, "title": "Noch anders", "scope": "occurrence", "occurrence": "2026-11-24"})).is_err());
 }
 
 /// A server event with what MailCraft doesn't read, in a writable calendar, read in with a
@@ -1165,6 +1166,19 @@ fn theirs_kept(tag: &str) -> (Session, Id, Id, std::path::PathBuf) {
     let doc = event("a", 22, "Vom Server").replace("END:VEVENT", "X-APPLE-TRAVEL-ADVISORY-BEHAVIOR:AUTOMATIC\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Erinnerung\r\nTRIGGER:-PT15M\r\nEND:VALARM\r\nEND:VEVENT");
     apply(&mut s, id, Some(listing()), vec![read(vec![change("a.ics", "\"7\"", &doc)], true, true, "t1")]);
     let e = s.mailbox.events.values().find(|e| e.title == "Vom Server").unwrap().id;
+    (s, id, e, dir)
+}
+
+/// [`theirs_kept`] for a series: the server's event repeats every week, four times.
+fn series_kept(tag: &str) -> (Session, Id, Id, std::path::PathBuf) {
+    let dir = std::env::temp_dir().join(format!("mc-dav-series-{tag}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let (mut s, id) = session();
+    s.path = Some(dir.join("mailbox.mailcraft"));
+    let doc = event("a", 22, "Wöchentlich").replace("DTSTART:", "RRULE:FREQ=WEEKLY;COUNT=4\r\nDTSTART:");
+    apply(&mut s, id, Some(listing()), vec![read(vec![change("a.ics", "\"7\"", &doc)], true, true, "t1")]);
+    let e = s.mailbox.events.values().find(|e| e.title == "Wöchentlich").unwrap().id;
     (s, id, e, dir)
 }
 
@@ -1275,6 +1289,35 @@ fn what_the_server_kept_of_a_change_or_a_deletion_is_read_whole_again_even_when_
 }
 
 #[test]
+fn a_series_is_changed_as_a_whole_with_its_rule_kept() {
+    let (mut s, id, e, dir) = series_kept("edit");
+    s.run("calendar.edit", &json!({"id": e, "title": "Geändert"})).unwrap();
+    let up = updates(&mut s, id);
+    assert_eq!(up.len(), 1, "the series goes up");
+    assert!(up[0].body.contains("SUMMARY:Geändert"), "{}", up[0].body);
+    assert!(up[0].body.contains("RRULE:FREQ=WEEKLY;COUNT=4"), "its rule stays:\n{}", up[0].body);
+    // Its rule is not changed from here: the document's is kept as it came.
+    let why = s.run("calendar.edit", &json!({"id": e, "recurrence": {"freq": "daily"}})).unwrap_err().to_string();
+    assert!(why.contains("only an appointment's"), "{why}");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn a_series_made_here_goes_up_with_its_rule() {
+    let (mut s, id, _, event) = made();
+    let cal = s.mailbox.calendars.iter().find(|c| c.origin.id == COLLECTION).unwrap().id;
+    s.run("calendar.delete", &json!({"id": event})).unwrap();
+    s.run(
+        "calendar.new",
+        &json!({"title": "Täglich", "start": "2026-11-20T10:00", "end": "2026-11-20T11:00", "calendar": cal, "recurrence": {"freq": "daily", "count": 3}}),
+    )
+    .unwrap();
+    let up = creates(&mut s, id);
+    assert_eq!(up.len(), 1);
+    assert!(up[0].body.contains("RRULE:FREQ=DAILY;COUNT=3"), "{}", up[0].body);
+}
+
+#[test]
 fn a_change_the_server_had_changed_too_is_held_and_the_owner_asked() {
     let (mut s, id, e, dir) = theirs_kept("held");
     s.run("calendar.edit", &json!({"id": e, "title": "Meins"})).unwrap();
@@ -1363,7 +1406,7 @@ fn a_batch_deletes_a_calendar_servers_events_as_one_delete_does_and_refuses_a_me
     s.mailbox.event_mut(b).unwrap().attendees.push(mailcraft_model::Attendee { address: invited, ..Default::default() });
     let refused = s.run("calendar.delete", &json!({"items": [{"id": a}, {"id": b}], "send": true})).unwrap_err().to_string();
     // (A batch asks what a change asks: a meeting or a series of a calendar server's stays.)
-    assert!(refused.contains("meeting on a calendar server"), "{refused}");
+    assert!(refused.contains("can't be changed from here"), "{refused}");
     assert_eq!(titles(&s).len(), 2);
     assert!(s.mailbox.event_changes.is_empty());
     // Without it, each goes up as a deletion.

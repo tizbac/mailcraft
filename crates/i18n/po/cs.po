@@ -708,6 +708,11 @@ msgstr "Schůzka, kterou organizuje někdo jiný, se odebere jen z vašeho kalen
 msgid "A meeting that repeats and skips some days can't be put on the server's calendar from here: everyone invited would get a cancellation for each skipped day. Keep it in a calendar on this computer, or make it again without the skipped days."
 msgstr "Opakovanou schůzku, která některé dny vynechává, nelze odsud dát do kalendáře na serveru: každý pozvaný by dostal zrušení za každý vynechaný den. Ponechte ji v kalendáři v tomto počítači, nebo ji vytvořte znovu bez vynechaných dnů."
 
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "A meeting, or one day of a series, on a calendar server can't be changed from here yet: change it on the server."
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/reading/unsubscribe.rs
 #, fuzzy
@@ -839,12 +844,6 @@ msgstr "Zabezpečené připojení k serveru se nepodařilo navázat. Zadejte adr
 #, fuzzy
 msgid "A series and one of its days are both named; nothing was changed."
 msgstr "Je uvedena řada i jeden z jejích dnů; nic se nezměnilo."
-
-#. what a command says
-#: crates/engine/src/cmd/remote.rs
-#, fuzzy
-msgid "A series or a meeting on a calendar server can't be changed from here yet: change it on the server."
-msgstr "Opakovanou událost nebo poradu na kalendářovém serveru zatím odsud nelze změnit: změňte ji na serveru."
 
 #. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
@@ -12464,6 +12463,11 @@ msgstr "Jakmile to bude fungovat, úložiště přihlašovacích údajů systém
 #. interface
 #: crates/ui-egui/src/dav_password_ask.rs crates/ui-egui/src/dav_settings.rs
 msgid "Once the server has taken it, MailCraft keeps it in your system's credential store, as File › Options lets it."
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/calendar.rs
+msgid "One day of a series on a calendar server can't be changed from here yet: change the whole series, or that day on the server."
 msgstr ""
 
 #. what a command says
@@ -29396,6 +29400,10 @@ msgstr "−Binární"
 #, fuzzy
 msgid "−Lines"
 msgstr "−Řádky"
+
+#, fuzzy
+#~ msgid "A series or a meeting on a calendar server can't be changed from here yet: change it on the server."
+#~ msgstr "Opakovanou událost nebo poradu na kalendářovém serveru zatím odsud nelze změnit: změňte ji na serveru."
 
 #, fuzzy
 #~ msgid "Messages (.eml, .mbox), calendars (.ics) and contacts (.vcf)"
