@@ -303,11 +303,11 @@ private fun CoreShell(
     // A CalDAV and CardDAV account is shown in the phone's own Calendar and Contacts apps: the
     // owner is asked for those rights once such an account exists, and what MailCraft keeps is
     // written there when they are given.
-    AskForSystemSyncOnce(hasDavAccount = accounts.any { it.kind == "dav" }) {
+    AskForSystemSyncOnce(hasDavAccount = accounts.any { it.calendars }) {
         scope.launch { writeSystemSync(appContext, core) }
     }
     LaunchedEffect(accounts) {
-        if (accounts.none { it.kind == "dav" }) return@LaunchedEffect
+        if (accounts.none { it.calendars }) return@LaunchedEffect
         writeSystemSync(appContext, core)
     }
     val pictured = rememberPictures(core, list, scope, appContext)

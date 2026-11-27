@@ -105,6 +105,7 @@ fn setup(s: &Session) -> TaskSetup {
         email: text::clip(&a.email, MAX_ADDRESS),
         display_name: text::clip(&a.display_name, MAX_NAME),
         kind: account_kind(a.kind).to_string(),
+        calendars: crate::queries::has_calendars(a),
     });
     let (answered, sent_to) = match s.mailbox.local_tasks {
         LocalTasks::Unasked => (false, None),

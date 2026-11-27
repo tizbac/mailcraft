@@ -272,10 +272,13 @@ fn failed(reason: &str) -> SignInOutcome {
 
 /// What waiting for a Linchange application password came to.
 enum Approval {
-    /// The application password, and the mail host it was approved for.
+    /// The application password, the mail host it was approved for, and the calendar and contact
+    /// homes that host names (empty when it names none).
     Approved {
         password: String,
         host: String,
+        calendar_homes: Vec<String>,
+        contact_homes: Vec<String>,
     },
     NoBrowser,
     Cancelled,
@@ -714,7 +717,14 @@ impl Core {
                         Approval::NoBrowser
                     } else {
                         match mailcraft_net::finish_linchange_app_token(&origin, &grant, &cancel) {
-                            Ok(password) => Approval::Approved { password, host },
+                            Ok(password) => {
+                                // Its calendars and address books are on the same server: found
+                                // from the mail host alone, with the password the page just made,
+                                // so that the account is added with them and works at once.
+                                let found = mailcraft_net::dav_find::find_linchange_homes(&job_email, &host, &password);
+                                let (calendar_homes, contact_homes) = found.map(|f| (f.calendar_homes, f.contact_homes)).unwrap_or_default();
+                                Approval::Approved { password, host, calendar_homes, contact_homes }
+                            }
                             Err(why) => Approval::of(why),
                         }
                     }
@@ -730,8 +740,8 @@ impl Core {
             reply.next().await.unwrap_or(Approval::Failed("the Linchange approval stopped unexpectedly".to_string()))
         };
         self.signins.linchange.lock().unwrap_or_else(PoisonError::into_inner).take();
-        let (password, host) = match approval {
-            Approval::Approved { password, host } => (password, host),
+        let (password, host, calendar_homes, contact_homes) = match approval {
+            Approval::Approved { password, host, calendar_homes, contact_homes } => (password, host, calendar_homes, contact_homes),
             Approval::NoBrowser => return Ok(LinchangeOutcome::NoBrowser),
             Approval::Cancelled => return Ok(LinchangeOutcome::Cancelled),
             Approval::TimedOut => return Ok(LinchangeOutcome::TimedOut),
@@ -749,6 +759,13 @@ impl Core {
         };
         match self.add_imap_account(settings).await {
             Ok(account) => {
+                // What the server named for its calendars and address books, so that the phone's
+                // own Calendar and Contacts apps see them too. A server that named none (or homes
+                // the engine won't take) leaves the account with its mail only, as before.
+                if !calendar_homes.is_empty() || !contact_homes.is_empty() {
+                    let dav = json!({"id": account, "calendarHomes": calendar_homes, "contactHomes": contact_homes});
+                    let _ = self.call(move |s| s.run("account.davSet", &dav).map(|_| ()).map_err(CoreError::from)).await;
+                }
                 let name = if display_name.trim().is_empty() { email.clone() } else { display_name.trim().to_string() };
                 Ok(LinchangeOutcome::SignedIn { account, email, name })
             }

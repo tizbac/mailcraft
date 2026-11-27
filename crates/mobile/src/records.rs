@@ -12,9 +12,13 @@ pub struct AccountRecord {
     pub name: String,
     pub email: String,
     pub display_name: String,
-    /// `microsoft`, `imap`, `local`, `jmap`, `exchange` or `other`. The phone app shows
+    /// `microsoft`, `imap`, `local`, `jmap`, `exchange`, `dav` or `other`. The phone app shows
     /// `microsoft` and `imap` accounts.
     pub kind: String,
+    /// The account keeps calendars or address books of its own on a CalDAV/CardDAV server (its
+    /// own, or one set up beside its mail): what the phone mirrors into its Calendar and Contacts
+    /// apps, whatever the account's kind.
+    pub calendars: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]

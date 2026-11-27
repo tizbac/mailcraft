@@ -530,6 +530,9 @@ pub struct AccountSetup {
     linchange_cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
     /// The Linchange tile was picked by hand, so the DNS answer keeps its name.
     linchange_by_hand: bool,
+    /// The calendars' and address books' homes the Linchange server named when it approved the
+    /// sign-in: the account is added with them, so its calendars work at once.
+    linchange_homes: (Vec<String>, Vec<String>),
     /// Whether the servers took the password, once the host knows.
     check: Option<Receiver<Result<(), mailcraft_i18n::Text>>>,
     /// The owner is in the browser, signing in for this wizard.
@@ -678,6 +681,7 @@ impl AccountSetup {
             discovered: None,
             linchange_cancel: None,
             linchange_by_hand: false,
+            linchange_homes: (Vec::new(), Vec::new()),
             check: None,
             waiting: false,
             reconnecting_google: false,
@@ -849,6 +853,15 @@ impl AccountSetup {
         for (key, server) in [("incoming", &self.incoming), ("outgoing", &self.outgoing)] {
             if let Some(v) = server.value() {
                 m.insert(key.into(), v);
+            }
+        }
+        // What the Linchange server named when it approved the sign-in: its calendars and address
+        // books are kept over CalDAV and CardDAV, and a read or a change goes to the same server
+        // with the account's own application password.
+        if self.service == "Linchange" {
+            let (calendars, contacts) = &self.linchange_homes;
+            if !calendars.is_empty() || !contacts.is_empty() {
+                m.insert("dav".into(), json!({"calendarHomes": calendars, "contactHomes": contacts}));
             }
         }
         match &self.oauth {
@@ -2116,7 +2129,7 @@ impl AccountSetup {
         }
         let server = format!("https://{host}");
         let description = fmt(tl!("MailCraft on {computer}"), &[("computer", &this_computer())]);
-        let started = app.begin_linchange_sign_in(server, description);
+        let started = app.begin_linchange_sign_in(server, self.email.trim().to_string(), description);
         self.go(Page::AppPassword);
         match started {
             Ok(cancel) => {
@@ -2145,8 +2158,9 @@ impl AccountSetup {
         let Some(answer) = app.poll_linchange_sign_in() else { return };
         self.waiting = false;
         match answer {
-            Ok(password) => {
-                self.password.0.clone_from(&password);
+            Ok(approval) => {
+                self.password.0.clone_from(&approval.password);
+                self.linchange_homes = (approval.calendar_homes, approval.contact_homes);
                 self.add_with_password(app);
             }
             Err(e) => self.error = e,
@@ -3161,14 +3175,17 @@ mod tests {
         asked
     }
 
-    type LinchangeSignIns = Log<(String, String, Arc<AtomicBool>, mpsc::Sender<Result<String, String>>)>;
+    type LinchangeSignIns = Log<(String, String, Arc<AtomicBool>, mpsc::Sender<Result<crate::LinchangeApproval, String>>)>;
 
-    /// A host that obtains Linchange application passwords: it answers `answer` at once, or
-    /// leaves the owner in the browser until the test sends one.
+    /// A host that obtains Linchange application passwords: it answers `answer` at once (no homes
+    /// found), or leaves the owner in the browser until the test sends one.
     fn linchange_sign_ins(app: &mut MailApp, answer: Option<Result<&str, &str>>) -> LinchangeSignIns {
         let asked: LinchangeSignIns = Default::default();
         let log = asked.clone();
-        let answer = answer.map(|a| a.map(str::to_string).map_err(str::to_string));
+        let answer = answer.map(|a| {
+            a.map(|password| crate::LinchangeApproval { password: password.to_string(), calendar_homes: Vec::new(), contact_homes: Vec::new() })
+                .map_err(str::to_string)
+        });
         app.services.linchange_sign_in = Some(Box::new(move |request: crate::LinchangeSignInRequest| {
             let (tx, rx) = mpsc::channel();
             log.lock().unwrap().push((request.server, request.description, request.cancel, tx.clone()));
@@ -3203,7 +3220,10 @@ mod tests {
             assert_eq!((asked[0].0.as_str(), asked[0].1.starts_with("MailCraft on ")), ("https://mail.example.org", true));
             // The page allows it: the application password is the account's own, and the
             // account is tried with it and added.
-            asked[0].3.send(Ok("lcapp_prefix_secret".into())).unwrap();
+            asked[0]
+                .3
+                .send(Ok(crate::LinchangeApproval { password: "lcapp_prefix_secret".into(), calendar_homes: Vec::new(), contact_homes: Vec::new() }))
+                .unwrap();
         }
         h.run_steps(8);
         assert_eq!(page(&h), Some(Page::Done));
@@ -3218,6 +3238,37 @@ mod tests {
                 .iter()
                 .any(|a| a.email == "noor@example.org" && a.incoming.as_ref().is_some_and(|server| server.host == "mail.example.org"))
         );
+    }
+
+    /// The Linchange server names its calendars and address books when it approves the sign-in:
+    /// the account is added with them, so the window reads them at its next run (D7).
+    #[test]
+    fn a_linchange_approval_keeps_the_calendars_its_server_names() {
+        let mut a = app(false);
+        lookups(&mut a, Some(Ok(vec!["mail.example.org"])));
+        let sign_ins = linchange_sign_ins(&mut a, None);
+        let mut h = open(a, json!({"email": "noor@example.org"}));
+        connect_manually(&mut h);
+        click(&mut h, Kind::Linchange.title());
+        h.run_steps(4);
+        {
+            let asked = sign_ins.lock().unwrap();
+            asked[0]
+                .3
+                .send(Ok(crate::LinchangeApproval {
+                    password: "lcapp_prefix_secret".into(),
+                    calendar_homes: vec!["https://mail.example.org/caldav/".into()],
+                    contact_homes: vec!["https://mail.example.org/carddav/".into()],
+                }))
+                .unwrap();
+        }
+        h.run_steps(8);
+        assert_eq!(page(&h), Some(Page::Done));
+        let found = h.state().session.mailbox.accounts.iter().find(|a| a.email == "noor@example.org").and_then(|a| a.dav.clone());
+        let dav = found.expect("the account keeps the calendars its server named");
+        assert_eq!(dav.calendar_homes, ["https://mail.example.org/caldav/"]);
+        assert_eq!(dav.contact_homes, ["https://mail.example.org/carddav/"]);
+        assert!(!dav.separate_password, "the application password is the account's own");
     }
     /// What a sign-in was asked for: the address, the application ID, and the flag that stops it.
     type SignIns = Log<(String, String, Arc<AtomicBool>)>;

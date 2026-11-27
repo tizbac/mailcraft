@@ -195,7 +195,7 @@ fn a_linchange_approval_does_not_start_offline() {
         let (_tx, rx) = mpsc::channel();
         rx
     }));
-    let why = a.begin_linchange_sign_in("https://mail.example.org".into(), "MailCraft on the laptop".into()).unwrap_err();
+    let why = a.begin_linchange_sign_in("https://mail.example.org".into(), "noor@example.org".into(), "MailCraft on the laptop".into()).unwrap_err();
     assert!(why.contains("offline"), "{why}");
     assert!(!called.load(Ordering::Relaxed), "nothing reached the host");
 }

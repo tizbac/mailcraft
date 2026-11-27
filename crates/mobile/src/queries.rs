@@ -183,6 +183,13 @@ pub(crate) fn date_of(s: &str) -> Result<Date, CoreError> {
 }
 
 /// The kind of an account in the words the app reads.
+/// Whether the account keeps calendars or address books on a server of its own: an account the
+/// phone's Calendar and Contacts apps mirror, whatever its kind (`kind: dav` or an IMAP one with
+/// CalDAV/CardDAV set up).
+pub(crate) fn has_calendars(a: &mailcraft_model::Account) -> bool {
+    a.dav.as_ref().is_some_and(|dav| !dav.calendar_homes.is_empty() || !dav.contact_homes.is_empty())
+}
+
 pub(crate) fn account_kind(kind: mailcraft_model::AccountKind) -> &'static str {
     use mailcraft_model::AccountKind;
     match kind {
@@ -210,6 +217,7 @@ impl Core {
                 email: text::clip(&a.email, MAX_ADDRESS),
                 display_name: text::clip(&a.display_name, MAX_NAME),
                 kind: account_kind(a.kind).to_string(),
+                calendars: has_calendars(a),
             });
             let folders = text::first(s.mailbox.folders.iter().filter(|f| wanted(f.account)), MAX_FOLDERS, |f| FolderRecord {
                 id: f.id,

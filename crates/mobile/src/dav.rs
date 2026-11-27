@@ -99,6 +99,7 @@ fn contact_only_ask(session: &Session, skip: &[Id]) -> Option<DavAsk> {
         collections: Vec::new(),
         no_room: false,
         generation: session.dav_generation.get(&account.id).copied().unwrap_or(0),
+        ..Default::default()
     })
 }
 

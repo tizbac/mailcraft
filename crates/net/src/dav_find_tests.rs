@@ -77,6 +77,29 @@ fn a_typed_address_is_the_only_place_asked_and_its_homes_and_counts_come_back() 
 }
 
 #[test]
+fn a_linchange_search_consents_to_the_mail_host_and_no_other() {
+    let mut asked = linchange_question("Mail.Example.org.");
+    assert_eq!(asked("mail.example.org", DavFindQuestion::OwnDomain), Some(true));
+    assert_eq!(asked("mail.example.org.", DavFindQuestion::Elsewhere), Some(true));
+    assert_eq!(asked("example.org", DavFindQuestion::OwnDomain), Some(false));
+    assert_eq!(asked("dav.example.net", DavFindQuestion::Elsewhere), Some(false));
+    assert_eq!(asked("", DavFindQuestion::Elsewhere), Some(false));
+}
+
+#[test]
+fn a_linchange_search_finds_the_homes_the_mail_host_names() {
+    // The mail host is the server the stand-in keeps the calendars and the books on: the search
+    // goes from it, and the homes it names come back.
+    let world = World::new();
+    let mut ask = ask("", "", PASSWORD);
+    ask.mail_host = "dav.example.net";
+    let found = find_with(&ask, &world, &mut no_srv, &mut linchange_question("dav.example.net"), &|| false).unwrap();
+    assert_eq!(found.calendar_homes, vec![format!("{DAV}/dav/cal/owner/")]);
+    assert_eq!(found.contact_homes.len(), 1);
+    assert!(found.calendars >= 1 && found.address_books >= 1);
+}
+
+#[test]
 fn the_host_the_domain_sends_the_search_to_is_asked_about_and_a_no_sends_it_nothing() {
     for yes in [false, true] {
         let world = World::new();

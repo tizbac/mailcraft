@@ -25,6 +25,8 @@ internal data class AccountItem(
     val email: String,
     val folders: List<FolderItem>,
     val kind: String = "microsoft",
+    /** It keeps calendars or address books on a CalDAV/CardDAV server (its own, or beside its mail). */
+    val calendars: Boolean = false,
 )
 
 /** The accounts of the mailbox, and the folder the Mail tab opens on. */
@@ -90,7 +92,7 @@ internal suspend fun loadOutline(
                 FolderItem(it.id, it.parent, it.name, it.kind, it.unread)
             }
             val name = account.displayName.ifBlank { account.name }.ifBlank { account.email }
-            AccountItem(account.id, name, account.email, folderTree(own), account.kind)
+            AccountItem(account.id, name, account.email, folderTree(own), account.kind, account.calendars)
         }
         val inbox = accounts.firstNotNullOfOrNull { account -> account.folders.firstOrNull { it.kind == "inbox" } }
         MailboxOutline(accounts, inbox?.id)

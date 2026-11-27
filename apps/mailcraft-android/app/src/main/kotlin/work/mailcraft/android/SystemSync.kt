@@ -74,7 +74,7 @@ internal object SystemSync {
     private suspend fun phoneAccounts(core: Core): List<PhoneAccount> =
         try {
             core.folders(0uL).accounts
-                .filter { it.kind == "dav" }
+                .filter { it.calendars }
                 .map { account ->
                     val label = listOf(account.displayName, account.name, account.email).firstOrNull { it.isNotBlank() }.orEmpty()
                     PhoneAccount(account.email.ifBlank { label }, label)
@@ -90,7 +90,7 @@ internal object SystemSync {
     suspend fun exportCalendars(context: Context, core: Core, only: String? = null) {
         if (!SystemSyncPermissions.granted(context)) return
         val dav = try {
-            core.folders(0uL).accounts.filter { it.kind == "dav" && (only == null || it.email == only) }.associate { it.id to it.email }
+            core.folders(0uL).accounts.filter { it.calendars && (only == null || it.email == only) }.associate { it.id to it.email }
         } catch (_: CoreException) {
             return
         }
@@ -203,7 +203,7 @@ internal object SystemSync {
     suspend fun exportContacts(context: Context, core: Core, only: String? = null) {
         if (!SystemSyncPermissions.granted(context)) return
         val dav = try {
-            core.folders(0uL).accounts.filter { it.kind == "dav" && (only == null || it.email == only) }.associate { it.id to it.email }
+            core.folders(0uL).accounts.filter { it.calendars && (only == null || it.email == only) }.associate { it.id to it.email }
         } catch (_: CoreException) {
             return
         }

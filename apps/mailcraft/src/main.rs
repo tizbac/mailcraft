@@ -544,6 +544,16 @@ fn google_client_secret() -> String {
 /// started is known of, instead of leaving the owner looking at a page that waits.) On Linux and
 /// FreeBSD the window hands the browser its activation token, so that it comes in front
 /// (`browser`). The address is not for the log: it names who is signing in.
+/// The host of an `https://` origin, as the calendar search takes one: no scheme, no port.
+fn host_of(server: &str) -> String {
+    let rest = server.trim().strip_prefix("https://").unwrap_or(server.trim());
+    let authority = rest.split('/').next().unwrap_or("");
+    match authority.rsplit_once(':') {
+        Some((host, port)) if port.chars().all(|c| c.is_ascii_digit()) => host.to_string(),
+        _ => authority.to_string(),
+    }
+}
+
 fn open_in_browser(url: &str) -> bool {
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     if let Some(browser) = BROWSER.get() {
@@ -1350,7 +1360,15 @@ fn build_services(
                     request.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
                     return Err(mailcraft_ui_egui::approval::NO_BROWSER.to_string());
                 }
-                mailcraft_net::finish_linchange_app_token(&request.server, &grant, &request.cancel).map_err(|e| e.to_string())
+                let password = mailcraft_net::finish_linchange_app_token(&request.server, &grant, &request.cancel).map_err(|e| e.to_string())?;
+                // Its calendars and address books are on the same server: found from its own name,
+                // with the application password the approval just made, so the account is added
+                // with them and they work at once. A server that names none leaves the account
+                // with its mail only, as before.
+                let host = host_of(&request.server);
+                let found = mailcraft_net::dav_find::find_linchange_homes(&request.email, &host, &password);
+                let (calendar_homes, contact_homes) = found.map(|f| (f.calendar_homes, f.contact_homes)).unwrap_or_default();
+                Ok(mailcraft_ui_egui::LinchangeApproval { password, calendar_homes, contact_homes })
             })
         })),
         test_account: Some(Box::new(move |account, secret| {
@@ -1855,9 +1873,9 @@ fn main() -> eframe::Result {
                 // Search answers from a word index kept beside the mailbox file, built in the
                 // background (R6.2).
                 session.index_words = true;
-                // Calendar and contacts servers (#209) ship switched off: `MAILCRAFT_DAV=1` turns
-                // them on, until they are ready.
-                session.dav_enabled = std::env::var("MAILCRAFT_DAV").is_ok_and(|v| v == "1");
+                // Calendar and contacts servers (#209) are on: calendars are read and changed both
+                // ways, and address books are read. `MAILCRAFT_DAV=0` turns them off.
+                session.dav_enabled = std::env::var("MAILCRAFT_DAV").is_ok_and(|v| v != "0");
                 // A run that keeps its mailbox and its settings keeps downloaded pictures too.
                 let kept_pictures = if kept && !sample && prefs_enabled() { keep_pictures() } else { None };
                 #[cfg(target_os = "linux")]

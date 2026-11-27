@@ -529,6 +529,20 @@ fn subscribed_calendars(app: &mut MailApp, ui: &mut Ui, t: &Tokens) {
     ) {
         let _ = app.run("ui.dialog", json!({"name": "subscribe"}));
     }
+    // Calendars and address books kept on the owner's own CalDAV/CardDAV server (#209): set up
+    // beside the account's mail, read and changed both ways where the server lets it. Each line
+    // says where the account's are, or opens the window to type them (or Find them).
+    if app.session.dav_enabled {
+        let accounts: Vec<mailcraft_model::Account> =
+            app.session.mailbox.accounts.iter().filter(|a| mailcraft_engine::cmd::dav_account::may_have(a)).cloned().collect();
+        if !accounts.is_empty() {
+            ui.add_space(8.0);
+            ui.label(egui::RichText::new(tl!("Calendars and contacts from a server")).font(semibold(12.0)).color(t.text));
+            for a in &accounts {
+                crate::dav_settings::info_row(app, ui, t, a);
+            }
+        }
+    }
 }
 
 /// "Download messages in full" for a Microsoft account: everything, or up to a size (larger ones

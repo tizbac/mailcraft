@@ -156,6 +156,33 @@ pub fn find(
     found
 }
 
+/// The calendar and contacts homes a Linchange server names, looked for from its mail host alone:
+/// where the sign-in's page and the mail already go, so that no other host is asked and the owner
+/// is not stopped with a question in the middle of an approval. `None` when it names none (or
+/// can't be reached): the account then keeps its mail only, as before.
+///
+/// Blocks: the host runs it on the thread that waited for the approval.
+pub fn find_linchange_homes(email: &str, mail_host: &str, password: &str) -> Option<DavFound> {
+    let host = mail_host.trim().trim_end_matches('.').to_ascii_lowercase();
+    if host.is_empty() || password.is_empty() {
+        return None;
+    }
+    let ask = DavFindAsk { email, mail_host, username: email, password, calendars: "", contacts: "", trusted: "" };
+    let mut question = linchange_question(&host);
+    match find(&ask, &mut question, &|| false) {
+        Ok(found) if !found.calendar_homes.is_empty() || !found.contact_homes.is_empty() => Some(found),
+        _ => None,
+    }
+}
+
+/// The owner's word for a Linchange server's search: only the mail host, where the password
+/// already goes, since nobody is here to be asked. Any other host the search would lead to is
+/// declined: the password is never sent there, and the search goes on without it.
+fn linchange_question(mail_host: &str) -> impl FnMut(&str, DavFindQuestion) -> Option<bool> + '_ {
+    let own = mail_host.trim().trim_end_matches('.').to_ascii_lowercase();
+    move |asked: &str, _why: DavFindQuestion| Some(asked.trim().trim_end_matches('.').to_ascii_lowercase() == own)
+}
+
 #[cfg(test)]
 #[path = "dav_find_tests.rs"]
 mod tests;

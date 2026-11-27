@@ -514,8 +514,9 @@ pub struct Services {
     /// Desktop: obtain a Linchange application password through the server's own browser page.
     /// The account password and second factor are typed there, never here; the host opens the
     /// page and waits for the person to allow it. The result is the password a Linchange account
-    /// uses for IMAP and SMTP, named for this computer.
-    pub linchange_sign_in: Option<Box<dyn Fn(LinchangeSignInRequest) -> Receiver<Result<String, String>>>>,
+    /// uses for IMAP and SMTP, named for this computer, and the calendars' and address books'
+    /// homes its server names ([`LinchangeApproval`]), found from the same host.
+    pub linchange_sign_in: Option<Box<dyn Fn(LinchangeSignInRequest) -> Receiver<Result<LinchangeApproval, String>>>>,
     /// Desktop: try signing in to an account's servers with a secret (a password, or an access
     /// token for an account that signs in on its provider's page) on a background thread, before
     /// the account is added.
@@ -869,10 +870,23 @@ pub trait PictureCache {
 pub struct LinchangeSignInRequest {
     /// The Linchange web origin (`https://mail.example.org`).
     pub server: String,
+    /// The account's address: the host looks for the account's calendars and address books under
+    /// the server's own name, once the approval is given.
+    pub email: String,
     /// What the account page shows for this credential (`MailCraft on the laptop`).
     pub description: String,
     /// Set when the owner gives up waiting, for the host to stop polling.
     pub cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+/// What a Linchange approval came to ([`Services::linchange_sign_in`]): the application password
+/// the server's page created, and the calendar and contact homes the same server names (empty
+/// when it names none, or they are on a host the password isn't sent to without asking).
+#[derive(Clone)]
+pub struct LinchangeApproval {
+    pub password: String,
+    pub calendar_homes: Vec<String>,
+    pub contact_homes: Vec<String>,
 }
 
 /// What the host needs to sign an account's owner in ([`Services::sign_in`]). A sign-in on the
@@ -1900,7 +1914,7 @@ pub struct MailApp {
     signing_in: Option<SigningIn>,
     /// Account setup on a Linchange server: the application password the browser approval
     /// brought, and the flag that stops the wait.
-    setup_linchange_sign_in: Option<Receiver<Result<String, String>>>,
+    setup_linchange_sign_in: Option<Receiver<Result<LinchangeApproval, String>>>,
     setup_linchange_cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
     /// What a sign-in for an account that is being set up came to, until its dialog takes it.
     setup_sign_in: Option<Result<Tokens, String>>,
@@ -3847,6 +3861,7 @@ impl MailApp {
     pub(crate) fn begin_linchange_sign_in(
         &mut self,
         server: String,
+        email: String,
         description: String,
     ) -> Result<std::sync::Arc<std::sync::atomic::AtomicBool>, String> {
         self.setup_linchange_sign_in = None;
@@ -3858,7 +3873,7 @@ impl MailApp {
             return Err(tl!("This build can't sign in to Linchange").to_string());
         };
         let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let request = LinchangeSignInRequest { server, description, cancel: cancel.clone() };
+        let request = LinchangeSignInRequest { server, email, description, cancel: cancel.clone() };
         self.setup_linchange_cancel = Some(cancel.clone());
         self.setup_linchange_sign_in = Some(sign_in(request));
         Ok(cancel)
@@ -3866,7 +3881,7 @@ impl MailApp {
 
     /// Account setup: whether the Linchange browser approval has answered, without taking the
     /// answer out until there is one.
-    pub(crate) fn poll_linchange_sign_in(&mut self) -> Option<Result<String, String>> {
+    pub(crate) fn poll_linchange_sign_in(&mut self) -> Option<Result<LinchangeApproval, String>> {
         let answer = match self.setup_linchange_sign_in.as_ref()?.try_recv() {
             Ok(answer) => answer,
             Err(std::sync::mpsc::TryRecvError::Empty) => return None,

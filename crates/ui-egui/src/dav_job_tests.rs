@@ -491,6 +491,8 @@ fn a_server_that_took_its_password_keeps_it_when_another_refuses() {
     until_taken_in(&mut a, id);
     assert_eq!(a.dav_password(id, HOME).as_deref(), Some("calendars"), "taken, and still held");
     assert_eq!(a.dav_password(id, OTHER), None, "refused: not held");
+}
+
 #[test]
 fn a_calendar_servers_calendar_that_takes_new_events_shows_no_lock() {
     let (mut a, id) = app(false);
