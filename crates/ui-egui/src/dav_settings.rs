@@ -419,10 +419,10 @@ pub fn show(ctx: &egui::Context, d: &mut DavSettings, app: &mut MailApp, t: &Tok
     if find {
         d.find(app);
     }
-    if let Some((event, keep)) = resolved {
-        if let Err(e) = app.execute("sync.davResolve", json!({"event": event, "keep": keep})) {
-            d.error = e;
-        }
+    if let Some((event, keep)) = resolved
+        && let Err(e) = app.execute("sync.davResolve", json!({"event": event, "keep": keep}))
+    {
+        d.error = e;
     }
     if stop {
         return match app.execute("account.davOff", json!({"id": d.account})) {

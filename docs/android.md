@@ -53,8 +53,9 @@ registered one either way.
 
 ## The phone's own Calendar and Contacts
 
-A CalDAV and CardDAV account (`kind: dav` in the mailbox) is also an Android account
-(`work.mailcraft.android`), made when the account is added and removed with it. The system's
+An account with a calendar and contacts server (`dav` in the mailbox: a CalDAV/CardDAV-only
+account, or a Linchange or IMAP account whose calendars were found at sign-in) is also an Android
+account (`work.mailcraft.android`), made when the account is added and removed with it. The system's
 Calendar and Contacts apps sync it through `CalendarSyncService` and `ContactsSyncService`
 (`MailCraftSyncAdapter`, `SystemSync`): MailCraft writes what it already has to those providers,
 one way and read-only there, and the sync adapter is asked after a MailCraft round and every six

@@ -249,18 +249,17 @@ fn also_changed(base: &Event, now: &Event) -> Vec<&'static str> {
 /// a copy of its own, made on the server as a new event, and the server's copy of the original is
 /// read as it is.
 fn keep_both(s: &mut Session, account: Id, at: usize, took: &mut Took) -> bool {
-    let Some(change) = s.mailbox.event_changes.get(at) else { return false };
-    let Some(event) = s.mailbox.event(change.event).cloned() else {
-        s.mailbox.event_changes.remove(at);
-        return false;
-    };
-    s.mailbox.event_changes.remove(at);
+    let Some(event) = s.mailbox.event_changes.get(at).map(|c| c.event) else { return false };
+    let Some(event) = s.mailbox.event(event).cloned() else { return false };
     let title = event.title.clone();
     let mut copy = event;
     copy.id = 0;
     copy.origin = Origin::default();
     copy.uid = String::new();
+    // (The change stays where it is when the copy can't be made: the conflict is asked again at
+    // the next run rather than the owner's change being lost.)
     let Ok(id) = s.mailbox.add_event(copy) else { return false };
+    s.mailbox.event_changes.remove(at);
     let token = super::remote::new_token(id, s.rev() ^ s.now().unsigned_abs().rotate_left(32));
     if let Ok(e) = s.mailbox.event_mut(id) {
         e.origin = Origin { account, ..Default::default() };
