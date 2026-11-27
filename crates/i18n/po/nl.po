@@ -477,6 +477,11 @@ msgid "A Microsoft Graph or JMAP account's server files its own copy; MailCraft 
 msgstr ""
 
 #. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "A Nextcloud, Fastmail, iCloud or other server's calendars and address books, kept both ways: no mail. Nothing is read until you save."
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/reading/warnings.rs
 #, fuzzy
 msgid "A brand's name on another address."
@@ -1016,7 +1021,7 @@ msgid "Account Settings"
 msgstr "Accountinstellingen"
 
 #. interface
-#: crates/ui-egui/src/account_setup.rs
+#: crates/ui-egui/src/account_setup.rs crates/ui-egui/src/dav_settings.rs
 msgid "Account name"
 msgstr "Accountnaam"
 
@@ -1076,6 +1081,11 @@ msgstr "Account toevoegen"
 #: crates/engine/src/cmd/calendar.rs
 msgid "Add Calendar"
 msgstr "Agenda toevoegen"
+
+#. interface
+#: crates/ui-egui/src/backstage.rs
+msgid "Add Calendars and Contacts Account"
+msgstr ""
 
 #. command label, interface
 #: crates/engine/src/cmd/followup.rs crates/ui-egui/src/dialogs.rs crates/ui-egui/src/reminder_dialog.rs
@@ -1725,6 +1735,11 @@ msgstr "Een X.509-certificaat (.cer, .pem) of een openbare OpenPGP-sleutel (.asc
 #, fuzzy
 msgid "An account couldn't be sent and received."
 msgstr "Een account kon niet worden verzonden en ontvangen."
+
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "An account of calendars and address books alone, such as a Nextcloud server's: no mail. Type its address (or the server's), its user name and password, then Find — or type the calendars' and contacts' addresses yourself."
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
@@ -2975,11 +2990,6 @@ msgstr "Agenda en contactpersonen hebben uw toestemming nodig: Bestand › Info 
 #. interface
 #: crates/ui-egui/src/dav_settings.rs
 msgid "Calendars"
-msgstr ""
-
-#. interface
-#: crates/ui-egui/src/dav_settings.rs
-msgid "Calendars and Contacts"
 msgstr ""
 
 #. interface
@@ -14622,7 +14632,7 @@ msgid "Saturday"
 msgstr "zaterdag"
 
 #. android, interface
-#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/CalendarEditor.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/PersonEditor.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/SettingsPages.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/TaskEditorScreen.kt crates/ui-egui/src/account_setup.rs crates/ui-egui/src/dav_settings.rs crates/ui-egui/src/dialogs.rs crates/ui-egui/src/forms.rs crates/ui-egui/src/signatures.rs
+#: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/CalendarEditor.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/PersonEditor.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/SettingsPages.kt apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/TaskEditorScreen.kt crates/ui-egui/src/account_setup.rs crates/ui-egui/src/dialogs.rs crates/ui-egui/src/forms.rs crates/ui-egui/src/signatures.rs
 #, fuzzy
 msgid "Save"
 msgstr "Opslaan"
@@ -17741,6 +17751,11 @@ msgstr "Het account is verdwenen"
 msgid "The account that signed in on Microsoft's page is not an administrator of your organisation, so it could not approve MailCraft. Copy the message for an administrator instead."
 msgstr "Het account dat zich heeft aangemeld op de pagina van Microsoft, is geen beheerder van uw organisatie en kon MailCraft daarom niet goedkeuren. Kopieer in plaats daarvan het bericht voor een beheerder."
 
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "The account was made but MailCraft didn't say which."
+msgstr ""
+
 #. what a command says
 #: crates/engine/src/cmd/calendar_opened.rs
 #, fuzzy
@@ -18767,6 +18782,11 @@ msgstr "De naam die ontvangers zien; leeg uw eigen naam"
 #, fuzzy
 msgid "The name the calendar gives itself"
 msgstr "De naam die de agenda zichzelf geeft"
+
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "The name the servers know you by, which need not be an address; empty: the account's name."
+msgstr ""
 
 #. android
 #: apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/AccountScreens.kt
@@ -21227,9 +21247,19 @@ msgstr "Typen"
 msgid "Type a name in the search box to search the organisation's address list"
 msgstr "Typ een naam in het zoekvak om de adreslijst van de organisatie te doorzoeken"
 
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Type an e-mail address first, or the calendars' and contacts' addresses yourself."
+msgstr ""
+
 #. command label
 #: crates/engine/src/cmd/format.rs
 msgid "Type in Cell"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "Type the account's name or address."
 msgstr ""
 
 #. interface
@@ -21857,6 +21887,11 @@ msgstr "Waaruit het bestaat"
 #, fuzzy
 msgid "What the Send/Receive before came to: the last one brought nothing new"
 msgstr "Resultaat van de vorige Verzenden/ontvangen: de laatste bracht niets nieuws"
+
+#. interface
+#: crates/ui-egui/src/dav_settings.rs
+msgid "What the account is called here: any name that isn't empty, or its e-mail address. An address lets Find look for the server; without one, type the calendar and contact addresses yourself."
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/calendar.rs

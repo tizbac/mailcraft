@@ -31,7 +31,14 @@ use crate::theme::{Tokens, regular};
 
 /// The dialog's state: what the owner is typing.
 pub struct DavSettings {
+    /// The account whose servers these are; 0 while a new account of calendars and address books
+    /// alone is being added (`adding`).
     pub(crate) account: Id,
+    /// Whether this adds an account of calendars and address books alone (no mail), rather than
+    /// changing the servers of one that is here.
+    pub(crate) adding: bool,
+    /// The name the new account is known by (its address, or any name when it keeps no mail).
+    pub(crate) name: String,
     pub(crate) calendars: String,
     pub(crate) contacts: String,
     /// The whole lists of homes the two fields stand for (what is kept, or what Find found): the
@@ -96,12 +103,38 @@ impl DavSettings {
         let first = |homes: Option<&Vec<String>>| homes.and_then(|h| h.first()).cloned().unwrap_or_default();
         Some(Self {
             account,
+            adding: false,
+            name: String::new(),
             calendars: first(server.map(|s| &s.calendar_homes)),
             contacts: first(server.map(|s| &s.contact_homes)),
             calendar_homes: server.map(|s| s.calendar_homes.clone()).unwrap_or_default(),
             contact_homes: server.map(|s| s.contact_homes.clone()).unwrap_or_default(),
             username: server.map(|s| s.username.clone()).unwrap_or_default(),
             separate: server.is_some_and(|s| s.separate_password),
+            password: String::new(),
+            shown: false,
+            error: String::new(),
+            finding: None,
+            found: None,
+        })
+    }
+
+    /// The window for a new account of calendars and address books alone, such as a Nextcloud
+    /// server's (no mail): nothing is read until Save.
+    pub(crate) fn adding(app: &MailApp) -> Option<Self> {
+        if !app.session.dav_enabled {
+            return None;
+        }
+        Some(Self {
+            account: 0,
+            adding: true,
+            name: String::new(),
+            calendars: String::new(),
+            contacts: String::new(),
+            calendar_homes: Vec::new(),
+            contact_homes: Vec::new(),
+            username: String::new(),
+            separate: true,
             password: String::new(),
             shown: false,
             error: String::new(),
@@ -122,18 +155,32 @@ impl DavSettings {
     /// Start the search: from the typed addresses, else from the account's domain. Nothing is
     /// sent before this. False when the host can't search or there is no password.
     pub(crate) fn find(&mut self, app: &MailApp) -> bool {
+        // (A new account is searched for by an e-mail address; a name that isn't one has no
+        // domain to look in, so its addresses are typed instead.)
+        if self.adding && !self.name.contains('@') {
+            return false;
+        }
         let (Some(search), Some(password)) = (app.services.dav_find.as_ref(), self.find_password(app)) else { return false };
-        let Some(a) = app.session.mailbox.account(self.account) else { return false };
+        let (email, mail_host, trusted) = match app.session.mailbox.account(self.account) {
+            Some(a) => (
+                a.email.trim().to_string(),
+                a.incoming.as_ref().map(|s| s.host.trim().to_string()).unwrap_or_default(),
+                a.dav.as_ref().map(|s| s.trusted.clone()).unwrap_or_default(),
+            ),
+            // (A new account: the name it is known by, which may be its address.)
+            None if self.adding => (self.name.trim().to_string(), String::new(), String::new()),
+            None => return false,
+        };
         let (answers, asked) = std::sync::mpsc::channel();
         let cancel = Arc::new(AtomicBool::new(false));
         let job = DavFindJob {
-            email: a.email.trim().to_string(),
-            mail_host: a.incoming.as_ref().map(|s| s.host.trim().to_string()).unwrap_or_default(),
+            email,
+            mail_host,
             username: self.username.trim().to_string(),
             password,
             calendars: self.calendars.trim().to_string(),
             contacts: self.contacts.trim().to_string(),
-            trusted: a.dav.as_ref().map(|s| s.trusted.clone()).unwrap_or_default(),
+            trusted,
             cancel: cancel.clone(),
             answers: asked,
         };
@@ -195,7 +242,8 @@ impl DavSettings {
         card.is_some() && origin_of(self.calendars.trim()).is_some_and(|cal| Some(cal) != card)
     }
 
-    /// Keep the settings, and hold the password typed for its origin. False, with the reason in
+    /// Keep the settings, and hold the password typed for its origin; for a new account, make
+    /// it first (calendars and address books alone, no mail). False, with the reason in
     /// [`DavSettings::error`], when the command refused them.
     pub(crate) fn save(&mut self, app: &mut MailApp) -> bool {
         // (A field as it was stands for its whole list; one the owner changed, for what it says.)
@@ -204,18 +252,66 @@ impl DavSettings {
             typed if list.first().is_some_and(|first| first == typed) => list.to_vec(),
             typed => vec![typed.to_string()],
         };
-        let params = json!({
-            "id": self.account,
-            "calendarHomes": homes(&self.calendars, &self.calendar_homes),
-            "contactHomes": homes(&self.contacts, &self.contact_homes),
-            "username": self.username.trim(),
-            "separatePassword": self.separate,
-        });
-        if let Err(e) = app.execute("account.davSet", params) {
-            self.error = e;
-            return false;
-        }
-        if self.separate
+        let (calendar_homes, contact_homes) = (homes(&self.calendars, &self.calendar_homes), homes(&self.contacts, &self.contact_homes));
+        let account = if self.adding {
+            let name = self.name.trim().to_string();
+            if name.is_empty() {
+                self.error = tl!("Type the account's name or address.").to_string();
+                return false;
+            }
+            let params = json!({
+                "email": name,
+                "kind": "dav",
+                "auth": "password",
+                "username": self.username.trim(),
+                "dav": {
+                    "calendarHomes": calendar_homes,
+                    "contactHomes": contact_homes,
+                    "separatePassword": true,
+                },
+            });
+            match app.execute("account.add", params) {
+                Ok(answer) => match answer.get("id").and_then(serde_json::Value::as_u64) {
+                    Some(id) => id,
+                    None => {
+                        self.error = tl!("The account was made but MailCraft didn't say which.").to_string();
+                        return false;
+                    }
+                },
+                Err(e) => {
+                    self.error = e;
+                    return false;
+                }
+            }
+        } else {
+            let params = json!({
+                "id": self.account,
+                "calendarHomes": calendar_homes,
+                "contactHomes": contact_homes,
+                "username": self.username.trim(),
+                "separatePassword": self.separate,
+            });
+            if let Err(e) = app.execute("account.davSet", params) {
+                self.error = e;
+                return false;
+            }
+            self.account
+        };
+        // (A new account's servers have a password of their own: it is held for each origin they
+        // name, and kept when the owner lets sign-ins be remembered.)
+        if self.adding {
+            // (A new account's servers always have a password of their own: it is held for each
+            // origin they name, and kept when the owner lets sign-ins be remembered.)
+            if !self.password.is_empty() {
+                let origins: Vec<String> = calendar_homes.iter().chain(&contact_homes).filter_map(|home| origin_of(home)).take(16).collect();
+                for origin in origins {
+                    if app.hold_dav_password(account, &origin, &self.password) {
+                        app.remember_dav_password(account, &origin, &self.password);
+                    }
+                    app.dav.trouble.remove(&account);
+                }
+            }
+        } else if self.separate
             && !self.password.is_empty()
             && let Some(origin) = self.password_origin()
             && app.hold_dav_password(self.account, &origin, &self.password)
@@ -260,12 +356,15 @@ pub(crate) fn status(app: &MailApp, a: &Account) -> Option<String> {
 
 pub fn show(ctx: &egui::Context, d: &mut DavSettings, app: &mut MailApp, t: &Tokens, enter: bool) -> Outcome {
     let watch = app.secret_watch();
-    let Some(account) = app.session.mailbox.account(d.account).cloned() else { return Outcome::Close };
-    let who = account.email.trim().to_string();
-    let set_up = account.dav.is_some();
+    let account = app.session.mailbox.account(d.account).cloned();
+    if !d.adding && account.is_none() {
+        return Outcome::Close;
+    }
+    let who = account.as_ref().map(|a| a.email.trim().to_string()).unwrap_or_default();
+    let set_up = account.as_ref().is_some_and(|a| a.dav.is_some());
     let remember = app.ui.remember_sign_in;
     d.poll();
-    let can_find = app.services.dav_find.is_some() && d.finding.is_none() && d.find_password(app).is_some();
+    let can_find = app.services.dav_find.is_some() && d.finding.is_none() && d.find_password(app).is_some() && (!d.adding || d.name.contains('@'));
     // Changes made here that the server's copy changed under: none of them is sent over it.
     let mut held: Vec<(serde_json::Value, String)> =
         app.session.dav_conflicts.iter().filter(|(_, h)| h.account == d.account).map(|(id, h)| (json!({"event": id}), h.title.clone())).collect();
@@ -275,8 +374,25 @@ pub fn show(ctx: &egui::Context, d: &mut DavSettings, app: &mut MailApp, t: &Tok
     held.truncate(50);
     let (mut submit, mut close, mut stop, mut find, mut answer) = (false, false, false, false, None);
     let mut resolved: Option<(serde_json::Value, &'static str)> = None;
-    let open = window(ctx, tl!("Calendars and Contacts"), 480.0, |ui| {
-        ui.label(crate::i18n::fmt(tl!("Where the calendars and contacts of {account} are kept"), &[("account", &who)]));
+    let open = window(ctx, tl!(if d.adding { "Add Calendars and Contacts" } else { "Calendars and Contacts" }), 480.0, |ui| {
+        if d.adding {
+            ui.label(tl!(
+                "An account of calendars and address books alone, such as a Nextcloud server's: no mail. Type its address (or the server's), its user name and password, then Find — or type the calendars' and contacts' addresses yourself."
+            ));
+            ui.label(tl!("Account name"));
+            crate::text_menu::field(
+                ui.add(egui::TextEdit::singleline(&mut d.name).hint_text("your server's name, or you@example.org").desired_width(f32::INFINITY)),
+            );
+            hint(
+                ui,
+                t,
+                tl!(
+                    "What the account is called here: any name that isn't empty, or its e-mail address. An address lets Find look for the server; without one, type the calendar and contact addresses yourself."
+                ),
+            );
+        } else {
+            ui.label(crate::i18n::fmt(tl!("Where the calendars and contacts of {account} are kept"), &[("account", &who)]));
+        }
         ui.label(tl!("Calendars"));
         crate::text_menu::field(
             ui.add(egui::TextEdit::singleline(&mut d.calendars).hint_text("https://dav.example.org/calendars/ada/").desired_width(f32::INFINITY)),
@@ -287,8 +403,17 @@ pub fn show(ctx: &egui::Context, d: &mut DavSettings, app: &mut MailApp, t: &Tok
         );
         hint(ui, t, tl!("The https:// addresses your provider gives for calendars (CalDAV) and contacts (CardDAV). Either may be left empty."));
         ui.label(tl!("User name"));
-        crate::text_menu::field(ui.add(egui::TextEdit::singleline(&mut d.username).hint_text(who.as_str()).desired_width(f32::INFINITY)));
-        hint(ui, t, tl!("Leave it empty to sign in with the account's address."));
+        let login_hint = if d.adding && !d.name.contains('@') { d.name.as_str() } else { who.as_str() };
+        crate::text_menu::field(ui.add(egui::TextEdit::singleline(&mut d.username).hint_text(login_hint).desired_width(f32::INFINITY)));
+        hint(
+            ui,
+            t,
+            if d.adding {
+                tl!("The name the servers know you by, which need not be an address; empty: the account's name.")
+            } else {
+                tl!("Leave it empty to sign in with the account's address.")
+            },
+        );
         ui.checkbox(&mut d.separate, tl!("These servers have a password of their own"));
         if d.separate {
             // (Before an address is typed or found, the field is for the server Find will find.)
@@ -312,7 +437,13 @@ pub fn show(ctx: &egui::Context, d: &mut DavSettings, app: &mut MailApp, t: &Tok
         }
         if app.services.dav_find.is_some() {
             ui.horizontal(|ui| {
-                let tip = if d.find_password(app).is_none() { tl!("Give the password first.") } else { tl!("Look for the servers now.") };
+                let tip = if d.find_password(app).is_none() {
+                    tl!("Give the password first.")
+                } else if d.adding && !d.name.contains('@') {
+                    tl!("Type an e-mail address first, or the calendars' and contacts' addresses yourself.")
+                } else {
+                    tl!("Look for the servers now.")
+                };
                 find = ui.add_enabled(can_find, egui::Button::new(tl!("Find"))).on_hover_text(tip).clicked();
                 if d.finding.is_some() {
                     ui.spinner();
@@ -365,12 +496,14 @@ pub fn show(ctx: &egui::Context, d: &mut DavSettings, app: &mut MailApp, t: &Tok
             }
             None => {}
         }
-        if let Some(line) = status(app, &account) {
+        if let Some(account) = account.as_ref()
+            && let Some(line) = status(app, account)
+        {
             hint(ui, t, &line);
         }
         // A change made here and on the server too: never sent over the server's copy, and kept
         // until the owner says which one (File › Options › When the server's copy changed too).
-        if !held.is_empty() {
+        if !held.is_empty() && !d.adding {
             ui.separator();
             ui.label(tl!("Changed here and on the server too"));
             hint(ui, t, tl!("Nothing was sent over the server's copy. Keep one of the two for each change."));
@@ -392,13 +525,15 @@ pub fn show(ctx: &egui::Context, d: &mut DavSettings, app: &mut MailApp, t: &Tok
             }
         }
         // What a change does when the server's copy changed too: ask (off), or keep both (on).
-        ui.separator();
-        let mut keep_both = app.session.prefs.dav_conflicts == DavConflicts::KeepBoth;
-        if ui.checkbox(&mut keep_both, tl!("When the server's copy changed too, keep both")).changed() {
-            let choice = if keep_both { "keepBoth" } else { "ask" };
-            let _ = app.execute("file.options", json!({"davConflicts": choice}));
+        if !d.adding {
+            ui.separator();
+            let mut keep_both = app.session.prefs.dav_conflicts == DavConflicts::KeepBoth;
+            if ui.checkbox(&mut keep_both, tl!("When the server's copy changed too, keep both")).changed() {
+                let choice = if keep_both { "keepBoth" } else { "ask" };
+                let _ = app.execute("file.options", json!({"davConflicts": choice}));
+            }
+            hint(ui, t, tl!("Off: MailCraft asks which copy to keep. On: the server's is read, and what changed here is kept as a copy of its own."));
         }
-        hint(ui, t, tl!("Off: MailCraft asks which copy to keep. On: the server's is read, and what changed here is kept as a copy of its own."));
         if !d.error.is_empty() {
             ui.label(egui::RichText::new(d.error.as_str()).color(t.red));
         }
@@ -409,8 +544,8 @@ pub fn show(ctx: &egui::Context, d: &mut DavSettings, app: &mut MailApp, t: &Tok
                 .clicked();
         }
         hint(ui, t, tl!("Saving sends nothing. MailCraft reads the servers at its next run."));
-        let ready = !(d.calendars.trim().is_empty() && d.contacts.trim().is_empty());
-        let (ok, cancel) = buttons(ui, tl!("Save"), ready);
+        let ready = !(d.calendars.trim().is_empty() && d.contacts.trim().is_empty()) && (!d.adding || !d.name.trim().is_empty());
+        let (ok, cancel) = buttons(ui, tl!(if d.adding { "Add Account" } else { "Save" }), ready);
         submit = ok || (enter && ready);
         close = cancel;
     });

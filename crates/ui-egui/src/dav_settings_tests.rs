@@ -301,3 +301,68 @@ fn a_missing_password_is_asked_for_once_not_twice() {
     assert!(a.hold_dav_password(id, CAL, "own"));
     assert!(status(&a, a.session.mailbox.account(id).unwrap()).is_some());
 }
+
+#[test]
+fn a_new_account_of_calendars_and_contacts_alone_is_added_with_its_servers() {
+    let (mut a, _) = app();
+    let mut d = DavSettings::adding(&a).expect("the window opens while the feature is on");
+    assert!(d.adding && d.account == 0);
+    d.name = "ada-dav@example.org".into();
+    d.username = "ada".into();
+    d.password = "dav-secret".into();
+    d.calendars = format!("{CAL}/calendars/ada/");
+    d.contacts = format!("{CARD}/addressbooks/ada/");
+    assert!(d.save(&mut a), "{}", d.error);
+    let made = a
+        .session
+        .mailbox
+        .accounts
+        .iter()
+        .find(|a| a.email == "ada-dav@example.org" && a.kind == mailcraft_model::AccountKind::Dav)
+        .expect("a calendars and contacts account");
+    let server = made.dav.clone().expect("with its servers");
+    assert_eq!(server.calendar_homes, vec![format!("{CAL}/calendars/ada/")]);
+    assert_eq!(server.contact_homes, vec![format!("{CARD}/addressbooks/ada/")]);
+    assert!(server.separate_password, "the servers have a password of their own");
+    assert!(made.incoming.is_none() && made.outgoing.is_none(), "no mail");
+    // The password is held for each of their origins, and no other.
+    assert_eq!(a.dav_passwords.get(&(made.id, CAL.into())).map(String::as_str), Some("dav-secret"));
+    assert_eq!(a.dav_passwords.get(&(made.id, CARD.into())).map(String::as_str), Some("dav-secret"));
+    assert_eq!(a.dav_passwords.len(), 2);
+}
+
+#[test]
+fn a_new_account_is_not_made_without_a_name() {
+    let (mut a, _) = app();
+    let mut d = DavSettings::adding(&a).unwrap();
+    d.calendars = format!("{CAL}/calendars/ada/");
+    d.password = "dav-secret".into();
+    assert!(!d.save(&mut a));
+    assert!(d.error.contains("name"), "{}", d.error);
+    assert!(!a.session.mailbox.accounts.iter().any(|a| a.kind == mailcraft_model::AccountKind::Dav));
+}
+
+#[test]
+fn a_new_account_may_be_named_anything_not_an_address() {
+    let (mut a, _) = app();
+    let mut d = DavSettings::adding(&a).unwrap();
+    // (A Nextcloud login need not be an e-mail address: the account's name may be any name.)
+    d.name = "nextcloud".into();
+    d.username = "ada".into();
+    d.password = "dav-secret".into();
+    d.calendars = format!("{CAL}/calendars/ada/");
+    assert!(d.save(&mut a), "{}", d.error);
+    let made = a
+        .session
+        .mailbox
+        .accounts
+        .iter()
+        .find(|a| a.kind == mailcraft_model::AccountKind::Dav && a.email == "nextcloud")
+        .expect("the account, named as it was");
+    assert_eq!(made.username, "ada", "the user name as typed");
+    // (Find needs an address to look in; a name that isn't one types the addresses instead.)
+    let mut again = DavSettings::adding(&a).unwrap();
+    again.name = "nextcloud".into();
+    again.password = "dav-secret".into();
+    assert!(!again.find(&a));
+}

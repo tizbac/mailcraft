@@ -447,6 +447,10 @@ impl Dialog {
             }
             "davPassword" => Dialog::DavPassword(Box::new(crate::dav_password_ask::DavPasswordAsk::open(app, id("id")?)?)),
             "davSettings" => {
+                if params.get("add").and_then(Value::as_bool) == Some(true) {
+                    // A new account of calendars and address books alone (a Nextcloud server's).
+                    return Some(Dialog::DavSettings(Box::new(crate::dav_settings::DavSettings::adding(app)?)));
+                }
                 // For the account named, else the first that can have them.
                 let account = match id("id") {
                     Some(id) => id,

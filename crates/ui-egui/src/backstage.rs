@@ -373,6 +373,17 @@ fn info(app: &mut MailApp, ui: &mut Ui, t: &Tokens) {
     ) {
         let _ = app.run("ui.dialog", json!({"name": "account"}));
     }
+    // Calendars and address books of a server of their own, with no mail (#209): a Nextcloud,
+    // Fastmail, iCloud or self-hosted server.
+    if tile(
+        ui,
+        "calendar",
+        tl!("Add Calendars and Contacts Account"),
+        tl!("A Nextcloud, Fastmail, iCloud or other server's calendars and address books, kept both ways: no mail. Nothing is read until you save."),
+        t,
+    ) {
+        let _ = app.run("ui.dialog", json!({"name": "davSettings", "add": true}));
+    }
     crate::auto_replies::info_tiles(app, ui, t);
     // The calendar of an account that signs in with Microsoft is kept on its server: the owner
     // can see for himself that what is changed here arrives there.
