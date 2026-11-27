@@ -101,11 +101,8 @@ fn read_book(endpoint: &Endpoint, book: &str, name: &str, trusted: &str, out: &m
     if entries.truncated || entries.capped {
         out.complete = false;
     }
-    let mut hrefs: Vec<&str> = entries
-        .members()
-        .filter(|entry| !entry.is_collection && !entry.is_base && entry.status < 400)
-        .map(|entry| entry.href.as_str())
-        .collect();
+    let mut hrefs: Vec<&str> =
+        entries.members().filter(|entry| !entry.is_collection && !entry.is_base && entry.status < 400).map(|entry| entry.href.as_str()).collect();
     if hrefs.len() > MOST_CONTACTS {
         out.complete = false;
         hrefs.truncate(MOST_CONTACTS);

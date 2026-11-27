@@ -17,8 +17,8 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{Receiver, TryRecvError};
 
-use mailcraft_engine::Session;
 use crate::dav_contacts::ContactRead;
+use mailcraft_engine::Session;
 use mailcraft_model::{Account, DavAsk, DavDownload, DavProblem, Id};
 
 use crate::sync::{Inner, SyncHost};
