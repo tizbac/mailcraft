@@ -17,7 +17,6 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{Receiver, TryRecvError};
 
-use crate::dav_contacts::ContactRead;
 use mailcraft_engine::Session;
 use mailcraft_model::{Account, DavAsk, DavDownload, DavProblem, Id};
 
@@ -33,14 +32,18 @@ const REFUSED_FOR: f64 = 4.0 * 3_600_000.0;
 #[derive(Default)]
 pub(crate) struct DavAnswer {
     pub calendar: Option<DavDownload>,
-    pub contacts: Option<ContactRead>,
+    pub contacts: Option<mailcraft_net::dav_contacts::ContactRead>,
+    /// What the server made of the contacts made, changed or deleted here.
+    pub uploaded: Option<mailcraft_model::remote::ContactsUploaded>,
 }
 
-/// The account and passwords an address book read is made with.
+/// The account and passwords an address book read and its changes are made with.
 #[derive(Clone)]
 pub(crate) struct ContactsJob {
     pub account: Account,
     pub passwords: HashMap<String, String>,
+    /// The contacts made, changed or deleted here, to tell the server before reading it again.
+    pub changes: Option<mailcraft_model::remote::ContactsUpload>,
 }
 
 /// How a DAV read is made: over the network, or as a test says.
@@ -50,21 +53,27 @@ pub(crate) type DavRunner = Arc<dyn Fn(DavAsk, ContactsJob) -> DavAnswer + Send 
 pub(crate) fn default_runner() -> DavRunner {
     #[cfg(test)]
     return Arc::new(|ask: DavAsk, job: ContactsJob| {
-        let _ = job.account;
-        DavAnswer { calendar: (!ask.homes.is_empty()).then_some(DavDownload { account: ask.account, ..Default::default() }), contacts: None }
+        let _ = (job.account, job.changes);
+        DavAnswer {
+            calendar: (!ask.homes.is_empty()).then_some(DavDownload { account: ask.account, ..Default::default() }),
+            contacts: None,
+            uploaded: None,
+        }
     });
     #[cfg(not(test))]
     Arc::new(|ask: DavAsk, job: ContactsJob| {
         // (A certificate the owner chose to trust is in the settings; a refusal comes back in the
         // download's problem and is said there.)
         let calendar = (!ask.homes.is_empty()).then(|| mailcraft_net::dav::look(&ask, &|origin| job.passwords.get(origin).cloned()).0);
-        let contacts = job
-            .account
-            .dav
+        let has_books = job.account.dav.as_ref().is_some_and(|server| !server.contact_homes.is_empty());
+        // (The changes first, as a Send/Receive does: the read then brings the server's copies.)
+        let uploaded = job
+            .changes
             .as_ref()
-            .is_some_and(|server| !server.contact_homes.is_empty())
-            .then(|| crate::dav_contacts::read(&job.account, &job.passwords));
-        DavAnswer { calendar, contacts }
+            .filter(|changes| has_books && !changes.ops.is_empty())
+            .map(|changes| mailcraft_net::dav_contacts::push(&job.account, changes, &job.passwords));
+        let contacts = has_books.then(|| mailcraft_net::dav_contacts::read(&job.account, &job.passwords));
+        DavAnswer { calendar, contacts, uploaded }
     })
 }
 
@@ -78,7 +87,7 @@ pub(crate) enum DavStart {
 
 /// What to read for an account that keeps address books and no calendars: the engine's calendar
 /// request is for calendars alone, so the account is named here and the books are read by
-/// [`crate::dav_contacts`].
+/// [`mailcraft_net::dav_contacts`].
 fn contact_only_ask(session: &Session, skip: &[Id]) -> Option<DavAsk> {
     let account = session
         .mailbox
@@ -175,6 +184,14 @@ impl DavJobs {
                 problem = contacts.problem;
             }
         }
+        if let Some(uploaded) = answer.uploaded
+            && let Err(e) = mailcraft_engine::cmd::remote::apply_book_contact_outcomes(session, &uploaded)
+        {
+            log::warn!("what an address book server made of the changes couldn't be taken in: {e}");
+            if problem == DavProblem::None {
+                problem = DavProblem::ServerErrors;
+            }
+        }
         Some((account, problem, wait))
     }
 
@@ -221,7 +238,8 @@ impl DavJobs {
         let runner = host.dav_runner();
         let account_for_job = session.mailbox.account(account).cloned();
         let Some(account_for_job) = account_for_job else { return DavStart::None };
-        let job = ContactsJob { account: account_for_job, passwords };
+        let changes = mailcraft_engine::cmd::remote::book_contact_upload(session, account).filter(|changes| !changes.is_empty());
+        let job = ContactsJob { account: account_for_job, passwords, changes };
         let (sender, reply) = std::sync::mpsc::channel::<DavAnswer>();
         let cancel = Arc::new(AtomicBool::new(false));
         let spawned = std::thread::Builder::new().name("mailcraft-dav".to_string()).spawn(move || {
@@ -229,6 +247,7 @@ impl DavJobs {
             let answer = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| runner(ask, job))).unwrap_or_else(|_| DavAnswer {
                 calendar: Some(DavDownload { account, problem: DavProblem::Unreachable, ..Default::default() }),
                 contacts: None,
+                uploaded: None,
             });
             let _ = sender.send(answer);
         });

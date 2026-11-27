@@ -24590,6 +24590,11 @@ msgid "no change of event {id} is waiting for you"
 msgstr ""
 
 #. what a command says
+#: crates/engine/src/cmd/dav_sync.rs
+msgid "no change of that contact is waiting for you"
+msgstr ""
+
+#. what a command says
 #: crates/engine/src/cmd/attach_item.rs crates/engine/src/cmd/contacts_move.rs crates/engine/src/cmd/people.rs crates/engine/src/cmd/people_merge.rs
 #, fuzzy
 msgid "no contact with id {id}"
@@ -25227,6 +25232,11 @@ msgstr "თემა ან ტექსტი შეიცავს {words}"
 #. what a command says
 #: crates/engine/src/cmd/contacts_opened.rs
 msgid "that account can't open an address book by address"
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/dav_sync.rs
+msgid "that change is gone"
 msgstr ""
 
 #. what a command says

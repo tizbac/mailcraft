@@ -122,6 +122,7 @@ fn contacts_calendars_and_todos_go_up_and_come_back() {
         card: mailcraft_vcard::write(&[&changed]),
         etag: change_key.clone(),
         token: "e2e-contact-token-2".into(),
+        force: false,
     };
     let sent = run(
         &base,
@@ -146,6 +147,7 @@ fn contacts_calendars_and_todos_go_up_and_come_back() {
         card: String::new(),
         etag: now.change_key.clone(),
         token: "e2e-contact-token-3".into(),
+        force: false,
     };
     let sent = run(
         &base,

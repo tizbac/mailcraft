@@ -80,6 +80,8 @@ pub struct HeldConflict {
     pub title: String,
     /// When the conflict was found (Unix seconds).
     pub since: i64,
+    /// The contact it is about, for a contact; 0 for an event (which is keyed by its own id).
+    pub contact: Id,
 }
 /// Most events one resource is taken to hold (a series with its changed occurrences).
 const MAX_PER_RESOURCE: usize = 1_000;
@@ -108,7 +110,7 @@ pub fn specs() -> Vec<CommandSpec> {
             .params("{} — the changes made here whose server's copy changed too, so that sending them would put over it: each with its event, account, title and when it was found. Keep one with `sync.davResolve`.")
             .when(available),
         CommandSpec::new("sync.davResolve", "Settle a Calendar Change", "Send / Receive", resolve)
-            .params(r#"{"event": number, "keep": "mine"|"theirs"} — a change whose server's copy changed too (`sync.davConflicts`): keep what was changed here (it goes up over the server's copy at the next Send/Receive) or the server's (the change is given up, and its copy is read). Never over the server's without this."#)
+            .params(r#"{"event"?: number, "href"?: string (the resource a contact's card is at, as `sync.davConflicts` lists it), "keep": "mine"|"theirs"} — a change whose server's copy changed too (`sync.davConflicts`): keep what was changed here (it goes up over the server's copy at the next Send/Receive) or the server's (the change is given up, and its copy is read). Never over the server's without this."#)
             .when(available),
         CommandSpec::new("sync.davChanges", "Calendar and Contacts Changes to Send", "Send / Receive", changes)
             .pure()
@@ -295,7 +297,7 @@ fn take_updated(s: &mut Session, account: Id, updated: &[DavUpdated], offset_at:
             } else {
                 let title = s.mailbox.event_changes.get(at).and_then(|c| c.base.as_ref()).map(|b| b.title.clone()).unwrap_or_default();
                 took.kept.push(title.clone());
-                s.dav_conflicts.insert(event, HeldConflict { account, title, since: s.now() });
+                s.dav_conflicts.insert(event, HeldConflict { account, title, since: s.now(), contact: 0 });
                 changed = true;
             }
             // (Read whole again, so that the owner is asked about the copy the server has now.)
@@ -483,37 +485,76 @@ fn uploaded(_: &mut Session, _: &Value) -> CmdResult {
 /// What waits for the owner: changes made here that the server's copy changed under (`take_updated`
 /// holds them; [`Prefs::dav_conflicts`](crate::session::Prefs)).
 fn conflicts(s: &mut Session, _: &Value) -> CmdResult {
-    let list: Vec<Value> = s
+    let mut list: Vec<Value> = s
         .dav_conflicts
         .iter()
         .take(200)
-        .map(|(event, held)| json!({"event": event, "account": held.account, "title": held.title, "since": held.since}))
+        .map(|(event, held)| json!({"kind": "event", "event": event, "account": held.account, "title": held.title, "since": held.since}))
         .collect();
+    list.extend(s.dav_contact_conflicts.iter().take(200).map(|(href, held)| {
+        json!({"kind": "contact", "href": href, "id": held.contact, "account": held.account, "title": held.title, "since": held.since})
+    }));
     Ok(json!({"conflicts": list}))
 }
 
 /// Which copy the owner keeps for one held change: `mine` (it goes up over the server's copy at the
 /// next Send/Receive, with the ETag the server had when the conflict was found) or `theirs` (the
-/// change is given up, and the server's copy is read).
+/// change is given up, and the server's copy is read). An event is named by `event`, a contact by
+/// the resource the server calls its card (`href`, as `sync.davConflicts` lists it).
 fn resolve(s: &mut Session, v: &Value) -> CmdResult {
-    let event = p::req_id(v, "event")?;
     let keep = p::req_str(v, "keep")?;
-    let Some(held) = s.dav_conflicts.remove(&event) else {
-        return Err(failed!("no change of event {id} is waiting for you", id = event));
-    };
-    match keep.trim() {
-        "mine" => {}
-        "theirs" => {
-            s.mailbox.event_changes.retain(|c| !(c.account == held.account && c.event == event && c.kind == EventChangeKind::Update));
-            // (Its ETag here is the one the change was made on, not the server's: the next read
-            // brings the copy as the server has it now.)
-            if let Ok(e) = s.mailbox.event_mut(event) {
-                e.origin.change_key.clear();
+    if let Some(event) = v.get("event").and_then(Value::as_u64) {
+        let Some(held) = s.dav_conflicts.remove(&event) else {
+            return Err(failed!("no change of event {id} is waiting for you", id = event));
+        };
+        match keep.trim() {
+            "mine" => {}
+            "theirs" => {
+                s.mailbox.event_changes.retain(|c| !(c.account == held.account && c.event == event && c.kind == EventChangeKind::Update));
+                // (Its ETag here is the one the change was made on, not the server's: the next
+                // read brings the copy as the server has it now.)
+                if let Ok(e) = s.mailbox.event_mut(event) {
+                    e.origin.change_key.clear();
+                }
             }
+            _ => return Err(bad("`keep` is \"mine\" or \"theirs\"")),
         }
-        _ => return Err(bad("`keep` is \"mine\" or \"theirs\"")),
+        return Ok(json!({"event": event, "kept": keep.trim()}));
     }
-    Ok(json!({"event": event, "kept": keep.trim()}))
+    if let Some(href) = v.get("href").and_then(Value::as_str) {
+        let key = super::remote::contact_key(href).to_string();
+        let Some(held) = s.dav_contact_conflicts.remove(&key) else {
+            return Err(fail("no change of that contact is waiting for you"));
+        };
+        let at = s.mailbox.book_contact_changes.iter().position(|c| c.account == held.account && super::remote::contact_key(&c.remote) == key);
+        match keep.trim() {
+            "mine" => {
+                let Some(at) = at else { return Err(fail("that change is gone")) };
+                if let Some(change) = s.mailbox.book_contact_changes.get_mut(at) {
+                    // (The owner's own choice: it is put over the server's copy whatever version
+                    // the server has, which is what `force` means.)
+                    change.force = true;
+                    change.etag.clear();
+                    change.name.clone_from(&held.title);
+                }
+            }
+            "theirs" => {
+                if let Some(at) = at {
+                    s.mailbox.book_contact_changes.remove(at);
+                }
+                // (The next read brings the card as the server has it now.)
+                if held.contact != 0
+                    && let Ok(contact) = s.mailbox.contact_mut(held.contact)
+                {
+                    contact.origin.change_key.clear();
+                }
+            }
+            _ => return Err(bad("`keep` is \"mine\" or \"theirs\"")),
+        }
+        s.mailbox_changed();
+        return Ok(json!({"contact": key, "kept": keep.trim()}));
+    }
+    Err(bad("`event` or `contact` is required"))
 }
 
 /// The account has no calendar server any more, or another one: what the old one gave goes (its

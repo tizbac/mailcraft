@@ -67,7 +67,7 @@ fn app(store: &Arc<Store>, separate: bool) -> (MailApp, Id, Sent) {
         seen.lock().unwrap().push(job.passwords.clone());
         let (send, receive) = std::sync::mpsc::channel();
         let download = DavDownload { account: job.ask.account, email: job.ask.email.clone(), server: job.ask.server.clone(), ..Default::default() };
-        send.send(DavDone { download }).unwrap();
+        send.send(DavDone { download, ..Default::default() }).unwrap();
         receive
     }));
     (a, id, sent)
@@ -186,7 +186,7 @@ fn signing_in(store: &Arc<Store>, separate: bool, took: bool) -> (MailApp, Id, S
             problem,
             ..Default::default()
         };
-        send.send(DavDone { download }).unwrap();
+        send.send(DavDone { download, ..Default::default() }).unwrap();
         receive
     }));
     (a, id, sent)

@@ -1439,11 +1439,20 @@ fn build_services(
         dav: Some(Box::new(move |job: mailcraft_ui_egui::DavJob| {
             background(&dav_ctx, "calendar server", move || {
                 let passwords = job.passwords;
+                // (The contacts made, changed or deleted here first, as a Send/Receive does: the
+                // read then brings the server's copies, with whatever it made of them.)
+                let uploaded = job.contacts.as_ref().map(|changes| mailcraft_net::dav_contacts::push(&job.account, changes, &passwords));
                 let (download, certificate) = mailcraft_net::dav::look(&job.ask, &|origin: &str| passwords.get(origin).cloned());
                 if certificate.is_some() {
                     log::warn!("a calendar server's certificate isn't one the system or the owner trusts");
                 }
-                mailcraft_ui_egui::DavDone { download }
+                let contacts = job
+                    .account
+                    .dav
+                    .as_ref()
+                    .filter(|d| !d.contact_homes.is_empty())
+                    .map(|_| mailcraft_net::dav_contacts::read(&job.account, &passwords));
+                mailcraft_ui_egui::DavDone { download, contacts, uploaded }
             })
         })),
         // Find in File › Info › Calendars and Contacts: the search, on the owner's click, asking

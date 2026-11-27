@@ -556,6 +556,10 @@ pub struct ContactOp {
     /// older answer cannot clear a newer edit of the same card.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub token: String,
+    /// The owner chose this copy over the server's, which changed since (`sync.davResolve`): it
+    /// is put over the server's whatever version it has. Only ever set by that answer.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub force: bool,
 }
 
 /// A change to a contact that lives on an account's server and that server is yet to receive. It
@@ -580,6 +584,10 @@ pub struct ContactChange {
     /// The generation of this change; an answer names the one it settles.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub token: String,
+    /// The owner chose this copy over the server's, which changed since (`sync.davResolve`): it
+    /// is put over the server's whatever version it has. Only ever set by that answer.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub force: bool,
 }
 
 /// The contacts made here that a server is yet to receive. It is kept in the mailbox so closing

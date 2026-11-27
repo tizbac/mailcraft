@@ -3755,7 +3755,7 @@ fn resource_key(id: &str) -> &str {
 }
 
 /// [`resource_key`] for a contact.
-fn contact_key(id: &str) -> &str {
+pub(crate) fn contact_key(id: &str) -> &str {
     resource_key(id)
 }
 
@@ -3767,6 +3767,9 @@ pub fn book_contact_upload(s: &Session, account: Id) -> Option<ContactsUpload> {
         .mailbox
         .book_contact_changes
         .iter()
+        // (A change the server's copy changed under is not sent again until the owner says which
+        // copy to keep: `sync.davConflicts`.)
+        .filter(|change| !s.dav_contact_conflicts.contains_key(contact_key(&change.remote)))
         .filter(|change| change.account == account)
         .take(mailcraft_model::remote::MAX_CONTACT_OPS)
         .map(|change| ContactOp {
@@ -3778,6 +3781,7 @@ pub fn book_contact_upload(s: &Session, account: Id) -> Option<ContactsUpload> {
             card: change.card.clone(),
             etag: change.etag.clone(),
             token: change.token.clone(),
+            force: change.force,
         })
         .collect();
     for contact in s
@@ -3804,6 +3808,7 @@ pub fn book_contact_upload(s: &Session, account: Id) -> Option<ContactsUpload> {
             card: text,
             etag: String::new(),
             token: uid,
+            force: false,
         });
     }
     (!ops.is_empty()).then(|| ContactsUpload { account, email: found.email.trim().to_string(), ops })
@@ -3838,6 +3843,7 @@ pub fn note_book_contact_changed(mailbox: &mut Mailbox, contact: &Contact, kind:
             etag: contact.origin.change_key.clone(),
             name: contact.name(),
             token,
+            force: false,
         });
     } else {
         let mut card = contact.clone();
@@ -3856,6 +3862,7 @@ pub fn note_book_contact_changed(mailbox: &mut Mailbox, contact: &Contact, kind:
             etag: contact.origin.change_key.clone(),
             name: contact.name(),
             token,
+            force: false,
         });
     }
     if mailbox.book_contact_changes.len() > MAX_CONTACT_CHANGES {
@@ -3875,6 +3882,26 @@ pub fn apply_book_contact_outcomes(s: &mut Session, uploaded: &ContactsUploaded)
         // Older or partial answers may not carry the address; the change itself does.
         let address = if outcome.remote.trim().is_empty() { &outcome.op.remote } else { &outcome.remote };
         let remote = contact_key(address);
+        // The server's copy changed too (412: the ETag the change was made on is no longer the
+        // server's): it is never put over. What was changed here is held, and the owner is asked
+        // which copy to keep (`sync.davConflicts`), or both are kept, as the settings say.
+        let from_a_server = s.mailbox.account(uploaded.account).is_some_and(|a| a.dav.is_some());
+        if from_a_server && matches!(outcome.status, 412 | 409) && outcome.op.kind != ContactChangeKind::Create {
+            if s.prefs.dav_conflicts == crate::DavConflicts::KeepBoth {
+                keep_both_contact(s, uploaded.account, remote);
+                continue;
+            }
+            if let Some(change) = s.mailbox.book_contact_changes.iter().find(|c| c.account == uploaded.account && contact_key(&c.remote) == remote) {
+                let held = crate::cmd::dav_sync::HeldConflict {
+                    account: uploaded.account,
+                    title: change.name.clone(),
+                    since: s.now(),
+                    contact: change.contact,
+                };
+                s.dav_contact_conflicts.insert(remote.to_string(), held);
+            }
+            continue;
+        }
         // Done and Gone are settled. A refusal is settled too: asking again would meet the same
         // permission, and dropping the note lets the next read put back what the server has.
         let settled = matches!(outcome.result, EventResult::Done | EventResult::Gone | EventResult::Denied | EventResult::Refused);
@@ -3936,6 +3963,7 @@ pub fn apply_book_contact_outcomes(s: &mut Session, uploaded: &ContactsUploaded)
                             etag: String::new(),
                             name,
                             token: new_token(outcome.op.contact, s.rev() ^ s.now().unsigned_abs().rotate_left(56)),
+                            force: false,
                         });
                         saved += 1;
                     }
@@ -3957,6 +3985,7 @@ pub fn apply_book_contact_outcomes(s: &mut Session, uploaded: &ContactsUploaded)
                                 etag: String::new(),
                                 name: String::new(),
                                 token: new_token(outcome.op.contact, s.rev() ^ s.now().unsigned_abs().rotate_left(48)),
+                                force: false,
                             });
                             saved += 1;
                         }
@@ -3970,6 +3999,28 @@ pub fn apply_book_contact_outcomes(s: &mut Session, uploaded: &ContactsUploaded)
         s.mailbox_changed();
     }
     Ok(json!({"saved": saved}))
+}
+
+/// The owner keeps both, for a contact whose server's copy changed too: the server's copy is read
+/// (the change is given up), and what was changed here is kept as a contact of its own in the same
+/// address book, to be made there as a new card. A deletion has nothing to keep here: the server's
+/// copy comes back.
+fn keep_both_contact(s: &mut Session, account: Id, remote: &str) {
+    let Some(at) = s.mailbox.book_contact_changes.iter().position(|c| c.account == account && contact_key(&c.remote) == remote) else {
+        return;
+    };
+    let change = s.mailbox.book_contact_changes.remove(at);
+    if change.kind == ContactChangeKind::Delete {
+        return;
+    }
+    let Some(mut copy) = s.mailbox.contact(change.contact).cloned() else { return };
+    copy.id = 0;
+    copy.origin = Origin { account, ..Default::default() };
+    copy.uid = String::new();
+    copy.book_id = change.book.clone();
+    let id = s.mailbox.add_contact(copy);
+    let _ = id;
+    s.mailbox_changed();
 }
 
 /// Remove everything that came from the server of `account`: its events, its contacts and the

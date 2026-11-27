@@ -78,3 +78,103 @@ fn a_read_only_address_book_is_not_offered_a_new_contact() {
         .to_string();
     assert!(why.contains("can't be written"), "{why}");
 }
+
+/// A session with an account whose calendars and address books are on a server, and one writable
+/// book of it: the address book's changes are the server's to take.
+fn dav_session() -> (Session, u64) {
+    let mut s = Session::at(crate::sample::mailbox(NOW, 0), NOW, 0);
+    s.dav_enabled = true;
+    let account = s
+        .run("account.add", &json!({"email": "dav@example.org", "incoming": {"host": "imap.example.org"}, "outgoing": {"host": "smtp.example.org"}}))
+        .unwrap()["id"]
+        .as_u64()
+        .unwrap();
+    s.run("account.davSet", &json!({"id": account, "contactHomes": ["https://mail.example.org/carddav/dav@example.org/"]})).unwrap();
+    s.mailbox.contact_books.push(ContactBook { account, id: BOOK.into(), name: "My contacts".into(), rights: Rights::Edit });
+    (s, account)
+}
+
+/// A contact of the book that the server has as `href` at the ETag `etag`, with a change of its
+/// company waiting to go up.
+fn changed_contact(s: &mut Session, account: u64, href: &str, etag: &str) -> u64 {
+    let id = s.run("people.new", &json!({"first": "Ada", "last": "Lovelace", "addressBook": BOOK})).unwrap()["id"].as_u64().unwrap();
+    {
+        let contact = s.mailbox.contact_mut(id).unwrap();
+        contact.origin.account = account;
+        contact.origin.id = href.to_string();
+        contact.origin.change_key = etag.to_string();
+    }
+    s.run("people.edit", &json!({"id": id, "company": "Analytical Engines"})).unwrap();
+    id
+}
+
+/// The answer a server gives a change it has changed since: 412.
+fn conflicted(s: &mut Session, account: u64, upload: &mailcraft_model::remote::ContactsUpload) -> ContactsUploaded {
+    let op = upload.ops[0].clone();
+    let uploaded = ContactsUploaded {
+        account,
+        email: upload.email.clone(),
+        outcomes: vec![ContactOutcome {
+            op,
+            result: EventResult::Failed,
+            remote: String::new(),
+            status: 412,
+            error: "the server's copy changed since".into(),
+        }],
+    };
+    remote::apply_book_contact_outcomes(s, &uploaded).unwrap();
+    uploaded
+}
+
+#[test]
+fn a_contact_the_server_changed_too_is_kept_until_the_owner_says_which_to_keep() {
+    let (mut s, account) = dav_session();
+    let id = changed_contact(&mut s, account, &format!("{BOOK}ada.vcf"), "\"7\"");
+    let upload = remote::book_contact_upload(&s, account).expect("the change");
+    conflicted(&mut s, account, &upload);
+    // Held: nothing more goes up, and the owner is asked.
+    assert!(s.dav_contact_conflicts.len() == 1);
+    assert!(remote::book_contact_upload(&s, account).is_none(), "held, not sent over it");
+    let asked = s.run("sync.davConflicts", &json!({})).unwrap();
+    let asked = asked["conflicts"].as_array().unwrap();
+    let row = asked.iter().find(|row| row["kind"] == "contact").expect("the contact is listed");
+    let href = row["href"].as_str().expect("the resource, as the window sends it back").to_string();
+    assert!(href.ends_with("/ada.vcf"), "{href}");
+    // Keep mine: the change goes up over the server's copy whatever version it has.
+    s.run("sync.davResolve", &json!({"href": href.clone(), "keep": "mine"})).unwrap();
+    let up = remote::book_contact_upload(&s, account).expect("kept, it goes up");
+    assert!(up.ops[0].force, "over the server's copy");
+    assert!(up.ops[0].card.contains("ORG:Analytical Engines"));
+    assert_eq!(up.ops[0].contact, id);
+}
+
+#[test]
+fn a_contact_change_given_up_for_the_servers_copy_waits_to_be_read() {
+    let (mut s, account) = dav_session();
+    let id = changed_contact(&mut s, account, &format!("{BOOK}ada.vcf"), "\"7\"");
+    let upload = remote::book_contact_upload(&s, account).expect("the change");
+    conflicted(&mut s, account, &upload);
+    let href = s.dav_contact_conflicts.keys().next().cloned().expect("the conflict's resource");
+    s.run("sync.davResolve", &json!({"href": href, "keep": "theirs"})).unwrap();
+    assert!(s.dav_contact_conflicts.is_empty());
+    assert!(remote::book_contact_upload(&s, account).is_none(), "given up");
+    // (Its ETag is the one the change was made on, not the server's: the next read brings the
+    // card as the server has it now.)
+    assert_eq!(s.mailbox.contact(id).unwrap().origin.change_key, "");
+}
+
+#[test]
+fn a_contact_conflict_with_both_kept_makes_a_copy_in_the_same_book() {
+    let (mut s, account) = dav_session();
+    s.run("file.options", &json!({"davConflicts": "keepBoth"})).unwrap();
+    let id = changed_contact(&mut s, account, &format!("{BOOK}ada.vcf"), "\"7\"");
+    let upload = remote::book_contact_upload(&s, account).expect("the change");
+    conflicted(&mut s, account, &upload);
+    assert!(s.dav_contact_conflicts.is_empty(), "nothing is asked");
+    assert!(s.mailbox.book_contact_changes.is_empty(), "the change is gone");
+    let up = remote::book_contact_upload(&s, account).expect("the copy waits");
+    assert_eq!(up.ops[0].kind, mailcraft_model::remote::ContactChangeKind::Create, "a new card");
+    assert_ne!(up.ops[0].contact, id, "a copy of its own");
+    assert_eq!(up.ops[0].book, BOOK);
+    assert!(up.ops[0].card.contains("ORG:Analytical Engines"));
+}

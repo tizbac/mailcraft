@@ -34,6 +34,7 @@ mod autoconfig;
 mod cert;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod dav;
+pub mod dav_contacts;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod dav_find;
 #[cfg(not(target_arch = "wasm32"))]

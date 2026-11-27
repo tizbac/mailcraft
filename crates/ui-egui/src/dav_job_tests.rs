@@ -93,7 +93,7 @@ fn a_job_is_started_with_the_homes_passwords_and_its_answer_is_taken_in_once() {
             signed_in: vec![HOME.into()],
             ..Default::default()
         };
-        send.send(DavDone { download }).unwrap();
+        send.send(DavDone { download, ..Default::default() }).unwrap();
         receive
     }));
     a.dav_tick();
@@ -152,7 +152,7 @@ fn failing_job(a: &mut MailApp, problem: mailcraft_model::DavProblem) -> Arc<Mut
             problem,
             ..Default::default()
         };
-        send.send(DavDone { download }).unwrap();
+        send.send(DavDone { download, ..Default::default() }).unwrap();
         receive
     }));
     jobs
@@ -252,7 +252,7 @@ fn one_account_in_trouble_does_not_hold_up_another() {
             problem,
             ..Default::default()
         };
-        send.send(DavDone { download }).unwrap();
+        send.send(DavDone { download, ..Default::default() }).unwrap();
         receive
     }));
     for _ in 0..4 {
@@ -279,7 +279,7 @@ fn what_is_held_is_the_password_that_was_sent_not_what_would_be_found_now() {
             signed_in: vec![HOME.into()],
             ..Default::default()
         };
-        send.send(DavDone { download }).unwrap();
+        send.send(DavDone { download, ..Default::default() }).unwrap();
         receive
     }));
     a.dav_tick();
@@ -429,7 +429,7 @@ fn held_job(a: &mut MailApp, problem: mailcraft_model::DavProblem, took: &[&str]
     std::thread::spawn(move || {
         while wait.recv().is_ok() {
             for (send, download) in answers.lock().unwrap().drain(..) {
-                let _ = send.send(DavDone { download });
+                let _ = send.send(DavDone { download, ..Default::default() });
             }
         }
     });

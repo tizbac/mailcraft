@@ -30,7 +30,6 @@ mod calendar_queries;
 mod compose;
 mod core;
 mod dav;
-mod dav_contacts;
 #[cfg(feature = "e2e")]
 mod e2e;
 mod error;
@@ -67,8 +66,6 @@ mod calendar_tests;
 mod compose_share_tests;
 #[cfg(test)]
 mod compose_tests;
-#[cfg(test)]
-mod dav_contacts_tests;
 #[cfg(test)]
 mod dav_tests;
 #[cfg(test)]

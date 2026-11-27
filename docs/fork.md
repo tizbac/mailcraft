@@ -45,11 +45,21 @@ File › Info › Calendars and Contacts with Find) are the base. This fork adds
 | Calendar and contacts servers are **on** (the desktop too; `MAILCRAFT_DAV=0` turns them off) | `apps/mailcraft/src/main.rs` |
 | A Linchange account is **added with the calendar and contact homes its server names**, found at sign-in from the server's own mail host with the application password the approval made (desktop and phone) | `crates/net/src/dav_find.rs` (`find_linchange_homes`), `apps/mailcraft/src/main.rs` (`linchange_sign_in`), `crates/ui-egui/src/{account_setup.rs,lib.rs}` (`LinchangeApproval`), `crates/mobile/src/accounts.rs` |
 | The subscribed calendars section of File › Info lists each account's calendar server with Set Up…/Change…, opening the same Calendars and Contacts window | `crates/ui-egui/src/backstage.rs`, `dav_settings.rs` |
-| **Conflicts never overwrite the server's copy**: a change made here on a version the server has changed since is held, and File › Info › Calendars and Contacts asks which copy to keep ("Keep Mine" / "Keep the Server's"); a setting keeps both instead (the server's read, what changed here made as a copy of its own) | `crates/engine/src/cmd/dav_sync.rs` (`take_updated`, `keep_both`, `sync.davConflicts`, `sync.davResolve`), `Prefs::dav_conflicts` (`file.options` `davConflicts`), `crates/ui-egui/src/dav_settings.rs` |
+| **Conflicts never overwrite the server's copy**: a change made here on a version the server has changed since is held, for a calendar or a contact, and File › Info › Calendars and Contacts asks which copy to keep ("Keep Mine" / "Keep the Server's"); a setting keeps both instead (the server's read, what changed here made as a copy of its own) | `crates/engine/src/cmd/dav_sync.rs` (`take_updated`, `keep_both`, `sync.davConflicts`, `sync.davResolve`), `crates/engine/src/cmd/remote.rs` (`apply_book_contact_outcomes`, `keep_both_contact`), `Prefs::dav_conflicts` (`file.options` `davConflicts`), `crates/ui-egui/src/dav_settings.rs` |
 
 Writes are conditional throughout (`If-Match` on a change or a deletion, `If-None-Match: *` on a
 create), so a server's newer copy is never put over; the tests are in
 `crates/engine/src/cmd/dav_sync_tests.rs` and `crates/net/src/dav_tests.rs`.
+
+### Address books on a card server (#209)
+
+Both ways on both platforms: the books a home lists and their cards are read
+(`crates/net/src/dav_contacts.rs`; the desktop job in `crates/ui-egui/src/dav_job.rs`, the phone's
+in `crates/mobile/src/dav.rs`), and a contact made, changed or deleted here is written back with
+`If-Match` (`If-None-Match: *` on a create). A change is written into the card the server sent
+(`mailcraft_vcard::patch` in `crates/vcard/src/patch.rs`), so a photo, keys and another program's
+properties stay. A conflict is held and asked the same way as a calendar's
+(`sync.davConflicts`, `sync.davResolve`), and the same setting keeps both.
 
 ### Exchange server accounts (upstream's #252, #962, #1274)
 
@@ -76,6 +86,8 @@ grep -q 'find_linchange_homes' crates/net/src/dav_find.rs crates/mobile/src/acco
 grep -q 'LinchangeApproval' crates/ui-egui/src/account_setup.rs
 grep -q 'sync.davConflicts' crates/engine/src/cmd/dav_sync.rs
 grep -q 'dav_conflicts' crates/engine/src/session.rs
+grep -q 'fn push' crates/net/src/dav_contacts.rs
+grep -q 'pub mod patch' crates/vcard/src/lib.rs
 grep -q 'internal suspend fun syncAll' apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/MailCraftApplication.kt
 grep -q 'Calendars and contacts from a server' crates/ui-egui/src/backstage.rs
 ```
@@ -85,9 +97,6 @@ screen changed), and a signed APK into `dist/release/` as [android.md](android.m
 
 ## What this fork does not have yet
 
-- **Address books on a calendar server are read on the phone only, and nothing is sent up**: the
-  desktop does not read CardDAV books yet, and contacts made or changed on either platform are not
-  written back to a CardDAV server. Calendars are both ways; contacts are the next part of #209.
 - Repeating appointments (series) cannot be made or changed on a calendar server yet (upstream's D6
   first part: single appointments).
 

@@ -116,6 +116,7 @@ fn a_send_and_receive_with_only_calendars_reads_them_and_says_when_it_is_done() 
                 ..Default::default()
             }),
             contacts: None,
+            uploaded: None,
         }
     }));
     let summary = block_on(core.background_sync(5_000)).expect("a round");

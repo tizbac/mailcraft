@@ -45,9 +45,13 @@ const REFUSED_FOR: f64 = 4.0 * 3_600_000.0;
 /// What the host is to do: ask the server of one account, with these passwords (by origin).
 pub struct DavJob {
     pub ask: DavAsk,
+    /// The account these servers belong to (its address books are read and changed with it too).
+    pub account: mailcraft_model::Account,
     /// The passwords the account has for its origins, which the host sends only in answer to that
     /// origin's own challenge.
     pub passwords: HashMap<String, String>,
+    /// The contacts made, changed or deleted here, to tell the server before reading it again.
+    pub contacts: Option<mailcraft_model::remote::ContactsUpload>,
 }
 
 /// Shows nothing of the asking and no password.
@@ -58,9 +62,13 @@ impl std::fmt::Debug for DavJob {
 }
 
 /// What the host read.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DavDone {
     pub download: DavDownload,
+    /// The account's address books, when it has any.
+    pub contacts: Option<mailcraft_model::ContactRead>,
+    /// What the server made of the contacts made, changed or deleted here.
+    pub uploaded: Option<mailcraft_model::remote::ContactsUploaded>,
 }
 
 /// What the window remembers of the job.
@@ -181,9 +189,11 @@ impl MailApp {
             let done = match receive.try_recv() {
                 Ok(done) => done,
                 Err(std::sync::mpsc::TryRecvError::Empty) => return,
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    DavDone { download: DavDownload { account, problem: DavProblem::Unreachable, ..Default::default() } }
-                }
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => DavDone {
+                    download: DavDownload { account, problem: DavProblem::Unreachable, ..Default::default() },
+                    contacts: None,
+                    uploaded: None,
+                },
             };
             self.dav.job = None;
             self.take_in_dav(done);
@@ -233,7 +243,9 @@ impl MailApp {
         let Some(start) = &self.services.dav else { return };
         self.dav.sent = sent;
         self.dav.sent_under = ask.server.clone();
-        let receive = start(DavJob { ask, passwords });
+        let Some(account_now) = self.session.mailbox.account(account).cloned() else { return };
+        let contacts = mailcraft_engine::cmd::remote::book_contact_upload(&self.session, account).filter(|changes| !changes.is_empty());
+        let receive = start(DavJob { ask, account: account_now, passwords, contacts });
         self.dav.job = Some((account, receive));
     }
 
@@ -256,7 +268,7 @@ impl MailApp {
     }
 
     fn take_in_dav(&mut self, done: DavDone) {
-        let download = done.download;
+        let DavDone { download, contacts, uploaded } = done;
         let (account, mut problem, mut signed_in) = (download.account, download.problem, download.signed_in.clone());
         let sent = std::mem::take(&mut self.dav.sent);
         let sent_under = std::mem::take(&mut self.dav.sent_under);
@@ -287,6 +299,26 @@ impl MailApp {
                 Value::Null
             }
         };
+        // The address books: what the server made of the contacts made, changed or deleted here
+        // first, then its own copies of them.
+        if let Some(uploaded) = uploaded
+            && let Err(e) = mailcraft_engine::cmd::remote::apply_book_contact_outcomes(&mut self.session, &uploaded)
+        {
+            log::warn!("what an address book server made of the changes couldn't be taken in: {e}");
+            if matches!(problem, DavProblem::None | DavProblem::Limits) {
+                problem = DavProblem::ServerErrors;
+            }
+        }
+        if let Some(read) = contacts {
+            if let Err(e) = mailcraft_engine::cmd::remote::apply_book_contacts(&mut self.session, &read.download) {
+                log::warn!("an address book read couldn't be taken in: {e}");
+                if matches!(problem, DavProblem::None | DavProblem::Limits) {
+                    problem = DavProblem::ServerErrors;
+                }
+            } else if problem == DavProblem::None {
+                problem = read.problem;
+            }
+        }
         // New events the server wouldn't take are kept on this computer (D6): the owner is told.
         let refused: Vec<&str> =
             applied.get("refused").and_then(Value::as_array).map(|r| r.iter().filter_map(Value::as_str).collect()).unwrap_or_default();

@@ -414,6 +414,14 @@ macro_rules! counts_only {
 }
 counts_only!(DavAskCollection, DavKnown, DavCalendar, DavListing, DavChange, DavRead);
 
+/// What a read of an account's address books came to: the cards, and why some may be missing.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ContactRead {
+    pub download: crate::remote::ContactsDownload,
+    pub problem: DavProblem,
+}
+
 #[cfg(test)]
 #[path = "dav_down_tests.rs"]
 mod dav_down_tests;

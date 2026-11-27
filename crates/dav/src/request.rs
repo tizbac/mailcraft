@@ -366,6 +366,23 @@ impl Endpoint {
         self.build(Method::Delete, &url, &[("If-Match", etag)], Vec::new())
     }
 
+    /// `PUT` that replaces `resource` (inside `collection`) whatever version the server has: only
+    /// for a change the owner chose over the server's own copy, after being asked which to keep
+    /// (`ContactChange::force`, `EventChange`'s own copy). Nothing else may write without a
+    /// condition.
+    pub fn put_over(&self, kind: Kind, collection: &str, resource: &str, body: &str) -> Result<HttpRequest, RequestError> {
+        let url = self.inside(collection, resource)?;
+        self.put(kind, &url, body, ("If-Match", "*"))
+    }
+
+    /// `DELETE` of `resource` (inside `collection`) whatever version the server has: only for a
+    /// deletion the owner chose over the server's own copy. Nothing else may delete without a
+    /// condition.
+    pub fn delete_over(&self, collection: &str, resource: &str) -> Result<HttpRequest, RequestError> {
+        let url = self.inside(collection, resource)?;
+        self.build(Method::Delete, &url, &[("If-Match", "*")], Vec::new())
+    }
+
     fn inside(&self, collection: &str, resource: &str) -> Result<String, RequestError> {
         let url = self.resolve(resource)?;
         if self.origin.is_within(collection, &url) { Ok(url) } else { Err(HrefError::OffCollection.into()) }

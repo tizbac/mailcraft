@@ -1567,6 +1567,9 @@ pub struct Session {
     /// until the owner says which copy to keep (`sync.davConflicts`, `sync.davResolve`). Never
     /// saved: after a restart the change is asked again and held again.
     pub dav_conflicts: BTreeMap<Id, crate::cmd::dav_sync::HeldConflict>,
+    /// The same for contacts, keyed by the resource the server calls the card (a deletion's
+    /// contact is gone, so its id is not one). Never saved.
+    pub dav_contact_conflicts: BTreeMap<String, crate::cmd::dav_sync::HeldConflict>,
     /// The width and theme each message was last read at in each place (the reading pane, a window
     /// of its own), whether its text part was shown instead of its HTML, and when it was last said
     /// ([`Session::read_at`]): a reply or forward quotes it as it was read where it was asked for,
@@ -1798,6 +1801,7 @@ impl Session {
             dav_generation: Default::default(),
             dav_sent: Default::default(),
             dav_conflicts: BTreeMap::new(),
+            dav_contact_conflicts: BTreeMap::new(),
             read_at: HashMap::new(),
             drawn_checked: HashSet::new(),
             read_count: 0,

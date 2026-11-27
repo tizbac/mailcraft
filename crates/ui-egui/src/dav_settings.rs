@@ -267,10 +267,14 @@ pub fn show(ctx: &egui::Context, d: &mut DavSettings, app: &mut MailApp, t: &Tok
     d.poll();
     let can_find = app.services.dav_find.is_some() && d.finding.is_none() && d.find_password(app).is_some();
     // Changes made here that the server's copy changed under: none of them is sent over it.
-    let held: Vec<(Id, String)> =
-        app.session.dav_conflicts.iter().filter(|(_, h)| h.account == d.account).map(|(id, h)| (*id, h.title.clone())).take(50).collect();
+    let mut held: Vec<(serde_json::Value, String)> =
+        app.session.dav_conflicts.iter().filter(|(_, h)| h.account == d.account).map(|(id, h)| (json!({"event": id}), h.title.clone())).collect();
+    held.extend(
+        app.session.dav_contact_conflicts.iter().filter(|(_, h)| h.account == d.account).map(|(href, h)| (json!({"href": href}), h.title.clone())),
+    );
+    held.truncate(50);
     let (mut submit, mut close, mut stop, mut find, mut answer) = (false, false, false, false, None);
-    let mut resolved: Option<(Id, &'static str)> = None;
+    let mut resolved: Option<(serde_json::Value, &'static str)> = None;
     let open = window(ctx, tl!("Calendars and Contacts"), 480.0, |ui| {
         ui.label(crate::i18n::fmt(tl!("Where the calendars and contacts of {account} are kept"), &[("account", &who)]));
         ui.label(tl!("Calendars"));
@@ -370,7 +374,7 @@ pub fn show(ctx: &egui::Context, d: &mut DavSettings, app: &mut MailApp, t: &Tok
             ui.separator();
             ui.label(tl!("Changed here and on the server too"));
             hint(ui, t, tl!("Nothing was sent over the server's copy. Keep one of the two for each change."));
-            for (event, title) in &held {
+            for (locate, title) in &held {
                 ui.horizontal(|ui| {
                     let name = crate::forms::kit::shown(title, 60);
                     if name.is_empty() {
@@ -379,10 +383,10 @@ pub fn show(ctx: &egui::Context, d: &mut DavSettings, app: &mut MailApp, t: &Tok
                         ui.label(name);
                     }
                     if ui.button(tl!("Keep Mine")).clicked() {
-                        resolved = Some((*event, "mine"));
+                        resolved = Some((locate.clone(), "mine"));
                     }
                     if ui.button(tl!("Keep the Server's")).clicked() {
-                        resolved = Some((*event, "theirs"));
+                        resolved = Some((locate.clone(), "theirs"));
                     }
                 });
             }
@@ -419,10 +423,13 @@ pub fn show(ctx: &egui::Context, d: &mut DavSettings, app: &mut MailApp, t: &Tok
     if find {
         d.find(app);
     }
-    if let Some((event, keep)) = resolved
-        && let Err(e) = app.execute("sync.davResolve", json!({"event": event, "keep": keep}))
-    {
-        d.error = e;
+    if let Some((mut locate, keep)) = resolved {
+        if let Some(fields) = locate.as_object_mut() {
+            fields.insert("keep".into(), json!(keep));
+        }
+        if let Err(e) = app.execute("sync.davResolve", locate.clone()) {
+            d.error = e;
+        }
     }
     if stop {
         return match app.execute("account.davOff", json!({"id": d.account})) {
