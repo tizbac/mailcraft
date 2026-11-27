@@ -42,7 +42,7 @@ File › Info › Calendars and Contacts with Find) are the base. This fork adds
 
 | Ours | Where |
 |---|---|
-| Calendar and contacts servers are **on** (the desktop too; `MAILCRAFT_DAV=0` turns them off) | `apps/mailcraft/src/main.rs` |
+| Calendar and contacts servers are **always on** (desktop and phone; no switch turns them off) | `apps/mailcraft/src/main.rs`, `crates/mobile/src/core.rs` |
 | A Linchange account is **added with the calendar and contact homes its server names**, found at sign-in from the server's own mail host with the application password the approval made (desktop and phone) | `crates/net/src/dav_find.rs` (`find_linchange_homes`), `apps/mailcraft/src/main.rs` (`linchange_sign_in`), `crates/ui-egui/src/{account_setup.rs,lib.rs}` (`LinchangeApproval`), `crates/mobile/src/accounts.rs` |
 | The subscribed calendars section of File › Info lists each account's calendar server with Set Up…/Change…, opening the same Calendars and Contacts window | `crates/ui-egui/src/backstage.rs`, `dav_settings.rs` |
 | **A new account of calendars and address books alone** is added from File › Info (Add Calendars and Contacts Account…, e.g. Nextcloud): its name may be any name (not only an address), its user name and password, Find or typed addresses, and no mail | `crates/ui-egui/src/dav_settings.rs` (`DavSettings::adding`, `save`), `backstage.rs` (the tile), `dialogs.rs` (`davSettings` with `add`) |

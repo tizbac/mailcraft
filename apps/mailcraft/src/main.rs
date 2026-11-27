@@ -1433,7 +1433,7 @@ fn build_services(
                 outcome: mailcraft_net::subscription::look(&job.address, &job.etag, &job.last_modified),
             })
         })),
-        // An account's calendars from its CalDAV server (#209, behind `MAILCRAFT_DAV=1`): the host
+        // An account's calendars from its CalDAV server (#209): the host
         // sends a password only in answer to that origin's own challenge, over TLS, to the one
         // certificate the owner trusted when there is one. Nothing here is logged but counts.
         dav: Some(Box::new(move |job: mailcraft_ui_egui::DavJob| {
@@ -1882,9 +1882,9 @@ fn main() -> eframe::Result {
                 // Search answers from a word index kept beside the mailbox file, built in the
                 // background (R6.2).
                 session.index_words = true;
-                // Calendar and contacts servers (#209) are on: calendars are read and changed both
-                // ways, and address books are read. `MAILCRAFT_DAV=0` turns them off.
-                session.dav_enabled = std::env::var("MAILCRAFT_DAV").is_ok_and(|v| v != "0");
+                // Calendar and contacts servers (#209) are always on: calendars are read and
+                // changed both ways, and address books too. There is no switch to turn them off.
+                session.dav_enabled = true;
                 // A run that keeps its mailbox and its settings keeps downloaded pictures too.
                 let kept_pictures = if kept && !sample && prefs_enabled() { keep_pictures() } else { None };
                 #[cfg(target_os = "linux")]

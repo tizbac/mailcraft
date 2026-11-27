@@ -619,7 +619,7 @@ pub struct Services {
     /// tests: subscribed calendars are then listed with what they held and not updated.
     pub subscription: Option<Box<dyn Fn(SubscriptionJob) -> Receiver<SubscriptionDone>>>,
     /// Desktop: read an account's calendars from its CalDAV server (#209, `mailcraft_net::dav::look`),
-    /// on a background thread, when `MAILCRAFT_DAV=1` and the account is due. The job holds the
+    /// on a background thread, when the account is due. The job holds the
     /// account's passwords by origin; the host sends one only in answer to that origin's own
     /// challenge, over TLS, to the pinned certificate when one is set. Absent in the browser and
     /// the tests.

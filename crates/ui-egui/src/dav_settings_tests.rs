@@ -366,3 +366,14 @@ fn a_new_account_may_be_named_anything_not_an_address() {
     again.password = "dav-secret".into();
     assert!(!again.find(&a));
 }
+
+#[test]
+fn the_file_info_tile_opens_the_window_to_add_an_account() {
+    let (mut a, _) = app();
+    let answer = a.execute("ui.dialog", json!({"name": "davSettings", "add": true})).expect("the dialog opens");
+    assert_eq!(answer["dialog"], json!("davSettings"));
+    match a.dialog.take() {
+        Some(crate::dialogs::Dialog::DavSettings(d)) => assert!(d.adding, "the window that adds one"),
+        _ => panic!("no add window"),
+    }
+}

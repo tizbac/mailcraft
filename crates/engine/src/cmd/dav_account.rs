@@ -10,8 +10,8 @@
 //! never a setting: the window holds it, per origin ([`DavServer::origins`]), and never lends one
 //! origin's to another.
 //!
-//! Everything here ships switched off ([`Session::dav_enabled`], read by the host from
-//! `MAILCRAFT_DAV=1`) until the feature is ready.
+//! Everything here is on in the apps ([`Session::dav_enabled`], which they set; a session may put
+//! it off, as the tests do).
 
 use mailcraft_model::{Account, AccountKind, DavServer};
 use serde_json::{Value, json};

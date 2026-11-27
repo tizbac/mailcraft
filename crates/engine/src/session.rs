@@ -1539,9 +1539,9 @@ pub struct Session {
     /// is disabled, the window offers nothing, and no move is put in a request for Gmail's API.
     /// Never saved.
     pub gmail_category_moves: bool,
-    /// Whether calendar and contacts servers (CalDAV and CardDAV, #209) are switched on: the host
-    /// reads `MAILCRAFT_DAV=1` and sets it; off, their commands are disabled and the window offers
-    /// nothing. Ships off until the feature is ready. Never saved.
+    /// Whether calendar and contacts servers (CalDAV and CardDAV, #209) are switched on: the
+    /// desktop and Android apps keep them on; a session can put them off (the tests do). Off,
+    /// their commands are disabled and the window offers nothing. Never saved.
     pub dav_enabled: bool,
     /// When each account's calendar server was last asked which calendars it has (Unix seconds):
     /// the homes are listed again after an hour ([`crate::cmd::dav_sync`]). Never saved.

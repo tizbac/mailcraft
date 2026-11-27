@@ -32,7 +32,8 @@
 //! Where the server's copy and a change here meet, the server's wins (v1): nothing here is
 //! changed yet, so nothing waits.
 //!
-//! The commands are the host's, never an agent's, and ship switched off (`MAILCRAFT_DAV=1`).
+//! The commands are the host's, never an agent's, and are on in the apps (a session may put them
+//! off, as the tests do).
 
 use std::collections::{HashMap, HashSet};
 

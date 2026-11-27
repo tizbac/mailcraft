@@ -731,8 +731,8 @@ fn main() {
     // A word index beside a mailbox opened from a file (`file.open`), as the window keeps one
     // (R6.2); the sample is kept in no file and has none.
     session.index_words = true;
-    // (Calendar and contacts servers, as the app has them: on, unless `MAILCRAFT_DAV=0`, #209.)
-    session.dav_enabled = std::env::var("MAILCRAFT_DAV").is_ok_and(|v| v != "0");
+    // (Calendar and contacts servers, as the app has them: always on, #209.)
+    session.dav_enabled = true;
     // A stand-in for the host's part in signing in, when a line of the script speaks to one.
     let host: Arc<Mutex<Host>> = Default::default();
     let stood_in = lines.iter().any(|l| l.get("host").is_some());

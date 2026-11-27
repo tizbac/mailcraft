@@ -235,7 +235,7 @@ impl Core {
             // stamped with a named zone is then rebased correctly.
             follow_time_zone(&mut session, zone_platform.as_ref());
             // Calendars and address books from a CalDAV and CardDAV server are this phone's to
-            // read (the desktop app keeps them behind MAILCRAFT_DAV=1 until the feature is done).
+            // read, as they are the desktop's: always on.
             session.dav_enabled = true;
             session.fallback_offset = Some(Arc::new(move |at| zone_host.utc_offset_minutes(at).unwrap_or(0)));
             if default_date {
