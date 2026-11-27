@@ -44,19 +44,24 @@ WORK="$CARGO_TARGET_DIR/arch-package"
 rm -rf "$WORK"
 mkdir -p "$WORK" "$DIST"
 
-echo "==> MailCraft $VERSION for Arch Linux $ARCH"
+# Arch's pkgver has no hyphen: a pre-release `0.15.70-rc.1` is `0.15.70rc.1` there (and a tag's
+# version is what the tarball is named after, so the two agree).
+PKGVER="${VERSION//-rc./rc.}"
+PKGVER="${PKGVER//-/.}"
+
+echo "==> MailCraft $VERSION for Arch Linux $ARCH (pkgver $PKGVER)"
 # The source tarball: the checkout exactly as it is (a version ahead of the last tag is fine).
-git -C "$ROOT" archive --format=tar.gz --prefix="mailcraft-$VERSION/" -o "$WORK/mailcraft-$VERSION.tar.gz" HEAD
+git -C "$ROOT" archive --format=tar.gz --prefix="mailcraft-$PKGVER/" -o "$WORK/mailcraft-$PKGVER.tar.gz" HEAD
 cp "$HERE/PKGBUILD" "$HERE/mailcraft.install" "$WORK/"
 # The committed PKGBUILD carries the version it was last built for; the package follows Cargo.toml.
-sed -i "s/^pkgver=.*/pkgver=$VERSION/" "$WORK/PKGBUILD"
+sed -i "s/^pkgver=.*/pkgver=$PKGVER/" "$WORK/PKGBUILD"
 
 args=(--noconfirm --force --clean)
 [[ $NOCHECK == 1 ]] && args+=(--nocheck)
 [[ $NODEPS == 1 ]] && args+=(--nodeps)
 ( cd "$WORK" && MAILCRAFT_BUILD_SHA="$(git -C "$ROOT" rev-parse HEAD)" PKGDEST="$DIST" makepkg "${args[@]}" )
 
-PKG="$(ls -1t "$DIST"/mailcraft-"$VERSION"-1-"$ARCH".pkg.tar.* 2>/dev/null | head -1)"
+PKG="$(ls -1t "$DIST"/mailcraft-"$PKGVER"-1-"$ARCH".pkg.tar.* 2>/dev/null | head -1)"
 [[ -n "$PKG" ]] || { echo "error: no package was written to $DIST" >&2; exit 1; }
 echo "wrote $PKG"
 

@@ -17,6 +17,9 @@
 pkgname=mailcraft
 pkgver=0.15.70
 pkgrel=1
+# (The packages published from this repository are zstd-compressed; a machine whose makepkg.conf
+# names another format still builds, and package.sh takes whichever name comes out.)
+PKGEXT='.pkg.tar.zst'
 pkgdesc='Open-source mail, calendar, contacts and tasks program that works the way Outlook users expect'
 arch=('x86_64' 'aarch64')
 url='https://github.com/tizbac/mailcraft'
@@ -46,6 +49,9 @@ prepare() {
 
 build() {
   cd "$pkgname-$pkgver"
+  # (Its own target directory, whatever the caller's environment says: package() reads it from
+  # here, and makepkg --clean then takes it away with the rest.)
+  export CARGO_TARGET_DIR="$srcdir/target"
   local stamp="${SOURCE_DATE_EPOCH:-$(date +%s)}"
   export MAILCRAFT_BUILD_DATE="$(date -u -d "@$stamp" +%Y-%m-%d)"
   # (The archive carries no .git; package.sh passes the commit in.)
@@ -55,6 +61,7 @@ build() {
 
 check() {
   cd "$pkgname-$pkgver"
+  export CARGO_TARGET_DIR="$srcdir/target"
   # (A smoke test of the engine: every command with hostile parameters never panics. The whole
   # suite runs in CI; this keeps the package build reasonable.)
   cargo test --frozen --release -p mailcraft-engine --lib hostile_params_never_panic
@@ -62,8 +69,8 @@ check() {
 
 package() {
   cd "$pkgname-$pkgver"
-  install -Dm755 target/release/mailcraft "$pkgdir/usr/bin/mailcraft"
-  install -Dm755 target/release/mailcraft-cli "$pkgdir/usr/bin/mailcraft-cli"
+  install -Dm755 "$srcdir/target/release/mailcraft" "$pkgdir/usr/bin/mailcraft"
+  install -Dm755 "$srcdir/target/release/mailcraft-cli" "$pkgdir/usr/bin/mailcraft-cli"
 
   local app_id='io.github.billsecond.mailcraft' today
   today="$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y-%m-%d)"
