@@ -1061,13 +1061,28 @@ fn a_refused_appointment_is_kept_on_this_computer_and_an_answer_for_elsewhere_is
 }
 
 #[test]
-fn meetings_and_changes_to_the_servers_events_stay_refused() {
+fn a_meeting_goes_out_only_with_the_owners_yes() {
     let (mut s, id, cal, _) = made();
-    let meeting = s.run(
+    // Without the yes nothing is made: the server could write to the people invited.
+    let asked = s
+        .run(
+            "calendar.new",
+            &json!({"title": "Treffen", "start": "2026-11-21T10:00", "end": "2026-11-21T11:00", "calendar": cal, "attendees": "bo@example.org"}),
+        )
+        .unwrap_err()
+        .to_string();
+    assert!(asked.contains("send"), "{asked}");
+    assert!(!s.mailbox.events.values().any(|e| e.title == "Treffen"), "nothing was made");
+    // With it, the meeting goes up as one, with who is invited: the server schedules it.
+    let made_meeting = s.run(
         "calendar.new",
         &json!({"title": "Treffen", "start": "2026-11-21T10:00", "end": "2026-11-21T11:00", "calendar": cal, "attendees": "bo@example.org", "send": true}),
     );
-    assert!(meeting.is_err());
+    assert!(made_meeting.is_ok(), "{made_meeting:?}");
+    let up = creates(&mut s, id);
+    let meeting = up.iter().find(|c| c.body.contains("SUMMARY:Treffen")).expect("the meeting goes up");
+    assert!(meeting.body.contains("ATTENDEE"), "{}", meeting.body);
+    assert!(meeting.body.contains("ORGANIZER"), "{}", meeting.body);
     apply(&mut s, id, None, vec![read(vec![change("a.ics", "\"1\"", &event("a", 22, "Vom Server"))], false, true, "t2")]);
     let theirs = s.mailbox.events.values().find(|e| e.title == "Vom Server").unwrap().id;
     // (How it shows, which isn't written to the server from here, stays refused.)
@@ -1296,9 +1311,12 @@ fn a_series_is_changed_as_a_whole_with_its_rule_kept() {
     assert_eq!(up.len(), 1, "the series goes up");
     assert!(up[0].body.contains("SUMMARY:Geändert"), "{}", up[0].body);
     assert!(up[0].body.contains("RRULE:FREQ=WEEKLY;COUNT=4"), "its rule stays:\n{}", up[0].body);
-    // Its rule is not changed from here: the document's is kept as it came.
-    let why = s.run("calendar.edit", &json!({"id": e, "recurrence": {"freq": "daily"}})).unwrap_err().to_string();
-    assert!(why.contains("only an appointment's"), "{why}");
+    // Its rule is changed from here too: the document's RRULE is the one now.
+    s.run("calendar.edit", &json!({"id": e, "recurrence": {"freq": "daily"}})).unwrap();
+    let up = updates(&mut s, id);
+    assert_eq!(up.len(), 1, "the new rule goes up");
+    assert!(up[0].body.contains("RRULE:FREQ=DAILY"), "{}", up[0].body);
+    assert!(!up[0].body.contains("RRULE:FREQ=WEEKLY"), "the old rule is gone:\n{}", up[0].body);
     let _ = std::fs::remove_dir_all(dir);
 }
 
@@ -1394,24 +1412,22 @@ fn what_mailcraft_knows_of_a_servers_event_changes_from_here_and_the_rest_is_ref
 }
 
 #[test]
-fn a_batch_deletes_a_calendar_servers_events_as_one_delete_does_and_refuses_a_meeting_among_them() {
+fn a_batch_deletes_a_calendar_servers_events_as_one_delete_does_and_a_meeting_among_them_with_the_yes() {
     use mailcraft_model::remote::EventChangeKind;
     let (mut s, id) = session();
     let docs = vec![change("a.ics", "\"1\"", &event("a", 2, "A")), change("b.ics", "\"1\"", &event("b", 3, "B"))];
     apply(&mut s, id, Some(listing()), vec![read(docs, true, true, "t1")]);
     let of = |s: &Session, title: &str| s.mailbox.events.values().find(|e| e.title == title).unwrap().id;
     let (a, b) = (of(&s, "A"), of(&s, "B"));
-    // A meeting among them, even with the yes to tell those invited: nothing is deleted.
+    // A meeting among them: the server writes to those invited (a cancellation), so the owner's
+    // yes is needed; with it, both go as deletions.
     let invited = mailcraft_model::Address::new("Bo", "bo@example.org");
     s.mailbox.event_mut(b).unwrap().attendees.push(mailcraft_model::Attendee { address: invited, ..Default::default() });
-    let refused = s.run("calendar.delete", &json!({"items": [{"id": a}, {"id": b}], "send": true})).unwrap_err().to_string();
-    // (A batch asks what a change asks: a meeting or a series of a calendar server's stays.)
-    assert!(refused.contains("can't be changed from here"), "{refused}");
+    let asked = s.run("calendar.delete", &json!({"items": [{"id": a}, {"id": b}]})).unwrap_err().to_string();
+    assert!(asked.contains("send"), "{asked}");
     assert_eq!(titles(&s).len(), 2);
     assert!(s.mailbox.event_changes.is_empty());
-    // Without it, each goes up as a deletion.
-    s.mailbox.event_mut(b).unwrap().attendees.clear();
-    s.run("calendar.delete", &json!({"items": [{"id": a}, {"id": b}]})).unwrap();
+    s.run("calendar.delete", &json!({"items": [{"id": a}, {"id": b}], "send": true})).unwrap();
     assert!(titles(&s).is_empty());
     let deletes = s.mailbox.event_changes.iter().filter(|c| c.kind == EventChangeKind::Delete && c.account == id).count();
     assert_eq!(deletes, 2);

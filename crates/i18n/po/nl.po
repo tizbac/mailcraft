@@ -494,15 +494,14 @@ msgid "A calendar server answered with errors, so some events may be out of date
 msgstr ""
 
 #. what a command says
-#: crates/mobile/src/jobs.rs
-msgid "A calendar server wouldn't sign in. Sign in again in the account's settings."
+#: crates/engine/src/cmd/calendar.rs
+msgid "A calendar server can't make a Teams meeting: say \"online\": false, or make it in a Microsoft account."
 msgstr ""
 
 #. what a command says
-#: crates/engine/src/cmd/calendar.rs
-#, fuzzy
-msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."
-msgstr "Een agenda van een agendaserver neemt hier afspraken aan, maar nog geen vergaderingen: de server zou zelf uitnodigingen kunnen versturen. Bewaar de vergadering in een agenda op deze computer."
+#: crates/mobile/src/jobs.rs
+msgid "A calendar server wouldn't sign in. Sign in again in the account's settings."
+msgstr ""
 
 #. what a command says
 #: crates/mobile/src/jobs.rs
@@ -689,6 +688,11 @@ msgstr "Een vergadering op een agendaserver kan hier nog niet worden verwijderd:
 msgid "A meeting on your calendar has this ID but another organizer, so this invitation can't change it."
 msgstr "Een vergadering in uw agenda heeft deze id, maar een andere organisator, dus deze uitnodiging kan die niet wijzigen."
 
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "A meeting somebody else organizes is answered or changed on the server: it can't be changed from here."
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/dialogs.rs
 #, fuzzy
@@ -706,11 +710,6 @@ msgstr "Een vergadering die iemand anders organiseert, wordt alleen uit uw agend
 #, fuzzy
 msgid "A meeting that repeats and skips some days can't be put on the server's calendar from here: everyone invited would get a cancellation for each skipped day. Keep it in a calendar on this computer, or make it again without the skipped days."
 msgstr "Een vergadering die wordt herhaald en sommige dagen overslaat, kan vanaf hier niet op de agenda van de server worden gezet: alle genodigden zouden voor elke overgeslagen dag een annulering ontvangen. Bewaar de vergadering in een agenda op deze computer, of maak de vergadering opnieuw zonder de overgeslagen dagen."
-
-#. what a command says
-#: crates/engine/src/cmd/remote.rs
-msgid "A meeting, or one day of a series, on a calendar server can't be changed from here yet: change it on the server."
-msgstr ""
 
 #. interface
 #: crates/ui-egui/src/reading/unsubscribe.rs
@@ -11939,9 +11938,8 @@ msgstr "Op Wayland moet u MailCraft opnieuw starten na het inschakelen van deze 
 
 #. what a command says
 #: crates/engine/src/cmd/remote.rs
-#, fuzzy
-msgid "On a calendar server only an appointment's title, time, location, description, reminder, categories and privacy can be changed from here yet: change the rest on the server."
-msgstr "Op een agendaserver kunnen hier voorlopig alleen de titel, tijd, locatie, beschrijving, herinnering, categorieën en privacy van een afspraak worden gewijzigd: wijzig de rest op de server."
+msgid "On a calendar server only an appointment's title, time, place, description, reminder, categories, privacy, how it repeats and who is invited can be changed from here yet: change the rest on the server."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs
@@ -12066,6 +12064,11 @@ msgstr ""
 #, fuzzy
 msgid "One day of a series on a calendar server can't be deleted from here yet: delete the whole series, or that day on the server."
 msgstr "Eén dag van een reeks op een agendaserver kan hier nog niet worden verwijderd: verwijder de hele reeks, of die dag op de server."
+
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "One day of a series on a calendar server is changed on the server, not here."
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
@@ -28582,6 +28585,14 @@ msgstr "−Bin"
 #, fuzzy
 msgid "−Lines"
 msgstr "−Regels"
+
+#, fuzzy
+#~ msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."
+#~ msgstr "Een agenda van een agendaserver neemt hier afspraken aan, maar nog geen vergaderingen: de server zou zelf uitnodigingen kunnen versturen. Bewaar de vergadering in een agenda op deze computer."
+
+#, fuzzy
+#~ msgid "On a calendar server only an appointment's title, time, location, description, reminder, categories and privacy can be changed from here yet: change the rest on the server."
+#~ msgstr "Op een agendaserver kunnen hier voorlopig alleen de titel, tijd, locatie, beschrijving, herinnering, categorieën en privacy van een afspraak worden gewijzigd: wijzig de rest op de server."
 
 #, fuzzy
 #~ msgid "A series or a meeting on a calendar server can't be changed from here yet: change it on the server."

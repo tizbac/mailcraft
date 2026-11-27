@@ -496,15 +496,14 @@ msgid "A calendar server answered with errors, so some events may be out of date
 msgstr ""
 
 #. what a command says
-#: crates/mobile/src/jobs.rs
-msgid "A calendar server wouldn't sign in. Sign in again in the account's settings."
+#: crates/engine/src/cmd/calendar.rs
+msgid "A calendar server can't make a Teams meeting: say \"online\": false, or make it in a Microsoft account."
 msgstr ""
 
 #. what a command says
-#: crates/engine/src/cmd/calendar.rs
-#, fuzzy
-msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."
-msgstr "Un calendrier d'un serveur de calendriers accepte des rendez-vous depuis ici, mais pas encore de réunions : le serveur pourrait envoyer lui-même des invitations. Gardez la réunion dans un calendrier de cet ordinateur."
+#: crates/mobile/src/jobs.rs
+msgid "A calendar server wouldn't sign in. Sign in again in the account's settings."
+msgstr ""
 
 #. what a command says
 #: crates/mobile/src/jobs.rs
@@ -690,6 +689,11 @@ msgstr "Une réunion sur un serveur de calendriers ne peut pas encore être supp
 msgid "A meeting on your calendar has this ID but another organizer, so this invitation can't change it."
 msgstr "Une réunion de votre calendrier porte cet identifiant mais un autre organisateur, cette invitation ne peut donc pas la modifier."
 
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "A meeting somebody else organizes is answered or changed on the server: it can't be changed from here."
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/dialogs.rs
 #, fuzzy
@@ -707,11 +711,6 @@ msgstr "Une réunion organisée par quelqu'un d'autre est retirée de votre cale
 #, fuzzy
 msgid "A meeting that repeats and skips some days can't be put on the server's calendar from here: everyone invited would get a cancellation for each skipped day. Keep it in a calendar on this computer, or make it again without the skipped days."
 msgstr "Une réunion périodique qui saute certains jours ne peut pas être placée d'ici dans le calendrier du serveur : chaque invité recevrait une annulation pour chaque jour sauté. Conservez-la dans un calendrier sur cet ordinateur, ou recréez-la sans les jours sautés."
-
-#. what a command says
-#: crates/engine/src/cmd/remote.rs
-msgid "A meeting, or one day of a series, on a calendar server can't be changed from here yet: change it on the server."
-msgstr ""
 
 #. interface
 #: crates/ui-egui/src/reading/unsubscribe.rs
@@ -12283,9 +12282,8 @@ msgstr "Sous Wayland, redémarrez MailCraft après avoir activé cette option. U
 
 #. what a command says
 #: crates/engine/src/cmd/remote.rs
-#, fuzzy
-msgid "On a calendar server only an appointment's title, time, location, description, reminder, categories and privacy can be changed from here yet: change the rest on the server."
-msgstr "Sur un serveur de calendriers, seuls le titre, l'heure, le lieu, la description, le rappel, les catégories et la confidentialité d'un rendez-vous peuvent être modifiés depuis ici pour l'instant : modifiez le reste sur le serveur."
+msgid "On a calendar server only an appointment's title, time, place, description, reminder, categories, privacy, how it repeats and who is invited can be changed from here yet: change the rest on the server."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs
@@ -12410,6 +12408,11 @@ msgstr ""
 #, fuzzy
 msgid "One day of a series on a calendar server can't be deleted from here yet: delete the whole series, or that day on the server."
 msgstr "Un jour d'une série sur un serveur de calendriers ne peut pas encore être supprimé depuis ici : supprimez toute la série, ou ce jour sur le serveur."
+
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "One day of a series on a calendar server is changed on the server, not here."
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
@@ -29107,6 +29110,14 @@ msgstr "−Bin"
 #, fuzzy
 msgid "−Lines"
 msgstr "−Lignes"
+
+#, fuzzy
+#~ msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."
+#~ msgstr "Un calendrier d'un serveur de calendriers accepte des rendez-vous depuis ici, mais pas encore de réunions : le serveur pourrait envoyer lui-même des invitations. Gardez la réunion dans un calendrier de cet ordinateur."
+
+#, fuzzy
+#~ msgid "On a calendar server only an appointment's title, time, location, description, reminder, categories and privacy can be changed from here yet: change the rest on the server."
+#~ msgstr "Sur un serveur de calendriers, seuls le titre, l'heure, le lieu, la description, le rappel, les catégories et la confidentialité d'un rendez-vous peuvent être modifiés depuis ici pour l'instant : modifiez le reste sur le serveur."
 
 #, fuzzy
 #~ msgid "A series or a meeting on a calendar server can't be changed from here yet: change it on the server."

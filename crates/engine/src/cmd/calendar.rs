@@ -530,11 +530,15 @@ fn create(s: &mut Session, v: &Value, meeting: bool) -> CmdResult {
         )));
     }
     if remote::dav_addable(&s.mailbox, e.calendar) {
-        // A calendar server may send invitations by itself: a meeting isn't made there from here.
-        if !e.attendees.is_empty() || e.online.is_some() {
-            return Err(fail(
-                "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer.",
-            ));
+        // A calendar server may send the invitations by itself (RFC 6638) once the owner said
+        // yes to that ("send": true, checked above for a calendar a server keeps). A Teams
+        // meeting stays Microsoft's to make.
+        if e.online.is_some() {
+            return Err(fail("A calendar server can't make a Teams meeting: say \"online\": false, or make it in a Microsoft account."));
+        }
+        let owner = s.mailbox.calendar(e.calendar).and_then(|c| remote::keeper(&s.mailbox, &c.origin)).map(|a| a.address());
+        if !e.attendees.is_empty() {
+            e.organizer = owner.or(e.organizer);
         }
     } else if served(s, e.calendar) {
         fits_server(s, &e)?;

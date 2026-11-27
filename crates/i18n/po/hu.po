@@ -500,15 +500,14 @@ msgid "A calendar server answered with errors, so some events may be out of date
 msgstr ""
 
 #. what a command says
-#: crates/mobile/src/jobs.rs
-msgid "A calendar server wouldn't sign in. Sign in again in the account's settings."
+#: crates/engine/src/cmd/calendar.rs
+msgid "A calendar server can't make a Teams meeting: say \"online\": false, or make it in a Microsoft account."
 msgstr ""
 
 #. what a command says
-#: crates/engine/src/cmd/calendar.rs
-#, fuzzy
-msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."
-msgstr "A naptárkiszolgáló naptára innen fogad találkozókat, megbeszéléseket még nem: a kiszolgáló maga is küldhetne meghívókat. Tartsa a megbeszélést egy ezen a számítógépen lévő naptárban."
+#: crates/mobile/src/jobs.rs
+msgid "A calendar server wouldn't sign in. Sign in again in the account's settings."
+msgstr ""
 
 #. what a command says
 #: crates/mobile/src/jobs.rs
@@ -695,6 +694,11 @@ msgstr "A naptárkiszolgálón lévő megbeszélés innen még nem törölhető:
 msgid "A meeting on your calendar has this ID but another organizer, so this invitation can't change it."
 msgstr "Egy találkozón a naptáradban ez az azonosító van, de egy másik szervező, így ez a meghívás nem változtathat rajta."
 
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "A meeting somebody else organizes is answered or changed on the server: it can't be changed from here."
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/dialogs.rs
 #, fuzzy
@@ -712,11 +716,6 @@ msgstr "A más által szervezett értekezlet csak az Ön naptárából kerül ki
 #, fuzzy
 msgid "A meeting that repeats and skips some days can't be put on the server's calendar from here: everyone invited would get a cancellation for each skipped day. Keep it in a calendar on this computer, or make it again without the skipped days."
 msgstr "Egy találkozó, amely megismétli és kihagy néhány napot nem lehet feltenni a szerver naptár innen: mindenki meghívott kap egy lemondás minden egyes kihagyt nap. Tartsa egy naptár ezen a számítógépen, vagy újra nélkül a kihagyott napok."
-
-#. what a command says
-#: crates/engine/src/cmd/remote.rs
-msgid "A meeting, or one day of a series, on a calendar server can't be changed from here yet: change it on the server."
-msgstr ""
 
 #. interface
 #: crates/ui-egui/src/reading/unsubscribe.rs
@@ -12323,9 +12322,8 @@ msgstr "Wayland alatt a beállítás bekapcsolása után indítsa újra a MailCr
 
 #. what a command says
 #: crates/engine/src/cmd/remote.rs
-#, fuzzy
-msgid "On a calendar server only an appointment's title, time, location, description, reminder, categories and privacy can be changed from here yet: change the rest on the server."
-msgstr "A naptárkiszolgálón egyelőre csak a találkozó címe, ideje, helye, leírása, emlékeztetője, kategóriái és bizalmassága módosítható innen: a többit a kiszolgálón módosítsa."
+msgid "On a calendar server only an appointment's title, time, place, description, reminder, categories, privacy, how it repeats and who is invited can be changed from here yet: change the rest on the server."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs
@@ -12450,6 +12448,11 @@ msgstr ""
 #, fuzzy
 msgid "One day of a series on a calendar server can't be deleted from here yet: delete the whole series, or that day on the server."
 msgstr "A naptárkiszolgálón lévő sorozat egyetlen napja innen még nem törölhető: törölje az egész sorozatot, vagy azt a napot a kiszolgálón."
+
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "One day of a series on a calendar server is changed on the server, not here."
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
@@ -29204,6 +29207,14 @@ msgstr "−Bin"
 #, fuzzy
 msgid "−Lines"
 msgstr "−Sorok"
+
+#, fuzzy
+#~ msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."
+#~ msgstr "A naptárkiszolgáló naptára innen fogad találkozókat, megbeszéléseket még nem: a kiszolgáló maga is küldhetne meghívókat. Tartsa a megbeszélést egy ezen a számítógépen lévő naptárban."
+
+#, fuzzy
+#~ msgid "On a calendar server only an appointment's title, time, location, description, reminder, categories and privacy can be changed from here yet: change the rest on the server."
+#~ msgstr "A naptárkiszolgálón egyelőre csak a találkozó címe, ideje, helye, leírása, emlékeztetője, kategóriái és bizalmassága módosítható innen: a többit a kiszolgálón módosítsa."
 
 #, fuzzy
 #~ msgid "A series or a meeting on a calendar server can't be changed from here yet: change it on the server."

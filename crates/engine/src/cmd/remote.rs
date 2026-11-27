@@ -933,13 +933,17 @@ pub fn dav_addable(mailbox: &Mailbox, calendar: Id) -> bool {
 }
 
 /// Whether a calendar server's event may become `after` from here (#209 D6): what MailCraft
-/// knows of it (title, time, place, description, reminder, categories, private), written into the
-/// document the server sent, which keeps everything else as it was, a series' rule included; not a
-/// meeting, nor one day of a series (the server could send updates by itself, and a day of a series
-/// is another resource), nor a move to another calendar.
+/// knows of it (title, time, place, description, reminder, categories, privacy, how it repeats,
+/// and who is invited when the owner said the server may write to them), written into the
+/// document the server sent, which keeps everything else as it was. Not somebody else's meeting
+/// (the organizer's to change), nor one day of a series (another resource), nor a move to another
+/// calendar.
 pub(crate) fn dav_changeable(before: &Event, after: &Event) -> Result<(), CmdError> {
-    if !before.origin.series.is_empty() || !before.attendees.is_empty() || before.origin.guest {
-        return Err(fail("A meeting, or one day of a series, on a calendar server can't be changed from here yet: change it on the server."));
+    if before.origin.guest {
+        return Err(fail("A meeting somebody else organizes is answered or changed on the server: it can't be changed from here."));
+    }
+    if !before.origin.series.is_empty() {
+        return Err(fail("One day of a series on a calendar server is changed on the server, not here."));
     }
     let mut same = after.clone();
     (same.title, same.location, same.description) = (before.title.clone(), before.location.clone(), before.description.clone());
@@ -947,9 +951,11 @@ pub(crate) fn dav_changeable(before: &Event, after: &Event) -> Result<(), CmdErr
     (same.start_zone, same.end_zone) = (before.start_zone.clone(), before.end_zone.clone());
     (same.start_repeated, same.end_repeated) = (before.start_repeated, before.end_repeated);
     (same.reminder_minutes, same.categories, same.private) = (before.reminder_minutes, before.categories.clone(), before.private);
+    (same.recurrence, same.exceptions) = (before.recurrence.clone(), before.exceptions.clone());
+    (same.attendees, same.response_options) = (before.attendees.clone(), before.response_options);
     if same != *before {
         return Err(fail(
-            "On a calendar server only an appointment's title, time, location, description, reminder, categories and privacy can be changed from here yet: change the rest on the server.",
+            "On a calendar server only an appointment's title, time, place, description, reminder, categories, privacy, how it repeats and who is invited can be changed from here yet: change the rest on the server.",
         ));
     }
     Ok(())
@@ -1452,6 +1458,9 @@ pub fn event_upload(s: &Session, account: Id) -> Result<EventsUpload, CmdError> 
         .event_changes
         .iter()
         .filter(|change| change.account == account && change.retry_at <= now && holds(mailbox, change, &here) && !lacks_rights(mailbox, change))
+        // (A change the server's copy changed under is not sent again until the owner says which
+        // copy to keep: `sync.davConflicts`.)
+        .filter(|change| !s.dav_conflicts.contains_key(&change.event))
         // (One made in a calendar server's calendar goes there, not to Microsoft: `sync.davRequest`.)
         .filter(|change| {
             let calendar = mailbox.event(change.event).map(|e| e.calendar).or_else(|| change.base.as_ref().map(|b| b.calendar));
@@ -1508,6 +1517,9 @@ pub fn event_upload(s: &Session, account: Id) -> Result<EventsUpload, CmdError> 
             kind: change.kind,
             event: change.event,
             remote: change.remote.clone(),
+            // (The version the change was made on: an Exchange server answers a conflict rather
+            // than putting it over a copy changed since. The owner's own choice sends none.)
+            change_key: if change.force { String::new() } else { change.base.as_deref().map(|b| b.origin.change_key.clone()).unwrap_or_default() },
             token: change.token.clone(),
             fields,
             series: if change.of_occurrence() { change.series.clone() } else { String::new() },
@@ -1716,6 +1728,27 @@ pub fn apply_event_outcomes(s: &mut Session, uploaded: &EventsUploaded) -> Resul
     for outcome in uploaded.outcomes.iter().take(MAX_OUTCOMES) {
         let mut outcome = outcome.clone();
         outcome.tidy();
+        // The server's copy changed too (an Exchange server's conflict: 412): it is never put
+        // over. What was changed here is held, and the owner is asked which copy to keep
+        // (`sync.davConflicts`), or both are kept, as the settings say.
+        let exchange = s.mailbox.account(uploaded.account).is_some_and(|a| a.kind == mailcraft_model::AccountKind::Exchange);
+        if exchange && outcome.status == 412 && outcome.op.kind != EventChangeKind::Create {
+            if s.prefs.dav_conflicts == crate::DavConflicts::KeepBoth {
+                keep_both_event(s, account, outcome.op.event, &offset_at);
+                continue;
+            }
+            let title = s
+                .mailbox
+                .event_changes
+                .iter()
+                .find(|c| c.account == account && c.event == outcome.op.event)
+                .and_then(|c| c.base.as_ref().map(|b| b.title.clone()))
+                .or_else(|| s.mailbox.event(outcome.op.event).map(|e| e.title.clone()))
+                .unwrap_or_default();
+            let held = crate::cmd::dav_sync::HeldConflict { account, title, since: now, contact: 0 };
+            s.dav_conflicts.insert(outcome.op.event, held);
+            continue;
+        }
         let mailbox = &mut s.mailbox;
         match outcome.op.kind {
             EventChangeKind::Create => created(mailbox, account, &outcome, &offset_at, now, &mut applied, &mut told),
@@ -3872,6 +3905,29 @@ pub fn note_book_contact_changed(mailbox: &mut Mailbox, contact: &Contact, kind:
     }
 }
 
+/// The owner keeps both, for an event whose server's copy changed too: the server's copy is read
+/// (the change is given up), and what was changed here is kept as an event of its own in the same
+/// calendar, to be made there as a new appointment.
+fn keep_both_event(s: &mut Session, account: Id, event: Id, offset_at: &dyn Fn(i64) -> i32) {
+    let _ = offset_at;
+    let Some(at) = s.mailbox.event_changes.iter().position(|c| c.account == account && c.event == event && c.kind != EventChangeKind::Create) else {
+        return;
+    };
+    s.mailbox.event_changes.remove(at);
+    let Some(from) = s.mailbox.event(event).cloned() else { return };
+    let mut copy = from;
+    copy.id = 0;
+    copy.origin = Origin { account, ..Default::default() };
+    copy.uid = String::new();
+    let Ok(id) = s.mailbox.add_event(copy) else { return };
+    let token = new_token(id, s.rev() ^ s.now().unsigned_abs().rotate_left(40));
+    if let Ok(e) = s.mailbox.event_mut(id) {
+        e.origin = Origin { account, ..Default::default() };
+    }
+    s.mailbox.event_changes.push(EventChange { account, kind: EventChangeKind::Create, event: id, token, ..Default::default() });
+    s.mailbox_changed();
+}
+
 /// Take in what a server made of the contacts made here: the URL of each it accepted, so the
 /// next download knows it for the same contact.
 pub fn apply_book_contact_outcomes(s: &mut Session, uploaded: &ContactsUploaded) -> CmdResult {
@@ -3886,7 +3942,8 @@ pub fn apply_book_contact_outcomes(s: &mut Session, uploaded: &ContactsUploaded)
         // The server's copy changed too (412: the ETag the change was made on is no longer the
         // server's): it is never put over. What was changed here is held, and the owner is asked
         // which copy to keep (`sync.davConflicts`), or both are kept, as the settings say.
-        let from_a_server = s.mailbox.account(uploaded.account).is_some_and(|a| a.dav.is_some());
+        let from_a_server =
+            s.mailbox.account(uploaded.account).is_some_and(|a| a.dav.is_some() || matches!(a.kind, mailcraft_model::AccountKind::Exchange));
         if from_a_server && matches!(outcome.status, 412 | 409) && outcome.op.kind != ContactChangeKind::Create {
             if s.prefs.dav_conflicts == crate::DavConflicts::KeepBoth {
                 keep_both_contact(s, uploaded.account, remote);

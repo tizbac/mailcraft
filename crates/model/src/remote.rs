@@ -731,6 +731,10 @@ pub struct EventChange {
     /// that would make the server write to anybody is not sent without it.
     #[serde(skip_serializing_if = "is_false")]
     pub send: bool,
+    /// The owner chose this copy over the server's, which changed since (`sync.davResolve`): the
+    /// change is sent over the server's whatever version it has. Only ever set by that answer.
+    #[serde(skip_serializing_if = "is_false")]
+    pub force: bool,
     /// What the owner wrote to go along with a cancellation or an answer.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub comment: String,
@@ -989,6 +993,11 @@ pub struct EventOp {
     /// What the server calls the event, for a change or a deletion.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub remote: String,
+    /// The mark of the version the change was made on (an Exchange server's `ChangeKey`): the
+    /// server changes the event only while it still has it, and answers a conflict when it
+    /// doesn't. Empty for a creation, or when the owner chose this copy over the server's.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub change_key: String,
     /// The mark a new event is made with ([`EventChange::token`]).
     #[serde(skip_serializing_if = "String::is_empty")]
     pub token: String,

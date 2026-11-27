@@ -1292,6 +1292,7 @@ proptest! {
                 [usize::from(*kind)],
             event: 7,
             remote: if flags.0 { remote.clone() } else { String::new() },
+            change_key: String::new(),
             token: mark.clone(),
             fields: EventFields {
                 title: Some(title.clone()),

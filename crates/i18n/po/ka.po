@@ -495,15 +495,14 @@ msgid "A calendar server answered with errors, so some events may be out of date
 msgstr ""
 
 #. what a command says
-#: crates/mobile/src/jobs.rs
-msgid "A calendar server wouldn't sign in. Sign in again in the account's settings."
+#: crates/engine/src/cmd/calendar.rs
+msgid "A calendar server can't make a Teams meeting: say \"online\": false, or make it in a Microsoft account."
 msgstr ""
 
 #. what a command says
-#: crates/engine/src/cmd/calendar.rs
-#, fuzzy
-msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."
-msgstr "კალენდრის სერვერის კალენდარი აქედან იღებს შეხვედრებს, მაგრამ ჯერ არა თათბირებს: სერვერს შეუძლია თავად გაგზავნოს მოწვევები. შეინახეთ თათბირი ამ კომპიუტერის კალენდარში."
+#: crates/mobile/src/jobs.rs
+msgid "A calendar server wouldn't sign in. Sign in again in the account's settings."
+msgstr ""
 
 #. what a command says
 #: crates/mobile/src/jobs.rs
@@ -689,6 +688,11 @@ msgstr "კალენდრის სერვერზე არსებუ�
 msgid "A meeting on your calendar has this ID but another organizer, so this invitation can't change it."
 msgstr "თქვენს კალენდარში ამ ID-ით შეხვედრა არის, მაგრამ სხვა ორგანიზატორით, ამიტომ ეს მოწვევა მას ვერ შეცვლის."
 
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "A meeting somebody else organizes is answered or changed on the server: it can't be changed from here."
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/dialogs.rs
 #, fuzzy
@@ -706,11 +710,6 @@ msgstr "სხვის მიერ ორგანიზებული შე
 #, fuzzy
 msgid "A meeting that repeats and skips some days can't be put on the server's calendar from here: everyone invited would get a cancellation for each skipped day. Keep it in a calendar on this computer, or make it again without the skipped days."
 msgstr "განმეორებადი შეხვედრა გამოტოვებული დღეებით სერვერის კალენდარში აქედან ვერ განთავსდება: ყველა მოწვეული ყოველ გამოტოვებულ დღეზე გაუქმებას მიიღებდა. შეინახეთ ის ამ კომპიუტერის კალენდარში ან ხელახლა შექმენით გამოტოვებული დღეების გარეშე."
-
-#. what a command says
-#: crates/engine/src/cmd/remote.rs
-msgid "A meeting, or one day of a series, on a calendar server can't be changed from here yet: change it on the server."
-msgstr ""
 
 #. interface
 #: crates/ui-egui/src/reading/unsubscribe.rs
@@ -12295,9 +12294,8 @@ msgstr "Wayland-ზე ამ პარამეტრის ჩართვი�
 
 #. what a command says
 #: crates/engine/src/cmd/remote.rs
-#, fuzzy
-msgid "On a calendar server only an appointment's title, time, location, description, reminder, categories and privacy can be changed from here yet: change the rest on the server."
-msgstr "კალენდრის სერვერზე აქედან ჯერჯერობით მხოლოდ შეხვედრის სათაური, დრო, ადგილი, აღწერა, შეხსენება, კატეგორიები და კონფიდენციალურობა იცვლება: დანარჩენი შეცვალეთ სერვერზე."
+msgid "On a calendar server only an appointment's title, time, place, description, reminder, categories, privacy, how it repeats and who is invited can be changed from here yet: change the rest on the server."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs
@@ -12422,6 +12420,11 @@ msgstr ""
 #, fuzzy
 msgid "One day of a series on a calendar server can't be deleted from here yet: delete the whole series, or that day on the server."
 msgstr "კალენდრის სერვერზე არსებული სერიის ერთი დღის წაშლა აქედან ჯერ შეუძლებელია: წაშალეთ მთელი სერია, ან ეს დღე სერვერზე."
+
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "One day of a series on a calendar server is changed on the server, not here."
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
@@ -29115,6 +29118,14 @@ msgstr ""
 #: crates/ui-egui/src/credits.rs
 msgid "−Lines"
 msgstr ""
+
+#, fuzzy
+#~ msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."
+#~ msgstr "კალენდრის სერვერის კალენდარი აქედან იღებს შეხვედრებს, მაგრამ ჯერ არა თათბირებს: სერვერს შეუძლია თავად გაგზავნოს მოწვევები. შეინახეთ თათბირი ამ კომპიუტერის კალენდარში."
+
+#, fuzzy
+#~ msgid "On a calendar server only an appointment's title, time, location, description, reminder, categories and privacy can be changed from here yet: change the rest on the server."
+#~ msgstr "კალენდრის სერვერზე აქედან ჯერჯერობით მხოლოდ შეხვედრის სათაური, დრო, ადგილი, აღწერა, შეხსენება, კატეგორიები და კონფიდენციალურობა იცვლება: დანარჩენი შეცვალეთ სერვერზე."
 
 #, fuzzy
 #~ msgid "A series or a meeting on a calendar server can't be changed from here yet: change it on the server."

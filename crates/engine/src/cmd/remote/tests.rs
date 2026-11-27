@@ -3305,3 +3305,125 @@ fn a_download_rehomes_only_strays_never_what_is_on_its_way_to_the_server() {
     assert!([made, mine].iter().all(|id| s.mailbox.event(*id).is_some_and(|e| e.origin.account == account && !e.origin.id.is_empty())));
     assert!(!creating(&s, made) && !creating(&s, mine));
 }
+
+/// A session with an Exchange server account of its own, one calendar of it, and an event the
+/// server has as `ID1` at the change key `"ck1"`.
+fn exchange_session() -> (Session, Id, Id) {
+    let now = 1_791_993_600;
+    let mut s = Session::at(crate::sample::mailbox(now, 0), now, 0);
+    s.dav_enabled = true;
+    let account = s
+        .run("account.add", &json!({"email": "ex@example.org", "kind": "exchange", "ews": {"url": "https://ews.example.org/EWS/Exchange.asmx"}}))
+        .unwrap()["id"]
+        .as_u64()
+        .unwrap();
+    let calendar = 900;
+    s.mailbox.calendars.push(mailcraft_model::Calendar {
+        id: calendar,
+        name: "Calendar".into(),
+        origin: Origin { account, id: "CAL1".into(), ..Default::default() },
+        visible: true,
+        ..Default::default()
+    });
+    let event = s
+        .mailbox
+        .add_event(Event {
+            title: "Besprechung".into(),
+            start: DateTime::new(Date::new(2026, 11, 27).unwrap(), 10, 0, 0).expect("a time"),
+            end: DateTime::new(Date::new(2026, 11, 27).unwrap(), 11, 0, 0).expect("a time"),
+            calendar,
+            origin: Origin { account, id: "ID1".into(), change_key: "\"ck1\"".into(), ..Default::default() },
+            ..Default::default()
+        })
+        .unwrap();
+    (s, account, event)
+}
+
+/// An answer from the Exchange server: a conflict (412) for the event `event`.
+fn exchange_conflict(account: Id, event: Id) -> EventsUploaded {
+    let op = EventOp { kind: EventChangeKind::Update, event, remote: "ID1".into(), change_key: "\"ck1\"".into(), ..Default::default() };
+    EventsUploaded {
+        account,
+        email: "ex@example.org".into(),
+        outcomes: vec![EventOutcome {
+            op,
+            result: EventResult::Failed,
+            status: 412,
+            error: "the server's copy changed since".into(),
+            ..Default::default()
+        }],
+        ..Default::default()
+    }
+}
+
+#[test]
+fn an_exchange_servers_conflict_is_held_until_the_owner_says_which_copy_to_keep() {
+    let (mut s, account, event) = exchange_session();
+    let before = s.mailbox.event(event).unwrap().clone();
+    s.mailbox.event_mut(event).unwrap().title = "Meins".into();
+    s.mailbox.event_changes.push(EventChange {
+        account,
+        kind: EventChangeKind::Update,
+        event,
+        remote: "ID1".into(),
+        base: Some(Box::new(before)),
+        ..Default::default()
+    });
+    apply_event_outcomes(&mut s, &exchange_conflict(account, event)).unwrap();
+    // Held: nothing more goes up, and the owner is asked.
+    assert_eq!(s.dav_conflicts.len(), 1);
+    assert!(event_upload(&s, account).unwrap().ops.is_empty(), "held, never over the server's copy");
+    let listed = s.run("sync.davConflicts", &json!({})).unwrap();
+    let row = listed["conflicts"].as_array().unwrap().iter().find(|row| row["kind"] == "event").cloned().expect("listed");
+    assert_eq!(row["event"], json!(event));
+    // Keep mine: it goes without the change key, so it is put over the copy the server has.
+    s.run("sync.davResolve", &json!({"event": event, "keep": "mine"})).unwrap();
+    let up = event_upload(&s, account).unwrap();
+    assert_eq!(up.ops.len(), 1);
+    assert!(up.ops[0].change_key.is_empty(), "over the server's copy");
+    assert_eq!(up.ops[0].fields.title.as_deref(), Some("Meins"));
+}
+
+#[test]
+fn an_exchange_conflict_given_up_for_the_servers_copy_goes() {
+    let (mut s, account, event) = exchange_session();
+    let before = s.mailbox.event(event).unwrap().clone();
+    s.mailbox.event_mut(event).unwrap().title = "Meins".into();
+    s.mailbox.event_changes.push(EventChange {
+        account,
+        kind: EventChangeKind::Update,
+        event,
+        remote: "ID1".into(),
+        base: Some(Box::new(before)),
+        ..Default::default()
+    });
+    apply_event_outcomes(&mut s, &exchange_conflict(account, event)).unwrap();
+    s.run("sync.davResolve", &json!({"event": event, "keep": "theirs"})).unwrap();
+    assert!(s.dav_conflicts.is_empty());
+    assert!(event_upload(&s, account).unwrap().ops.is_empty(), "given up");
+}
+
+#[test]
+fn an_exchange_conflict_with_both_kept_makes_a_copy_here() {
+    let (mut s, account, event) = exchange_session();
+    s.run("file.options", &json!({"davConflicts": "keepBoth"})).unwrap();
+    let before = s.mailbox.event(event).unwrap().clone();
+    s.mailbox.event_mut(event).unwrap().title = "Meins".into();
+    s.mailbox.event_changes.push(EventChange {
+        account,
+        kind: EventChangeKind::Update,
+        event,
+        remote: "ID1".into(),
+        base: Some(Box::new(before)),
+        ..Default::default()
+    });
+    apply_event_outcomes(&mut s, &exchange_conflict(account, event)).unwrap();
+    assert!(s.dav_conflicts.is_empty(), "nothing is asked");
+    let copies: Vec<_> = s.mailbox.events.values().filter(|e| e.id != event && e.title == "Meins").collect();
+    assert_eq!(copies.len(), 1, "what changed here is kept as a copy");
+    let up = event_upload(&s, account).unwrap();
+    assert!(
+        up.ops.iter().any(|op| op.kind == EventChangeKind::Create && op.fields.title.as_deref() == Some("Meins")),
+        "the copy is made on the server"
+    );
+}

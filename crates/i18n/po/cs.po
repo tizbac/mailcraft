@@ -496,15 +496,14 @@ msgid "A calendar server answered with errors, so some events may be out of date
 msgstr ""
 
 #. what a command says
-#: crates/mobile/src/jobs.rs
-msgid "A calendar server wouldn't sign in. Sign in again in the account's settings."
+#: crates/engine/src/cmd/calendar.rs
+msgid "A calendar server can't make a Teams meeting: say \"online\": false, or make it in a Microsoft account."
 msgstr ""
 
 #. what a command says
-#: crates/engine/src/cmd/calendar.rs
-#, fuzzy
-msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."
-msgstr "Kalendář na kalendářovém serveru odsud přijímá schůzky, zatím ne porady: server by mohl sám rozesílat pozvánky. Ponechte poradu v kalendáři v tomto počítači."
+#: crates/mobile/src/jobs.rs
+msgid "A calendar server wouldn't sign in. Sign in again in the account's settings."
+msgstr ""
 
 #. what a command says
 #: crates/mobile/src/jobs.rs
@@ -690,6 +689,11 @@ msgstr "Poradu na kalendářovém serveru zatím odsud nelze smazat: server by m
 msgid "A meeting on your calendar has this ID but another organizer, so this invitation can't change it."
 msgstr "Schůzka ve vašem kalendáři má toto ID, ale jiného organizátora, takže ji tato pozvánka nemůže změnit."
 
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "A meeting somebody else organizes is answered or changed on the server: it can't be changed from here."
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/dialogs.rs
 #, fuzzy
@@ -707,11 +711,6 @@ msgstr "Schůzka, kterou organizuje někdo jiný, se odebere jen z vašeho kalen
 #, fuzzy
 msgid "A meeting that repeats and skips some days can't be put on the server's calendar from here: everyone invited would get a cancellation for each skipped day. Keep it in a calendar on this computer, or make it again without the skipped days."
 msgstr "Opakovanou schůzku, která některé dny vynechává, nelze odsud dát do kalendáře na serveru: každý pozvaný by dostal zrušení za každý vynechaný den. Ponechte ji v kalendáři v tomto počítači, nebo ji vytvořte znovu bez vynechaných dnů."
-
-#. what a command says
-#: crates/engine/src/cmd/remote.rs
-msgid "A meeting, or one day of a series, on a calendar server can't be changed from here yet: change it on the server."
-msgstr ""
 
 #. interface
 #: crates/ui-egui/src/reading/unsubscribe.rs
@@ -12348,9 +12347,8 @@ msgstr "Ve Waylandu po zapnutí této možnosti MailCraft restartujte. Je nutný
 
 #. what a command says
 #: crates/engine/src/cmd/remote.rs
-#, fuzzy
-msgid "On a calendar server only an appointment's title, time, location, description, reminder, categories and privacy can be changed from here yet: change the rest on the server."
-msgstr "Na kalendářovém serveru lze odsud zatím měnit jen název, čas, místo, popis, připomenutí, kategorie a soukromí schůzky: zbytek změňte na serveru."
+msgid "On a calendar server only an appointment's title, time, place, description, reminder, categories, privacy, how it repeats and who is invited can be changed from here yet: change the rest on the server."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs
@@ -12475,6 +12473,11 @@ msgstr ""
 #, fuzzy
 msgid "One day of a series on a calendar server can't be deleted from here yet: delete the whole series, or that day on the server."
 msgstr "Jeden den opakované události na kalendářovém serveru zatím odsud nelze smazat: smažte celou řadu, nebo ten den na serveru."
+
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "One day of a series on a calendar server is changed on the server, not here."
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
@@ -29400,6 +29403,14 @@ msgstr "−Binární"
 #, fuzzy
 msgid "−Lines"
 msgstr "−Řádky"
+
+#, fuzzy
+#~ msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."
+#~ msgstr "Kalendář na kalendářovém serveru odsud přijímá schůzky, zatím ne porady: server by mohl sám rozesílat pozvánky. Ponechte poradu v kalendáři v tomto počítači."
+
+#, fuzzy
+#~ msgid "On a calendar server only an appointment's title, time, location, description, reminder, categories and privacy can be changed from here yet: change the rest on the server."
+#~ msgstr "Na kalendářovém serveru lze odsud zatím měnit jen název, čas, místo, popis, připomenutí, kategorie a soukromí schůzky: zbytek změňte na serveru."
 
 #, fuzzy
 #~ msgid "A series or a meeting on a calendar server can't be changed from here yet: change it on the server."

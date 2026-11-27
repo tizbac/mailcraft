@@ -1204,7 +1204,11 @@ pub fn update_item(kind: Kind, item: &ItemUp, id: &str, change_key: &str, send: 
         }
     }
     let change = Element::new("t:ItemChange").child(item_id).child(updates);
-    operation.attr("ConflictResolution", "AlwaysOverwrite").child(Element::new("m:ItemChanges").child(change))
+    // (Only while the server still has the version the change was made on; without a key — a
+    // creation, or the owner's own choice over the server's copy — whatever version is there.)
+    operation
+        .attr("ConflictResolution", if change_key.trim().is_empty() { "AlwaysOverwrite" } else { "NeverOverwrite" })
+        .child(Element::new("m:ItemChanges").child(change))
 }
 
 fn default_folder(kind: Kind) -> &'static str {
@@ -1341,7 +1345,10 @@ pub fn update_event(fields: &mailcraft_model::remote::EventFields, id: &str, cha
     };
     Element::new("m:UpdateItem")
         .attr("SendMeetingInvitationsOrCancellations", if send { "SendToAllAndSaveCopy" } else { "SendToNone" })
-        .attr("ConflictResolution", "AlwaysOverwrite")
+        // (A change made on the version the server has goes only while it still has it: an older
+        // copy is a conflict, never put over. Without a key — a creation, or the owner's own
+        // choice over the server's copy — it is written whatever version is there.)
+        .attr("ConflictResolution", if change_key.trim().is_empty() { "AlwaysOverwrite" } else { "NeverOverwrite" })
         .child(Element::new("m:ItemChanges").child(Element::new("t:ItemChange").child(item_id).child(updates)))
 }
 
@@ -1448,6 +1455,14 @@ pub fn saved(reply: &Reply, operation: &str) -> Result<(String, String), Error> 
 /// Whether a `DeleteItem` answer says it was done.
 pub fn deleted(reply: &Reply) -> Result<(), Error> {
     let messages = reply.messages("DeleteItem")?;
+    let [message] = messages.as_slice() else { return Err(Error::Unexpected) };
+    message.ok().map(|_| ())
+}
+
+/// Whether an `UpdateItem` answer says it was done ([`saved`] needs an item in it, which an update
+/// the server gave nothing back for has not). A conflict or a refusal is the error it names.
+pub fn updated(reply: &Reply) -> Result<(), Error> {
+    let messages = reply.messages("UpdateItem")?;
     let [message] = messages.as_slice() else { return Err(Error::Unexpected) };
     message.ok().map(|_| ())
 }

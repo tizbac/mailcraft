@@ -123,10 +123,14 @@ pub fn specs() -> Vec<CommandSpec> {
 }
 
 /// Why the commands are out of reach, when they are: the feature is switched off, or no account
-/// has a calendar and contacts server.
+/// has a calendar and contacts server (or an Exchange server, whose conflicts are settled here).
 fn available(s: &Session) -> Option<&'static str> {
-    super::dav_account::switched_on(s)
-        .or_else(|| if s.mailbox.accounts.iter().any(|a| a.dav.is_some()) { None } else { Some("no account has a calendar and contacts server") })
+    // (An Exchange server's conflicts are settled here too, whether or not calendar and contacts
+    // servers are switched on.)
+    if s.mailbox.accounts.iter().any(|a| a.kind == mailcraft_model::AccountKind::Exchange || (a.dav.is_some() && s.dav_enabled)) {
+        return None;
+    }
+    super::dav_account::switched_on(s).or(Some("no account has a calendar and contacts server"))
 }
 
 /// What the server made of the events made here that the request gave it (#209 D6). Taken in only
@@ -243,6 +247,17 @@ fn also_changed(base: &Event, now: &Event) -> Vec<&'static str> {
     }
     if base.reminder_minutes != now.reminder_minutes {
         out.push("VALARM");
+    }
+    if base.recurrence != now.recurrence {
+        out.push("RRULE");
+    }
+    if base.exceptions != now.exceptions {
+        out.push("EXDATE");
+    }
+    if base.attendees != now.attendees {
+        // (Who is invited, and who organizes it: the server writes to them when it schedules.)
+        out.push("ATTENDEE");
+        out.push("ORGANIZER");
     }
     out
 }
@@ -508,7 +523,14 @@ fn resolve(s: &mut Session, v: &Value) -> CmdResult {
             return Err(failed!("no change of event {id} is waiting for you", id = event));
         };
         match keep.trim() {
-            "mine" => {}
+            "mine" => {
+                // (An Exchange server's change goes with the version it was made on, or with none
+                // at all when the owner chose this copy: `force`.)
+                if let Some(change) = s.mailbox.event_changes.iter_mut().find(|c| c.account == held.account && c.event == event) {
+                    change.force = true;
+                    change.retry_at = 0;
+                }
+            }
             "theirs" => {
                 s.mailbox.event_changes.retain(|c| !(c.account == held.account && c.event == event && c.kind == EventChangeKind::Update));
                 // (Its ETag here is the one the change was made on, not the server's: the next

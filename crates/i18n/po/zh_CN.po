@@ -497,15 +497,14 @@ msgid "A calendar server answered with errors, so some events may be out of date
 msgstr ""
 
 #. what a command says
-#: crates/mobile/src/jobs.rs
-msgid "A calendar server wouldn't sign in. Sign in again in the account's settings."
+#: crates/engine/src/cmd/calendar.rs
+msgid "A calendar server can't make a Teams meeting: say \"online\": false, or make it in a Microsoft account."
 msgstr ""
 
 #. what a command says
-#: crates/engine/src/cmd/calendar.rs
-#, fuzzy
-msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."
-msgstr "日历服务器上的日历可以从这里接受约会，但暂不接受会议：服务器可能会自行发送邀请。请将会议保留在此计算机上的日历中。"
+#: crates/mobile/src/jobs.rs
+msgid "A calendar server wouldn't sign in. Sign in again in the account's settings."
+msgstr ""
 
 #. what a command says
 #: crates/mobile/src/jobs.rs
@@ -692,6 +691,11 @@ msgstr "暂时无法从这里删除日历服务器上的会议：服务器可能
 msgid "A meeting on your calendar has this ID but another organizer, so this invitation can't change it."
 msgstr "您的日历中有同一 ID 但组织者不同的会议，因此此邀请无法更改该会议。"
 
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "A meeting somebody else organizes is answered or changed on the server: it can't be changed from here."
+msgstr ""
+
 #. interface
 #: crates/ui-egui/src/dialogs.rs
 #, fuzzy
@@ -709,11 +713,6 @@ msgstr "他人组织的会议只会从您的日历中移除，除非您选择拒
 #, fuzzy
 msgid "A meeting that repeats and skips some days can't be put on the server's calendar from here: everyone invited would get a cancellation for each skipped day. Keep it in a calendar on this computer, or make it again without the skipped days."
 msgstr "无法从这里将跳过部分日期的重复会议放到服务器日历中：所有受邀者都会收到每个跳过日期的取消通知。请将其保存在此计算机的日历中，或重新创建不跳过日期的会议。"
-
-#. what a command says
-#: crates/engine/src/cmd/remote.rs
-msgid "A meeting, or one day of a series, on a calendar server can't be changed from here yet: change it on the server."
-msgstr ""
 
 #. interface
 #: crates/ui-egui/src/reading/unsubscribe.rs
@@ -12319,9 +12318,8 @@ msgstr "在 Wayland 上，启用此选项后请重启 MailCraft。需要可用�
 
 #. what a command says
 #: crates/engine/src/cmd/remote.rs
-#, fuzzy
-msgid "On a calendar server only an appointment's title, time, location, description, reminder, categories and privacy can be changed from here yet: change the rest on the server."
-msgstr "在日历服务器上，目前只能从这里更改约会的标题、时间、地点、说明、提醒、类别和私密设置：其余内容请在服务器上更改。"
+msgid "On a calendar server only an appointment's title, time, place, description, reminder, categories, privacy, how it repeats and who is invited can be changed from here yet: change the rest on the server."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/forms.rs
@@ -12446,6 +12444,11 @@ msgstr ""
 #, fuzzy
 msgid "One day of a series on a calendar server can't be deleted from here yet: delete the whole series, or that day on the server."
 msgstr "暂时无法从这里删除日历服务器上定期系列中的某一天：请删除整个系列，或在服务器上删除那一天。"
+
+#. what a command says
+#: crates/engine/src/cmd/remote.rs
+msgid "One day of a series on a calendar server is changed on the server, not here."
+msgstr ""
 
 #. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
@@ -29043,6 +29046,14 @@ msgstr "−二进制"
 #, fuzzy
 msgid "−Lines"
 msgstr "−行"
+
+#, fuzzy
+#~ msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."
+#~ msgstr "日历服务器上的日历可以从这里接受约会，但暂不接受会议：服务器可能会自行发送邀请。请将会议保留在此计算机上的日历中。"
+
+#, fuzzy
+#~ msgid "On a calendar server only an appointment's title, time, location, description, reminder, categories and privacy can be changed from here yet: change the rest on the server."
+#~ msgstr "在日历服务器上，目前只能从这里更改约会的标题、时间、地点、说明、提醒、类别和私密设置：其余内容请在服务器上更改。"
 
 #, fuzzy
 #~ msgid "A series or a meeting on a calendar server can't be changed from here yet: change it on the server."

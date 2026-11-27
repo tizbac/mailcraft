@@ -28,7 +28,7 @@ use mailcraft_model::remote_tasks::{RemoteTask, RemoteTaskList, TaskOpKind, Task
 
 use crate::client::Client;
 use crate::directory::{self, Answer, Item, ItemUp, Kind};
-use crate::error::{Error, ResponseCode};
+use crate::error::ResponseCode;
 use crate::folder::{DistinguishedFolder, FindFolder, FolderInfo, GetFolder};
 use crate::http::HttpExchange;
 use crate::run::{Asked, Run, Stop, config_line, unreachable_line};
@@ -500,7 +500,7 @@ impl<E: HttpExchange> Run<'_, E> {
                 }
             }
             mailcraft_model::remote::EventChangeKind::Delete => {
-                let element = directory::delete_item(Kind::Calendar, &op.remote, "", op.cancel, false);
+                let element = directory::delete_item(Kind::Calendar, &op.remote, &op.change_key, op.cancel, false);
                 self.ask(&element, &|reply| directory::deleted(reply)).await.map(|()| (String::new(), String::new()))
             }
             mailcraft_model::remote::EventChangeKind::Create | mailcraft_model::remote::EventChangeKind::Update => {
@@ -535,8 +535,8 @@ impl<E: HttpExchange> Run<'_, E> {
                         other => other,
                     }
                 } else {
-                    let element = directory::update_event(&op.fields, &op.remote, "", op.send, zone);
-                    self.ask(&element, &|_reply| Ok::<_, Error>(())).await.map(|()| (String::new(), String::new()))
+                    let element = directory::update_event(&op.fields, &op.remote, &op.change_key, op.send, zone);
+                    self.ask(&element, &directory::updated).await.map(|()| (String::new(), String::new()))
                 }
             }
         };
@@ -555,6 +555,13 @@ impl<E: HttpExchange> Run<'_, E> {
             Err(Asked::Code(ResponseCode::ItemNotFound | ResponseCode::FolderNotFound)) => outcome.result = EventResult::Gone,
             Err(Asked::Code(ResponseCode::AccessDenied)) => outcome.result = EventResult::Denied,
             Err(Asked::Code(ResponseCode::ServerBusy)) => outcome.result = EventResult::Failed,
+            // (The copy changed since the version this was made on: never put over it. The engine
+            // holds it and the owner is asked which copy to keep.)
+            Err(Asked::Code(code)) if is_conflict(&code) => {
+                outcome.result = EventResult::Failed;
+                outcome.status = 412;
+                outcome.error = "the server's copy changed since".to_owned();
+            }
             Err(Asked::Stop(Stop::Busy(seconds))) => {
                 outcome.result = EventResult::Failed;
                 outcome.retry_after = Some(seconds.max(1));
@@ -599,7 +606,9 @@ impl<E: HttpExchange> Run<'_, E> {
                 if op.remote.is_empty() {
                     Err(Asked::Bad)
                 } else {
-                    let element = directory::delete_item(Kind::Contacts, &op.remote, "", false, false);
+                    // (The card's version, unless the owner chose this copy: `force`.)
+                    let key = if op.force { "" } else { op.etag.as_str() };
+                    let element = directory::delete_item(Kind::Contacts, &op.remote, key, false, false);
                     self.ask(&element, &|reply| directory::deleted(reply)).await.map(|()| (String::new(), String::new()))
                 }
             }
@@ -612,8 +621,9 @@ impl<E: HttpExchange> Run<'_, E> {
                 if op.remote.is_empty() {
                     Err(Asked::Bad)
                 } else {
-                    let element = directory::update_item(Kind::Contacts, &ItemUp::Contact(Box::new(contact)), &op.remote, "", false, "");
-                    self.ask(&element, &|_reply| Ok::<_, Error>(())).await.map(|()| (op.remote.clone(), String::new()))
+                    let key = if op.force { "" } else { op.etag.as_str() };
+                    let element = directory::update_item(Kind::Contacts, &ItemUp::Contact(Box::new(contact)), &op.remote, key, false, "");
+                    self.ask(&element, &directory::updated).await.map(|()| (op.remote.clone(), String::new()))
                 }
             }
         };
@@ -633,6 +643,12 @@ impl<E: HttpExchange> Run<'_, E> {
             Err(Asked::Stop(Stop::Busy(seconds))) => {
                 outcome.result = EventResult::Failed;
                 outcome.error = format!("the server is busy for {seconds} s");
+            }
+            // (The card changed since the version this was made on: never put over it.)
+            Err(Asked::Code(code)) if is_conflict(&code) => {
+                outcome.result = EventResult::Failed;
+                outcome.status = 412;
+                outcome.error = "the server's copy changed since".to_owned();
             }
             Err(Asked::Code(_)) => {
                 outcome.result = EventResult::Refused;
@@ -666,7 +682,7 @@ impl<E: HttpExchange> Run<'_, E> {
             }
             TaskOpKind::Update => {
                 let element = directory::update_task(&op.patch, &op.id, "");
-                self.ask(&element, &|_reply| Ok::<_, Error>(())).await.map(|()| (String::new(), String::new()))
+                self.ask(&element, &directory::updated).await.map(|()| (String::new(), String::new()))
             }
         };
         match result {
@@ -697,6 +713,16 @@ impl<E: HttpExchange> Run<'_, E> {
         }
         outcome
     }
+}
+
+/// Whether the server refused a change because its own copy changed since the version the change
+/// was made on: never put over it, and the owner is asked which copy to keep (`sync.davConflicts`).
+fn is_conflict(code: &ResponseCode) -> bool {
+    matches!(code, ResponseCode::Other(name)
+        if name == "ErrorIrresolvableConflict"
+            || name == "ErrorChangeKeyMismatch"
+            || name == "ErrorInvalidChangeKey"
+            || name == "ErrorItemNotSaved")
 }
 
 /// A safe phrase for a change whose answer couldn't be used: never any text the server wrote.

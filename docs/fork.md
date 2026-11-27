@@ -45,7 +45,8 @@ File › Info › Calendars and Contacts with Find) are the base. This fork adds
 | Calendar and contacts servers are **on** (the desktop too; `MAILCRAFT_DAV=0` turns them off) | `apps/mailcraft/src/main.rs` |
 | A Linchange account is **added with the calendar and contact homes its server names**, found at sign-in from the server's own mail host with the application password the approval made (desktop and phone) | `crates/net/src/dav_find.rs` (`find_linchange_homes`), `apps/mailcraft/src/main.rs` (`linchange_sign_in`), `crates/ui-egui/src/{account_setup.rs,lib.rs}` (`LinchangeApproval`), `crates/mobile/src/accounts.rs` |
 | The subscribed calendars section of File › Info lists each account's calendar server with Set Up…/Change…, opening the same Calendars and Contacts window | `crates/ui-egui/src/backstage.rs`, `dav_settings.rs` |
-| **Conflicts never overwrite the server's copy**: a change made here on a version the server has changed since is held, for a calendar or a contact, and File › Info › Calendars and Contacts asks which copy to keep ("Keep Mine" / "Keep the Server's"); a setting keeps both instead (the server's read, what changed here made as a copy of its own) | `crates/engine/src/cmd/dav_sync.rs` (`take_updated`, `keep_both`, `sync.davConflicts`, `sync.davResolve`), `crates/engine/src/cmd/remote.rs` (`apply_book_contact_outcomes`, `keep_both_contact`), `Prefs::dav_conflicts` (`file.options` `davConflicts`), `crates/ui-egui/src/dav_settings.rs` |
+| **Conflicts never overwrite the server's copy**: a change made here on a version the server has changed since is held, for a calendar or a contact, and File › Info › Calendars and Contacts asks which copy to keep ("Keep Mine" / "Keep the Server's"); a setting keeps both instead (the server's read, what changed here made as a copy of its own). The same holds for an Exchange server account (`ChangeKey` + `NeverOverwrite`, `directory::updated`) | `crates/engine/src/cmd/dav_sync.rs` (`take_updated`, `keep_both`, `sync.davConflicts`, `sync.davResolve`), `crates/engine/src/cmd/remote.rs` (`apply_event_outcomes`, `apply_book_contact_outcomes`, `keep_both_event`, `keep_both_contact`), `crates/ews/src/{directory_run.rs,directory.rs}` (`is_conflict`, `updated`, `ChangeKey`), `Prefs::dav_conflicts` (`file.options` `davConflicts`), `crates/ui-egui/src/dav_settings.rs` |
+| A repeating appointment on a calendar server is made, changed and deleted as a whole, its rule included, and a meeting made there goes up with who is invited (the server schedules it) once the owner says `send` | `crates/engine/src/cmd/remote.rs` (`dav_changeable`), `crates/engine/src/cmd/dav_sync.rs` (`also_changed`), `crates/engine/src/cmd/calendar.rs` (`create`) |
 
 Writes are conditional throughout (`If-Match` on a change or a deletion, `If-None-Match: *` on a
 create), so a server's newer copy is never put over; the tests are in
@@ -66,8 +67,12 @@ properties stay. A conflict is held and asked the same way as a calendar's
 The desktop keeps an Exchange server account's calendars, address books and to-do lists in step
 both ways: changes made here go up before the read (`crates/ews/src/directory_run.rs`), then the
 calendars, books and lists come down (`crates/engine/src/cmd/ews_directory.rs`,
-`crates/ui-egui/src/ews_calendar.rs`). This is upstream's, unmodified here: if a rebase changes it,
-keep it.
+`crates/ui-egui/src/ews_calendar.rs`). **Writes are conditional, as DAV's are**: an update or a
+deletion carries the `ChangeKey` the change was made on, with `ConflictResolution=NeverOverwrite`,
+so a copy the server changed since is answered `ErrorIrresolvableConflict`, never put over. The
+engine holds it and asks the owner which copy to keep, exactly as for DAV
+(`sync.davConflicts`, `sync.davResolve`, `Prefs::dav_conflicts`), and an update the server refused
+is no longer taken as done (`directory::updated`).
 
 ### Interface texts
 
@@ -86,6 +91,8 @@ grep -q 'find_linchange_homes' crates/net/src/dav_find.rs crates/mobile/src/acco
 grep -q 'LinchangeApproval' crates/ui-egui/src/account_setup.rs
 grep -q 'sync.davConflicts' crates/engine/src/cmd/dav_sync.rs
 grep -q 'dav_conflicts' crates/engine/src/session.rs
+grep -q 'ConflictResolution' crates/ews/src/directory.rs
+grep -q 'fn is_conflict' crates/ews/src/directory_run.rs
 grep -q 'fn push' crates/net/src/dav_contacts.rs
 grep -q 'pub mod patch' crates/vcard/src/lib.rs
 grep -q 'internal suspend fun syncAll' apps/mailcraft-android/app/src/main/kotlin/work/mailcraft/android/MailCraftApplication.kt
@@ -97,9 +104,9 @@ screen changed), and a signed APK into `dist/release/` as [android.md](android.m
 
 ## What this fork does not have yet
 
-- One day of a series on a calendar server cannot be changed from here: the whole series can
-  (made, changed, deleted), and that one day has to be changed on the server. A series' rule is
-  kept as it came, so how it repeats is changed on the server too.
+- One day of a series on a calendar server is changed on the server: a change here is refused
+  rather than made as an event only this computer would have. A Teams meeting (`online`) is
+  Microsoft's to make, never a calendar server's.
 
 ## Revision history
 

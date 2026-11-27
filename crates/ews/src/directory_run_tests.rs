@@ -151,3 +151,43 @@ fn a_task_patch_becomes_a_to_do() {
     assert_eq!(task.importance, Importance::Low);
     let _ = TaskFields::default();
 }
+
+/// An exchange that answers an `UpdateItem` with the conflict an EWS server gives when its copy
+/// changed since the version the change was made on.
+struct Conflicted;
+
+impl crate::http::HttpExchange for Conflicted {
+    fn exchange(&self, _request: &crate::http::HttpRequest) -> impl Future<Output = Result<crate::http::HttpResponse, crate::http::TransportError>> {
+        let body = crate::standin::response(
+            "UpdateItem",
+            "<m:UpdateItemResponseMessage ResponseClass=\"Error\"><m:MessageText>The change key is wrong.</m:MessageText><m:ResponseCode>ErrorIrresolvableConflict</m:ResponseCode></m:UpdateItemResponseMessage>",
+        );
+        ready(Ok(crate::http::HttpResponse::new(200, body.into_bytes())))
+    }
+}
+
+#[test]
+fn an_exchange_conflict_is_never_put_over_and_is_told_as_one() {
+    let client = crate::Client::new("http://127.0.0.1/EWS/Exchange.asmx", crate::Secret::new("test")).unwrap();
+    let op = EventOp {
+        kind: EventChangeKind::Update,
+        event: 7,
+        remote: "ID1".into(),
+        change_key: "\"ck1\"".into(),
+        fields: EventFields { title: Some("Geändert".into()), ..Default::default() },
+        ..Default::default()
+    };
+    let request = mailcraft_model::sync::EwsDirectoryRequest {
+        account: 1,
+        email: "ada@example.org".into(),
+        url: "http://127.0.0.1/EWS/Exchange.asmx".into(),
+        changes: Some(mailcraft_model::remote::EventsUpload { account: 1, email: "ada@example.org".into(), ops: vec![op], ..Default::default() }),
+        ..Default::default()
+    };
+    let cancel = std::sync::atomic::AtomicBool::new(false);
+    let result = crate::standin::block_on(sync_directory(&client, &Conflicted, &request, &cancel, &mut |_| true)).unwrap();
+    let outcome = result.uploaded.as_ref().expect("an answer").outcomes[0].clone();
+    assert_eq!(outcome.result, mailcraft_model::remote::EventResult::Failed);
+    assert_eq!(outcome.status, 412, "the engine holds it and asks the owner");
+    assert!(outcome.error.contains("changed since"), "{}", outcome.error);
+}
