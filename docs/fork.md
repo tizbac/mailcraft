@@ -47,6 +47,7 @@ File › Info › Calendars and Contacts with Find) are the base. This fork adds
 | The subscribed calendars section of File › Info lists each account's calendar server with Set Up…/Change…, opening the same Calendars and Contacts window | `crates/ui-egui/src/backstage.rs`, `dav_settings.rs` |
 | **Conflicts never overwrite the server's copy**: a change made here on a version the server has changed since is held, for a calendar or a contact, and File › Info › Calendars and Contacts asks which copy to keep ("Keep Mine" / "Keep the Server's"); a setting keeps both instead (the server's read, what changed here made as a copy of its own). The same holds for an Exchange server account (`ChangeKey` + `NeverOverwrite`, `directory::updated`) | `crates/engine/src/cmd/dav_sync.rs` (`take_updated`, `keep_both`, `sync.davConflicts`, `sync.davResolve`), `crates/engine/src/cmd/remote.rs` (`apply_event_outcomes`, `apply_book_contact_outcomes`, `keep_both_event`, `keep_both_contact`), `crates/ews/src/{directory_run.rs,directory.rs}` (`is_conflict`, `updated`, `ChangeKey`), `Prefs::dav_conflicts` (`file.options` `davConflicts`), `crates/ui-egui/src/dav_settings.rs` |
 | A repeating appointment on a calendar server is made, changed and deleted as a whole, its rule included, and a meeting made there goes up with who is invited (the server schedules it) once the owner says `send` | `crates/engine/src/cmd/remote.rs` (`dav_changeable`), `crates/engine/src/cmd/dav_sync.rs` (`also_changed`), `crates/engine/src/cmd/calendar.rs` (`create`) |
+| **One day of a series** is changed or skipped in the series' own document: a `VEVENT` of the series' `UID` with a `RECURRENCE-ID` of the day's original start, or an `EXDATE` on the master; every other line of the document is kept | `crates/ical/src/patch_occurrence.rs`, `crates/engine/src/cmd/dav_sync.rs` (`updates`, `take_updated`) |
 
 Writes are conditional throughout (`If-Match` on a change or a deletion, `If-None-Match: *` on a
 create), so a server's newer copy is never put over; the tests are in
@@ -104,9 +105,10 @@ screen changed), and a signed APK into `dist/release/` as [android.md](android.m
 
 ## What this fork does not have yet
 
-- One day of a series on a calendar server is changed on the server: a change here is refused
-  rather than made as an event only this computer would have. A Teams meeting (`online`) is
-  Microsoft's to make, never a calendar server's.
+- A Teams meeting (`online`) is Microsoft's to make, never a calendar server's.
+- A series' exception is written into the document the server sent; a mailbox without the
+  documents kept (no file, or let go of for room) leaves the day's change waiting for the read
+  that brings it (`sync.davRequest`), as for any change written into a document.
 
 ## Revision history
 

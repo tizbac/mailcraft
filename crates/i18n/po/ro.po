@@ -679,12 +679,6 @@ msgstr "O întâlnire nu poate fi mutată în calendarul altei cutii poștale: t
 msgid "A meeting is forwarded to {n} people at most at once."
 msgstr "O întâlnire se redirecționează către cel mult {n} persoane odată."
 
-#. what a command says
-#: crates/engine/src/cmd/calendar.rs
-#, fuzzy
-msgid "A meeting on a calendar server can't be deleted from here yet: the server could send cancellations by itself."
-msgstr "O ședință de pe un server de calendare nu poate fi încă ștearsă de aici: serverul ar putea trimite singur anulări."
-
 #. interface
 #: crates/ui-egui/src/reading/invitation.rs
 #, fuzzy
@@ -12480,22 +12474,6 @@ msgid "Once the server has taken it, MailCraft keeps it in your system's credent
 msgstr ""
 
 #. what a command says
-#: crates/engine/src/cmd/calendar.rs
-msgid "One day of a series on a calendar server can't be changed from here yet: change the whole series, or that day on the server."
-msgstr ""
-
-#. what a command says
-#: crates/engine/src/cmd/calendar.rs
-#, fuzzy
-msgid "One day of a series on a calendar server can't be deleted from here yet: delete the whole series, or that day on the server."
-msgstr "O zi dintr-o serie de pe un server de calendare nu poate fi încă ștearsă de aici: ștergeți toată seria sau acea zi pe server."
-
-#. what a command says
-#: crates/engine/src/cmd/remote.rs
-msgid "One day of a series on a calendar server is changed on the server, not here."
-msgstr ""
-
-#. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
 #, fuzzy
 msgid "One occurrence of a series can't be in another calendar than the rest of the series."
@@ -17340,6 +17318,11 @@ msgstr "Altcineva"
 #, fuzzy
 msgid "Somebody else organizes this meeting: it stays in the calendar its invitation came to."
 msgstr "Altcineva organizează această întâlnire: rămâne în calendarul în care a sosit invitația."
+
+#. what a command says
+#: crates/engine/src/cmd/calendar.rs
+msgid "Somebody else's meeting is called off on the server: it can't be deleted from here."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/calendar_sync.rs
@@ -29432,6 +29415,14 @@ msgstr "−Bin"
 #, fuzzy
 msgid "−Lines"
 msgstr "−Linii"
+
+#, fuzzy
+#~ msgid "A meeting on a calendar server can't be deleted from here yet: the server could send cancellations by itself."
+#~ msgstr "O ședință de pe un server de calendare nu poate fi încă ștearsă de aici: serverul ar putea trimite singur anulări."
+
+#, fuzzy
+#~ msgid "One day of a series on a calendar server can't be deleted from here yet: delete the whole series, or that day on the server."
+#~ msgstr "O zi dintr-o serie de pe un server de calendare nu poate fi încă ștearsă de aici: ștergeți toată seria sau acea zi pe server."
 
 #, fuzzy
 #~ msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."

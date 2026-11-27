@@ -679,12 +679,6 @@ msgstr "无法将会议移动到其他邮箱的日历：这会向所有受邀者
 msgid "A meeting is forwarded to {n} people at most at once."
 msgstr "一次最多将会议转发给 {n} 人。"
 
-#. what a command says
-#: crates/engine/src/cmd/calendar.rs
-#, fuzzy
-msgid "A meeting on a calendar server can't be deleted from here yet: the server could send cancellations by itself."
-msgstr "暂时无法从这里删除日历服务器上的会议：服务器可能会自行发送取消通知。"
-
 #. interface
 #: crates/ui-egui/src/reading/invitation.rs
 #, fuzzy
@@ -12435,22 +12429,6 @@ msgid "Once the server has taken it, MailCraft keeps it in your system's credent
 msgstr ""
 
 #. what a command says
-#: crates/engine/src/cmd/calendar.rs
-msgid "One day of a series on a calendar server can't be changed from here yet: change the whole series, or that day on the server."
-msgstr ""
-
-#. what a command says
-#: crates/engine/src/cmd/calendar.rs
-#, fuzzy
-msgid "One day of a series on a calendar server can't be deleted from here yet: delete the whole series, or that day on the server."
-msgstr "暂时无法从这里删除日历服务器上定期系列中的某一天：请删除整个系列，或在服务器上删除那一天。"
-
-#. what a command says
-#: crates/engine/src/cmd/remote.rs
-msgid "One day of a series on a calendar server is changed on the server, not here."
-msgstr ""
-
-#. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
 #, fuzzy
 msgid "One occurrence of a series can't be in another calendar than the rest of the series."
@@ -17281,6 +17259,11 @@ msgstr "别人"
 #, fuzzy
 msgid "Somebody else organizes this meeting: it stays in the calendar its invitation came to."
 msgstr "此会议由其他人组织，会保留在收到邀请的日历中。"
+
+#. what a command says
+#: crates/engine/src/cmd/calendar.rs
+msgid "Somebody else's meeting is called off on the server: it can't be deleted from here."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/calendar_sync.rs
@@ -29046,6 +29029,14 @@ msgstr "−二进制"
 #, fuzzy
 msgid "−Lines"
 msgstr "−行"
+
+#, fuzzy
+#~ msgid "A meeting on a calendar server can't be deleted from here yet: the server could send cancellations by itself."
+#~ msgstr "暂时无法从这里删除日历服务器上的会议：服务器可能会自行发送取消通知。"
+
+#, fuzzy
+#~ msgid "One day of a series on a calendar server can't be deleted from here yet: delete the whole series, or that day on the server."
+#~ msgstr "暂时无法从这里删除日历服务器上定期系列中的某一天：请删除整个系列，或在服务器上删除那一天。"
 
 #, fuzzy
 #~ msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."

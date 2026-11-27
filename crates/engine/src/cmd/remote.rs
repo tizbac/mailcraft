@@ -285,7 +285,7 @@ fn zones_from_remote(start: &str, end: &str, at: (Timestamp, Timestamp), repeats
 
 /// The day of `series` that an occurrence at `instant` is, as the series names its days
 /// ([`mailcraft_model::zoned`]): for a series that repeats in a zone of its own, by that zone.
-fn series_day_at(series: &Event, instant: Timestamp, offset_at: &dyn Fn(Timestamp) -> i32) -> Date {
+pub(crate) fn series_day_at(series: &Event, instant: Timestamp, offset_at: &dyn Fn(Timestamp) -> i32) -> Date {
     if series.all_day { occurrence_day(true, instant, offset_at) } else { series.occurrence_day(instant, offset_at) }
 }
 
@@ -941,9 +941,6 @@ pub fn dav_addable(mailbox: &Mailbox, calendar: Id) -> bool {
 pub(crate) fn dav_changeable(before: &Event, after: &Event) -> Result<(), CmdError> {
     if before.origin.guest {
         return Err(fail("A meeting somebody else organizes is answered or changed on the server: it can't be changed from here."));
-    }
-    if !before.origin.series.is_empty() {
-        return Err(fail("One day of a series on a calendar server is changed on the server, not here."));
     }
     let mut same = after.clone();
     (same.title, same.location, same.description) = (before.title.clone(), before.location.clone(), before.description.clone());

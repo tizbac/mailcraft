@@ -573,11 +573,6 @@ msgstr ""
 msgid "A meeting is forwarded to {n} people at most at once."
 msgstr ""
 
-#. what a command says
-#: crates/engine/src/cmd/calendar.rs
-msgid "A meeting on a calendar server can't be deleted from here yet: the server could send cancellations by itself."
-msgstr ""
-
 #. interface
 #: crates/ui-egui/src/reading/invitation.rs
 msgid "A meeting on your calendar has this ID but another organizer, so this invitation can't change it."
@@ -10448,21 +10443,6 @@ msgid "Once the server has taken it, MailCraft keeps it in your system's credent
 msgstr ""
 
 #. what a command says
-#: crates/engine/src/cmd/calendar.rs
-msgid "One day of a series on a calendar server can't be changed from here yet: change the whole series, or that day on the server."
-msgstr ""
-
-#. what a command says
-#: crates/engine/src/cmd/calendar.rs
-msgid "One day of a series on a calendar server can't be deleted from here yet: delete the whole series, or that day on the server."
-msgstr ""
-
-#. what a command says
-#: crates/engine/src/cmd/remote.rs
-msgid "One day of a series on a calendar server is changed on the server, not here."
-msgstr ""
-
-#. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
 msgid "One occurrence of a series can't be in another calendar than the rest of the series."
 msgstr ""
@@ -14498,6 +14478,11 @@ msgstr ""
 #. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
 msgid "Somebody else organizes this meeting: it stays in the calendar its invitation came to."
+msgstr ""
+
+#. what a command says
+#: crates/engine/src/cmd/calendar.rs
+msgid "Somebody else's meeting is called off on the server: it can't be deleted from here."
 msgstr ""
 
 #. interface

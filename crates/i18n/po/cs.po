@@ -677,12 +677,6 @@ msgstr "Schůzku nelze přesunout do kalendáře jiné poštovní schránky: vš
 msgid "A meeting is forwarded to {n} people at most at once."
 msgstr "Schůzka se najednou přeposílá nejvýše {n} lidem."
 
-#. what a command says
-#: crates/engine/src/cmd/calendar.rs
-#, fuzzy
-msgid "A meeting on a calendar server can't be deleted from here yet: the server could send cancellations by itself."
-msgstr "Poradu na kalendářovém serveru zatím odsud nelze smazat: server by mohl sám rozesílat zrušení."
-
 #. interface
 #: crates/ui-egui/src/reading/invitation.rs
 #, fuzzy
@@ -12464,22 +12458,6 @@ msgid "Once the server has taken it, MailCraft keeps it in your system's credent
 msgstr ""
 
 #. what a command says
-#: crates/engine/src/cmd/calendar.rs
-msgid "One day of a series on a calendar server can't be changed from here yet: change the whole series, or that day on the server."
-msgstr ""
-
-#. what a command says
-#: crates/engine/src/cmd/calendar.rs
-#, fuzzy
-msgid "One day of a series on a calendar server can't be deleted from here yet: delete the whole series, or that day on the server."
-msgstr "Jeden den opakované události na kalendářovém serveru zatím odsud nelze smazat: smažte celou řadu, nebo ten den na serveru."
-
-#. what a command says
-#: crates/engine/src/cmd/remote.rs
-msgid "One day of a series on a calendar server is changed on the server, not here."
-msgstr ""
-
-#. what a command says
 #: crates/engine/src/cmd/calendar/meeting.rs
 #, fuzzy
 msgid "One occurrence of a series can't be in another calendar than the rest of the series."
@@ -17317,6 +17295,11 @@ msgstr "Někdo jiný"
 #, fuzzy
 msgid "Somebody else organizes this meeting: it stays in the calendar its invitation came to."
 msgstr "Tuto schůzku organizuje někdo jiný: zůstává v kalendáři, do kterého přišla její pozvánka."
+
+#. what a command says
+#: crates/engine/src/cmd/calendar.rs
+msgid "Somebody else's meeting is called off on the server: it can't be deleted from here."
+msgstr ""
 
 #. interface
 #: crates/ui-egui/src/calendar_sync.rs
@@ -29403,6 +29386,14 @@ msgstr "−Binární"
 #, fuzzy
 msgid "−Lines"
 msgstr "−Řádky"
+
+#, fuzzy
+#~ msgid "A meeting on a calendar server can't be deleted from here yet: the server could send cancellations by itself."
+#~ msgstr "Poradu na kalendářovém serveru zatím odsud nelze smazat: server by mohl sám rozesílat zrušení."
+
+#, fuzzy
+#~ msgid "One day of a series on a calendar server can't be deleted from here yet: delete the whole series, or that day on the server."
+#~ msgstr "Jeden den opakované události na kalendářovém serveru zatím odsud nelze smazat: smažte celou řadu, nebo ten den na serveru."
 
 #, fuzzy
 #~ msgid "A calendar server's calendar takes appointments from here, not meetings yet: the server could send invitations by itself. Keep the meeting in a calendar on this computer."

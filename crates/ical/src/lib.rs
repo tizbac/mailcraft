@@ -24,6 +24,7 @@
 
 mod lines;
 mod patch;
+mod patch_occurrence;
 mod read;
 mod rrule;
 #[cfg(test)]
@@ -40,6 +41,7 @@ use mailcraft_model::{Event, Task};
 use mailcraft_time::Timestamp;
 
 pub use patch::patch_event;
+pub use patch_occurrence::patch_occurrence;
 pub use read::{parse, parse_events};
 pub use rrule::{format_rrule, parse_rrule};
 pub use write::{write, write_in};

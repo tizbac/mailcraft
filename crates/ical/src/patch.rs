@@ -4,6 +4,10 @@
 //! only the properties MailCraft changes are replaced; every other line of the document (alarms,
 //! attachments, another program's own properties, the zones it names) is kept as it came, folded
 //! as it came (RFC 5545 section 3.1).
+//!
+//! [`patch_occurrence`](crate::patch_occurrence) is the same for one day of a series: the exception is a `VEVENT` of the
+//! series' own `UID` with a `RECURRENCE-ID` of the day's original start, and a day the series no
+//! longer has is an `EXDATE` on the master.
 
 /// The properties of the event that are written anew: what the owner can change from here, and
 /// the stamps of a change.
@@ -13,12 +17,12 @@ const REPLACED: [&str; 8] = ["SUMMARY", "LOCATION", "DESCRIPTION", "DTSTART", "D
 const MAX_LINES: usize = 100_000;
 
 /// One content line with the lines folded into it, as they came, and its name in upper case.
-struct Group<'a> {
-    lines: Vec<&'a str>,
-    name: String,
+pub(crate) struct Group<'a> {
+    pub(crate) lines: Vec<&'a str>,
+    pub(crate) name: String,
 }
 
-fn groups(doc: &str) -> Option<Vec<Group<'_>>> {
+pub(crate) fn groups(doc: &str) -> Option<Vec<Group<'_>>> {
     let mut out: Vec<Group<'_>> = Vec::new();
     for (n, line) in doc.split('\n').enumerate() {
         if n >= MAX_LINES {
@@ -40,12 +44,12 @@ fn groups(doc: &str) -> Option<Vec<Group<'_>>> {
 }
 
 /// The value of a group's first line after its name and parameters (`BEGIN:VEVENT` → `VEVENT`).
-fn value<'a>(g: &Group<'a>) -> &'a str {
+pub(crate) fn value<'a>(g: &Group<'a>) -> &'a str {
     g.lines.first().and_then(|l| l.split_once(':')).map(|(_, v)| v.trim()).unwrap_or_default()
 }
 
 /// The components a document's groups are in, for each group: the path of `BEGIN`s it is under.
-fn paths(groups: &[Group<'_>]) -> Option<Vec<Vec<String>>> {
+pub(crate) fn paths(groups: &[Group<'_>]) -> Option<Vec<Vec<String>>> {
     let mut stack: Vec<String> = Vec::new();
     let mut out = Vec::with_capacity(groups.len());
     for g in groups {

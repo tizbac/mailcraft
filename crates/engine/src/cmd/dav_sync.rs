@@ -202,21 +202,54 @@ fn deletes(s: &Session, account: Id, collections: &[DavAskCollection]) -> Vec<Da
 }
 
 /// The events of the account's calendar servers changed here (#209 D6), each as the server's own
-/// document with what changed written into it ([`mailcraft_ical::patch_event`]), to be put over
-/// the resource only while it has the ETag the change was made on; [`MAX_EVENT_OPS`] at most.
+/// document with what changed written into it ([`mailcraft_ical::patch_event`], or
+/// [`mailcraft_ical::patch_occurrence`] for one day of a series), to be put over the resource only
+/// while it has the ETag the change was made on; [`MAX_EVENT_OPS`] at most.
 // shortcut: a change whose document isn't kept here (no mailbox file, or let go of for room) waits;
 // read the document from the server first when that is seen to happen.
 fn updates(s: &Session, account: Id, collections: &[DavAskCollection]) -> Vec<DavUpdate> {
     let Some(file) = s.path.as_deref() else { return Vec::new() };
     let now = s.now();
+    let offset_at = super::remote::offset_of(s);
     let mut out = Vec::new();
-    for change in s.mailbox.event_changes.iter().filter(|c| c.account == account && c.kind == EventChangeKind::Update && c.retry_at <= now) {
+    let due = |c: &mailcraft_model::remote::EventChange| {
+        c.account == account
+            && c.retry_at <= now
+            && (c.kind == EventChangeKind::Update || (c.kind == EventChangeKind::Delete && !c.series.is_empty()))
+    };
+    for change in s.mailbox.event_changes.iter().filter(|c| due(c)) {
         if out.len() >= MAX_EVENT_OPS {
             break;
         }
         // (A change the server's copy changed under is not sent again until the owner says which
         // copy to keep: `sync.davConflicts`.)
         if s.dav_conflicts.contains_key(&change.event) {
+            continue;
+        }
+        if change.of_occurrence() {
+            // One day of a series: the resource is the series', and the day is an exception in
+            // its own document (or an `EXDATE` when the day is gone).
+            let href = change.series.clone();
+            let Some(collection) = collections.iter().find(|c| within(&c.href, &href)) else { continue };
+            let Some(series) = s.mailbox.events.values().find(|e| e.origin.account == account && e.origin.id == href) else { continue };
+            let etag = change
+                .base
+                .as_deref()
+                .map(|b| b.origin.change_key.clone())
+                .filter(|key| !key.is_empty())
+                .unwrap_or_else(|| series.origin.change_key.clone());
+            if etag.is_empty() {
+                continue;
+            }
+            let Some(raw) = raw::read(file, account, &href) else { continue };
+            let was = change.base.as_deref().cloned().unwrap_or_else(|| {
+                let day = super::remote::series_day_at(series, change.occurrence, &offset_at);
+                super::remote::occurrence_in(series, day, &offset_at)
+            });
+            let one = if change.kind == EventChangeKind::Update { s.mailbox.event(change.event).cloned() } else { None };
+            let opts = mailcraft_ical::WriteOptions { method: String::new(), now };
+            let Some(body) = mailcraft_ical::patch_occurrence(&raw, &was, one.as_ref(), &offset_at, &opts, Some(s.zone())) else { continue };
+            out.push(DavUpdate { collection: collection.href.clone(), href, etag, body });
             continue;
         }
         let Some(event) = s.mailbox.event(change.event).filter(|e| e.origin.id == change.remote) else { continue };
@@ -295,7 +328,16 @@ fn keep_both(s: &mut Session, account: Id, at: usize, took: &mut Took) -> bool {
 fn take_updated(s: &mut Session, account: Id, updated: &[DavUpdated], offset_at: &dyn Fn(i64) -> i32, took: &mut Took) -> bool {
     let mut changed = false;
     for answer in updated.iter().take(MAX_EVENT_OPS) {
-        let at = s.mailbox.event_changes.iter().position(|c| c.account == account && c.kind == EventChangeKind::Update && c.remote == answer.href);
+        // (A day of a series is sent against the series' resource, so an answer about it names
+        // that resource while the change names no resource of its own.)
+        let at = s.mailbox.event_changes.iter().position(|c| {
+            c.account == account
+                && match c.kind {
+                    EventChangeKind::Update => c.remote == answer.href || (c.remote.is_empty() && !c.series.is_empty() && c.series == answer.href),
+                    EventChangeKind::Delete => c.remote.is_empty() && !c.series.is_empty() && c.series == answer.href,
+                    _ => false,
+                }
+        });
         let Some(at) = at else { continue };
         if answer.outcome == DavPutOver::NotNow {
             continue;
@@ -328,7 +370,7 @@ fn take_updated(s: &mut Session, account: Id, updated: &[DavUpdated], offset_at:
             took.reread.push(answer.href.clone());
         }
         if answer.outcome == DavPutOver::Refused
-            && let Some(base) = change.base
+            && let Some(base) = change.base.clone()
             && let Ok(e) = s.mailbox.event_mut(change.event)
             && e.origin.id == answer.href
         {
@@ -344,6 +386,16 @@ fn take_updated(s: &mut Session, account: Id, updated: &[DavUpdated], offset_at:
             let origin = e.origin.clone();
             if answer.outcome == DavPutOver::Done {
                 changed_while_out(s, account, change.event, origin, offset_at);
+            }
+        }
+        // (A day of a series: the series' document changed on the server, so the series and the
+        // day are read again, which brings the exception as the server keeps it.)
+        if change.of_occurrence() {
+            let series = s.mailbox.events.values().find(|e| e.origin.account == account && e.origin.id == change.series).map(|e| e.id);
+            for id in series.into_iter().chain(std::iter::once(change.event)) {
+                if let Ok(e) = s.mailbox.event_mut(id) {
+                    e.origin.change_key.clear();
+                }
             }
         }
         s.dav_sent.remove(&change.event);

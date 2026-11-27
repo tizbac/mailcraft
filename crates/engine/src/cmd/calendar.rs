@@ -135,18 +135,18 @@ fn may_alter(s: &Session, e: &Event) -> Result<(), CmdError> {
 }
 
 /// The event to delete when it is in a calendar of a calendar server that may be written to (#209
-/// D6): a whole event or series, not one day of it, and not a meeting (its server could send the
-/// cancellations by itself). `None` for any other event, which [`changing`] looks at.
+/// D6): a whole event or series, not one day of it (that is the series' own document, and the
+/// general path notes it), nor somebody else's meeting (the organizer's to call off). `None` for
+/// any other event, which [`changing`] looks at.
 fn dav_deleting(s: &Session, v: &Value) -> Result<Option<Event>, CmdError> {
     let id = target(s, v)?;
     let Some(e) = s.mailbox.event(id).filter(|e| remote::dav_addable(&s.mailbox, e.calendar)).cloned() else { return Ok(None) };
+    // (One day of a series is an `EXDATE` in the series' resource: `note_occurrence_gone`.)
     if p::date(v, "occurrence")?.is_some() || !e.origin.series.is_empty() {
-        return Err(fail(
-            "One day of a series on a calendar server can't be deleted from here yet: delete the whole series, or that day on the server.",
-        ));
+        return Ok(None);
     }
-    if !e.attendees.is_empty() || e.origin.guest {
-        return Err(fail("A meeting on a calendar server can't be deleted from here yet: the server could send cancellations by itself."));
+    if e.origin.guest {
+        return Err(fail("Somebody else's meeting is called off on the server: it can't be deleted from here."));
     }
     Ok(Some(e))
 }
@@ -610,13 +610,6 @@ fn may_change(s: &Session, v: &Value, before: &Event, e: &Event) -> Result<bool,
 /// the change would leave it; the occurrence is changed by as much (an hour later, another
 /// title), on its own day.
 fn change_one(s: &mut Session, v: &Value, series: &Event, day: Date, changed: Event) -> CmdResult {
-    // (One day of a calendar server's series is another resource, which this version doesn't
-    // write: refused before anything is made.)
-    if remote::dav_addable(&s.mailbox, series.calendar) {
-        return Err(fail(
-            "One day of a series on a calendar server can't be changed from here yet: change the whole series, or that day on the server.",
-        ));
-    }
     if !happens_on(s, series, day) {
         return Err(failed!("the series doesn't happen on {date}", date = day.iso()));
     }

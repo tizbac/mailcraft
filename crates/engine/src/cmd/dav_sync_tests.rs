@@ -1158,16 +1158,30 @@ fn a_deletion_the_server_kept_is_given_up_and_the_calendar_is_read_whole_again()
 }
 
 #[test]
-fn one_day_of_a_series_or_a_meeting_on_the_server_is_not_changed_from_here() {
-    let (mut s, id, _) = theirs();
-    let series = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:s\r\nDTSTART:20261123T100000Z\r\nDTEND:20261123T110000Z\r\nRRULE:FREQ=DAILY;COUNT=5\r\nSUMMARY:Serie\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
-    apply(&mut s, id, None, vec![read(vec![change("s.ics", "\"8\"", series)], false, true, "t3")]);
-    let serie = s.mailbox.events.values().find(|e| e.title == "Serie").unwrap().id;
-    assert!(s.run("calendar.delete", &json!({"id": serie, "occurrence": "2026-11-24"})).is_err());
-    assert!(deletes(&mut s, id).is_empty());
-    // The series as a whole is changed from here; one of its days is not.
-    assert!(s.run("calendar.edit", &json!({"id": serie, "title": "Anders"})).is_ok());
-    assert!(s.run("calendar.edit", &json!({"id": serie, "title": "Noch anders", "scope": "occurrence", "occurrence": "2026-11-24"})).is_err());
+fn one_day_of_a_series_is_changed_and_skipped_in_the_series_own_document() {
+    let (mut s, id, serie, dir) = series_kept("one-day");
+    // The series repeats every week from the 22nd: the 29th is one of its days, changed here.
+    s.run("calendar.edit", &json!({"id": serie, "title": "Anders", "scope": "occurrence", "occurrence": "2026-11-29"})).unwrap();
+    let up = updates(&mut s, id);
+    assert_eq!(up.len(), 1, "the day goes up");
+    assert_eq!(up[0].href, format!("{COLLECTION}a.ics"), "against the series' resource");
+    assert!(up[0].body.contains("RECURRENCE-ID:20261129T100000Z"), "the day it replaces:\n{}", up[0].body);
+    assert!(up[0].body.contains("SUMMARY:Anders"), "{}", up[0].body);
+    assert!(up[0].body.contains("RRULE:FREQ=WEEKLY;COUNT=4"), "the series stays:\n{}", up[0].body);
+    // The server takes it: nothing more waits, and the series is read again (which gives the
+    // document the ETag the next change goes with).
+    update_answer(&mut s, id, mailcraft_model::DavPutOver::Done);
+    assert!(updates(&mut s, id).is_empty());
+    let doc = event("a", 22, "Wöchentlich").replace("DTSTART:", "RRULE:FREQ=WEEKLY;COUNT=4\r\nDTSTART:");
+    apply(&mut s, id, None, vec![read(vec![change("a.ics", "\"9\"", &doc)], false, true, "t2")]);
+    // A day the series no longer has is an `EXDATE` on the master.
+    s.run("calendar.delete", &json!({"id": serie, "occurrence": "2026-12-06"})).unwrap();
+    let up = updates(&mut s, id);
+    assert_eq!(up.len(), 1, "the skipped day goes up");
+    assert_eq!(up[0].etag, "\"9\"", "over the document as it is now");
+    assert!(up[0].body.contains("EXDATE:20261206T100000Z"), "{}", up[0].body);
+    assert!(up[0].body.contains("RRULE:FREQ=WEEKLY;COUNT=4"));
+    let _ = std::fs::remove_dir_all(dir);
 }
 
 /// A server event with what MailCraft doesn't read, in a writable calendar, read in with a
